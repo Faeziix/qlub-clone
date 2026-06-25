@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import {
   updateVendorSettings,
   type VendorSettingsInput,
-} from "@/app/admin/settings/actions";
+} from "@/app/[locale]/admin/settings/actions";
 
 type FormState = {
   name: string;

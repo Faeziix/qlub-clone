@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireSession } from "@/app/admin/actions";
+import { requireSession } from "@/app/[locale]/admin/actions";
 
 import { TableStatus } from "@prisma/client";
 

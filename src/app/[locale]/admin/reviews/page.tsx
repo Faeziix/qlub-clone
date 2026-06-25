@@ -1,5 +1,5 @@
 import { Star, Utensils, ConciergeBell, Sparkles } from "lucide-react";
-import { requireSession } from "@/app/admin/actions";
+import { requireSession } from "@/app/[locale]/admin/actions";
 import { db } from "@/lib/db";
 import { PageHeader, Card, StatCard } from "@/components/admin/ui";
 import { StarRating } from "@/components/ui/StarRating";

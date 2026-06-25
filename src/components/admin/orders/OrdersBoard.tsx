@@ -13,7 +13,7 @@ import { Card, StatusPill, EmptyRow } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { formatMoney, timeAgo, parseJSON, cn } from "@/lib/utils";
-import { updateOrderStatus, cancelOrder } from "@/app/admin/orders/actions";
+import { updateOrderStatus, cancelOrder } from "@/app/[locale]/admin/orders/actions";
 
 // --- Types -------------------------------------------------------------------
 

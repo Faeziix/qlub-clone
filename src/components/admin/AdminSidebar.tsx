@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
-import { logout } from "@/app/admin/actions";
+import { logout } from "@/app/[locale]/admin/actions";
 
 const nav = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },

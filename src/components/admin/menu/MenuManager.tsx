@@ -24,7 +24,7 @@ import {
   updateItem,
   createItem,
   deleteItem,
-} from "@/app/admin/menu/actions";
+} from "@/app/[locale]/admin/menu/actions";
 
 /* ---------- Serializable types shared with the server page ---------- */
 

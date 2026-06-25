@@ -188,10 +188,10 @@ describe("JSONB write-path: admin createItem tags must be native array not JSON 
     expect(typeof wrongWrite).toBe("string");
   });
 
-  it("src/app/admin/menu/actions.ts createItem does NOT use tags string literal", async () => {
+  it("src/app/[locale]/admin/menu/actions.ts createItem does NOT use tags string literal", async () => {
     const { readFileSync } = await import("fs");
     const actionsSource = readFileSync(
-      new URL("../src/app/admin/menu/actions.ts", import.meta.url),
+      new URL("../src/app/[locale]/admin/menu/actions.ts", import.meta.url),
       "utf-8"
     );
     expect(actionsSource).not.toContain('tags: "[]"');

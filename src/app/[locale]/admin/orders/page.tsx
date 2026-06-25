@@ -5,7 +5,7 @@ import {
   Flame,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { requireSession } from "@/app/admin/actions";
+import { requireSession } from "@/app/[locale]/admin/actions";
 import { PageHeader, StatCard } from "@/components/admin/ui";
 import { formatMoney } from "@/lib/utils";
 import { bigintToNumber } from "@/lib/money";

@@ -47,7 +47,6 @@ export function MenuExperience({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply theme + direction at the document root for full-page theming.
   React.useEffect(() => {
     const root = document.documentElement;
     root.classList.remove(
@@ -58,8 +57,7 @@ export function MenuExperience({
       "theme-midnight"
     );
     root.classList.add(`theme-${theme}`);
-    root.setAttribute("dir", dir);
-  }, [theme, dir]);
+  }, [theme]);
 
   const count = hydrated ? cart.count() : 0;
   const subtotal = hydrated ? cart.subtotal() : 0;

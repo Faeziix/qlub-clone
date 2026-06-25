@@ -47,12 +47,14 @@ describe("repository safety hardening", () => {
   });
 
   it("ships no pre-filled credentials on the admin login form", () => {
-    const loginForm = read("src/app/admin/login/_components/LoginForm.tsx");
+    const loginForm = read(
+      "src/app/[locale]/admin/login/_components/LoginForm.tsx"
+    );
     expect(loginForm).not.toMatch(/defaultValue=/);
   });
 
   it("gates the demo-account list behind a non-prod flag", () => {
-    const loginPage = read("src/app/admin/login/page.tsx");
+    const loginPage = read("src/app/[locale]/admin/login/page.tsx");
     expect(loginPage).toContain("isDemoSeedingEnabled");
   });
 

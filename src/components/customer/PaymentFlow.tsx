@@ -73,10 +73,8 @@ export function PaymentFlow({
   const router = useRouter();
 
   React.useEffect(() => {
-    const root = document.documentElement;
-    root.classList.add(`theme-${theme}`);
-    root.setAttribute("dir", dir);
-  }, [theme, dir]);
+    document.documentElement.classList.add(`theme-${theme}`);
+  }, [theme]);
 
   const remainingRial = BigInt(order.total) - BigInt(order.amountPaid);
 

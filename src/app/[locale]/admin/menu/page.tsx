@@ -1,5 +1,5 @@
 import { UtensilsCrossed, LayoutGrid, CheckCircle2, BookOpen } from "lucide-react";
-import { requireSession } from "@/app/admin/actions";
+import { requireSession } from "@/app/[locale]/admin/actions";
 import { db } from "@/lib/db";
 import { PageHeader, StatCard, EmptyRow } from "@/components/admin/ui";
 import { MenuManager, type MenuTree } from "@/components/admin/menu/MenuManager";

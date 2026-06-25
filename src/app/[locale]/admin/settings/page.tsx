@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { requireSession } from "@/app/admin/actions";
+import { requireSession } from "@/app/[locale]/admin/actions";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { Building2 } from "lucide-react";
 import { SettingsForm } from "@/components/admin/settings/SettingsForm";

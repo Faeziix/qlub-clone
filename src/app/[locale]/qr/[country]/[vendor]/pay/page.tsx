@@ -8,11 +8,11 @@ export default async function PayPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ country: string; vendor: string }>;
-  searchParams: Promise<{ order?: string; lang?: string }>;
+  params: Promise<{ locale: string; country: string; vendor: string }>;
+  searchParams: Promise<{ order?: string }>;
 }) {
-  const { country, vendor: slug } = await params;
-  const { order: orderId, lang } = await searchParams;
+  const { locale, country, vendor: slug } = await params;
+  const { order: orderId } = await searchParams;
   if (!orderId) redirect(`/qr/${country}/${slug}`);
 
   const [order, vendor] = await Promise.all([
@@ -26,12 +26,14 @@ export default async function PayPage({
     name: i.name,
     quantity: i.quantity,
     lineTotal: i.lineTotal,
-    modifiers: Array.isArray(i.modifiers) ? (i.modifiers as { optionName: string }[]) : [],
+    modifiers: Array.isArray(i.modifiers)
+      ? (i.modifiers as { optionName: string }[])
+      : [],
   }));
 
   return (
     <PaymentFlow
-      lang={lang ?? vendor.locale}
+      lang={locale}
       theme={vendor.theme}
       vendorSlug={vendor.slug}
       vendorName={vendor.name}

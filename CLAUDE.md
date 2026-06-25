@@ -17,6 +17,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - **ADR 0007** — Review is per-Payment (`paymentId @unique`): each split-bill payer can review once; no orderId on Review.
 - **ADR 0008** — Schema modernization: native Postgres enums, JSONB columns, Iran defaults (IRR/fa/Asia/Tehran/ir), translation tables, monotonic per-vendor orderNumber, AuditLog, sub-merchant fields.
 - **ADR 0009** — Server-authoritative pricing: re-fetch DB prices at order creation; honored-price rule with `priceChanged` flag; `$transaction` wrapping for all money writes; `initiatePaymentLeg` with TTL reservation; idempotency keys persisted and deduplicated.
+- **ADR 0010** — next-intl Farsi-first RTL foundation: `[locale]` path segment; default locale `fa`; `app/[locale]/layout.tsx` sets `<html lang dir>` server-side; middleware handles cookie + Accept-Language; removed 6 dead locales; Vazirmatn font; imperative DOM dir mutations removed.
 - **Dual-track architecture** — Track A (Vercel + Neon, synthetic data only, separate repo/brand) vs Track B (domestic Iran infra, production). See PRD issue #1.
 - **Integer-rial money** — All monetary values are BigInt rial with no floats. Conversion only via `money.ts` at named boundaries.
 - **Server-authoritative pricing** — Bill computed from DB prices at order creation, snapshotted onto `OrderItem`. Payment verifies against the snapshot.
@@ -48,6 +49,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 - ❌ `eslint.ignoreDuringBuilds: true` silently skips lint → ✅ Remove this flag; ESLint must pass.
 - ❌ `pnpm` in README/scripts despite `bun.lockb` → ✅ bun everywhere, no exceptions.
+- ❌ Stale `.next/types/` directory causes spurious typecheck errors after moving routes → ✅ `rm -rf .next` before running `tsc --noEmit` when routes have moved.
+- ❌ Moving `app/admin` to `app/[locale]/admin` breaks all imports referencing `@/app/admin/*` → ✅ Run `sed -i 's|"@/app/admin/|"@/app/[locale]/admin/|g'` on src files after the move, and update path-based test fixtures too.
+- ❌ Imperative `document.documentElement.setAttribute("dir", ...)` in `useEffect` causes visible RTL flash → ✅ Set `dir` server-side on `<html>` in `[locale]/layout.tsx`; remove the imperative mutation entirely.
 - ❌ No `.nvmrc` or `engines` field → ✅ Both required for Node version pinning.
 - ❌ Incomplete `.env.example` missing `DIRECT_URL` → ✅ Document every required env var with comments.
 - ❌ `prisma migrate dev --create-only` blocks with drift prompt on an existing DB → ✅ Use `prisma migrate diff --from-empty --to-schema-datamodel --script` to generate baseline SQL, then `prisma migrate resolve --applied <name>` to mark it applied.
@@ -103,5 +107,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 - #9 — Server-authoritative pricing + honored-price rule + concurrency + idempotency
 
+**Done (M3 issues):**
+- #10 — next-intl Farsi-first RTL foundation: `[locale]` segment, server-side `<html lang dir>`, middleware, fa/en only
+
 **In progress / next:**
-- M3: #10 (next-intl Farsi-first RTL foundation)
+- M3: remaining issues (design system, Vazirmatn, tokens)

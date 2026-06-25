@@ -99,10 +99,11 @@ export function serializePayment(payment: PaymentRaw) {
 export function serializePaymentResult(result: {
   payment: PaymentRaw;
   fullyPaid: boolean;
-  amountPaid: number;
+  amountPaid: bigint;
 }) {
   return {
     ...result,
+    amountPaid: bigintToNumber(result.amountPaid),
     payment: serializePayment(result.payment),
   };
 }

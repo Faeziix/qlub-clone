@@ -213,7 +213,7 @@ function OrderRow({
 
       <div className="flex items-center justify-between gap-3 sm:justify-end">
         <span className="text-base font-extrabold tabular-nums">
-          {formatMoney(order.total, order.currency)}
+          {formatMoney(order.total)}
         </span>
         <div onClick={(e) => e.stopPropagation()}>
           <OrderActions order={order} />
@@ -309,7 +309,7 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                   )}
                 </div>
                 <span className="shrink-0 text-sm font-semibold tabular-nums">
-                  {formatMoney(it.lineTotal, order.currency)}
+                  {formatMoney(it.lineTotal)}
                 </span>
               </div>
             );
@@ -319,18 +319,18 @@ function OrderDetail({ order }: { order: BoardOrder }) {
 
       {/* Totals */}
       <div className="rounded-2xl border border-line p-4">
-        {totalRow("Subtotal", formatMoney(order.subtotal, order.currency))}
+        {totalRow("Subtotal", formatMoney(order.subtotal))}
         {order.discount > 0 &&
-          totalRow("Discount", `- ${formatMoney(order.discount, order.currency)}`)}
+          totalRow("Discount", `- ${formatMoney(order.discount)}`)}
         {order.serviceCharge > 0 &&
-          totalRow("Service charge", formatMoney(order.serviceCharge, order.currency))}
-        {order.tax > 0 && totalRow("Tax", formatMoney(order.tax, order.currency))}
+          totalRow("Service charge", formatMoney(order.serviceCharge))}
+        {order.tax > 0 && totalRow("Tax", formatMoney(order.tax))}
         {order.tipAmount > 0 &&
-          totalRow("Tip", formatMoney(order.tipAmount, order.currency))}
-        {totalRow("Total", formatMoney(order.total, order.currency), true)}
+          totalRow("Tip", formatMoney(order.tipAmount))}
+        {totalRow("Total", formatMoney(order.total), true)}
         {order.amountPaid > 0 &&
           order.amountPaid < order.total &&
-          totalRow("Paid", formatMoney(order.amountPaid, order.currency))}
+          totalRow("Paid", formatMoney(order.amountPaid))}
       </div>
 
       {/* Payments */}
@@ -358,11 +358,11 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold tabular-nums">
-                    {formatMoney(p.total, order.currency)}
+                    {formatMoney(p.total)}
                   </p>
                   {p.tipAmount > 0 && (
                     <p className="text-xs text-muted">
-                      incl. {formatMoney(p.tipAmount, order.currency)} tip
+                      incl. {formatMoney(p.tipAmount)} tip
                     </p>
                   )}
                 </div>

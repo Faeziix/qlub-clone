@@ -45,6 +45,7 @@
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.5.2",
     "eslint": "^9",
+    "fast-check": "^4.8.0",
     "postcss": "^8.5.15",
     "prisma": "^6.19.3",
     "tailwindcss": "^3.4.19",

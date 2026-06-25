@@ -3,14 +3,14 @@ import { requireSession } from "@/app/admin/actions";
 import { db } from "@/lib/db";
 import { PageHeader, Card, StatCard } from "@/components/admin/ui";
 import { StarRating } from "@/components/ui/StarRating";
-import { cn, round2 } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { ReviewsList, type ReviewRow } from "@/components/admin/reviews/ReviewsList";
 
 export const dynamic = "force-dynamic";
 
 function avg(values: number[]): number {
   if (values.length === 0) return 0;
-  return round2(values.reduce((a, b) => a + b, 0) / values.length);
+  return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 100) / 100;
 }
 
 export default async function ReviewsPage() {

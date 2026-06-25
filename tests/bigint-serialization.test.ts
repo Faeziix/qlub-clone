@@ -155,7 +155,7 @@ describe("serializePaymentResult — BigInt money fields become numbers", () => 
     const result = serializePaymentResult({
       payment: fakePayment,
       fullyPaid: true,
-      amountPaid: 175_000,
+      amountPaid: BigInt(175_000),
     });
     expect(typeof result.payment.amount).toBe("number");
     expect(result.payment.amount).toBe(175_000);
@@ -165,7 +165,7 @@ describe("serializePaymentResult — BigInt money fields become numbers", () => 
     const result = serializePaymentResult({
       payment: fakePayment,
       fullyPaid: true,
-      amountPaid: 175_000,
+      amountPaid: BigInt(175_000),
     });
     expect(typeof result.payment.tipAmount).toBe("number");
     expect(result.payment.tipAmount).toBe(20_000);
@@ -175,7 +175,7 @@ describe("serializePaymentResult — BigInt money fields become numbers", () => 
     const result = serializePaymentResult({
       payment: fakePayment,
       fullyPaid: true,
-      amountPaid: 175_000,
+      amountPaid: BigInt(175_000),
     });
     expect(typeof result.payment.total).toBe("number");
     expect(result.payment.total).toBe(195_000);
@@ -185,7 +185,7 @@ describe("serializePaymentResult — BigInt money fields become numbers", () => 
     const result = serializePaymentResult({
       payment: fakePayment,
       fullyPaid: true,
-      amountPaid: 175_000,
+      amountPaid: BigInt(175_000),
     });
     expect(result.fullyPaid).toBe(true);
     expect(result.amountPaid).toBe(175_000);
@@ -195,7 +195,7 @@ describe("serializePaymentResult — BigInt money fields become numbers", () => 
     const result = serializePaymentResult({
       payment: fakePayment,
       fullyPaid: true,
-      amountPaid: 175_000,
+      amountPaid: BigInt(175_000),
     });
     expect(() => JSON.stringify(result)).not.toThrow();
   });
@@ -204,7 +204,7 @@ describe("serializePaymentResult — BigInt money fields become numbers", () => 
     const result = serializePaymentResult({
       payment: fakePayment,
       fullyPaid: true,
-      amountPaid: 175_000,
+      amountPaid: BigInt(175_000),
     });
     const parsed = JSON.parse(JSON.stringify(result));
     expect(typeof parsed.payment.amount).toBe("number");

@@ -8,6 +8,7 @@ import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
 import { formatAmount } from "@/lib/utils";
 import { computeBill, lineTotal } from "@/lib/pricing";
+import { bigintToJson } from "@/lib/money";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -42,6 +43,14 @@ export function CartSheet({
     setPlacing(true);
     setError(null);
     try {
+      const serializedLines = lines.map((l) => ({
+        ...l,
+        unitPrice: bigintToJson(BigInt(l.unitPrice)),
+        modifiers: l.modifiers.map((m) => ({
+          ...m,
+          priceDelta: bigintToJson(BigInt(m.priceDelta)),
+        })),
+      }));
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -49,7 +58,7 @@ export function CartSheet({
           vendorSlug: vendor.slug,
           tableCode,
           type: tableCode ? "dinein" : "qsr",
-          lines,
+          lines: serializedLines,
         }),
       });
       const data = await res.json();
@@ -97,7 +106,7 @@ export function CartSheet({
                       )}
                       {l.notes && (
                         <p className="mt-0.5 text-xs italic text-muted">
-                          “{l.notes}”
+                          &quot;{l.notes}&quot;
                         </p>
                       )}
                     </div>
@@ -124,17 +133,16 @@ export function CartSheet({
               ))}
             </div>
 
-            {/* Bill summary */}
             <div className="mt-5 space-y-2 rounded-2xl bg-surface-2 p-4 text-sm">
               <Row label={t("subtotal")} value={bill.subtotal} c={vendor.currency} />
-              {bill.serviceCharge > 0 && (
+              {bill.serviceCharge > 0n && (
                 <Row
                   label={`${t("serviceCharge")} (${vendor.serviceChargePct}%)`}
                   value={bill.serviceCharge}
                   c={vendor.currency}
                 />
               )}
-              {bill.tax > 0 && (
+              {bill.tax > 0n && (
                 <Row
                   label={`${t("tax")} ${vendor.taxInclusive ? "(incl.)" : ""}`}
                   value={bill.tax}
@@ -176,7 +184,7 @@ function Row({
   c,
 }: {
   label: string;
-  value: number;
+  value: bigint;
   c: string;
 }) {
   return (

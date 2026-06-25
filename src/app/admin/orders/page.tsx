@@ -7,7 +7,7 @@ import {
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/admin/actions";
 import { PageHeader, StatCard } from "@/components/admin/ui";
-import { formatMoney, round2 } from "@/lib/utils";
+import { formatMoney } from "@/lib/utils";
 import { OrdersBoard } from "@/components/admin/orders/OrdersBoard";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +37,7 @@ export default async function OrdersPage() {
   const todaysCount = todays.length;
 
   const paidToday = todays.filter((o) => o.status === "paid");
-  const todaysRevenue = round2(
-    paidToday.reduce((sum, o) => sum + Number(o.total), 0)
-  );
+  const todaysRevenue = paidToday.reduce((sum, o) => sum + o.total, 0n);
 
   // Avg prep time: served/paid orders -> minutes between created & updated.
   const completed = orders.filter(

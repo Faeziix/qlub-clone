@@ -31,14 +31,7 @@ export interface CartLine {
   notes?: string;
 }
 
-export interface BillBreakdown {
-  subtotal: number;
-  serviceCharge: number;
-  tax: number;
-  discount: number;
-  tip: number;
-  total: number;
-}
+export type { BillBreakdownRial as BillBreakdown } from "./pricing";
 
 export type OrderStatus =
   | "open"

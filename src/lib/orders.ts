@@ -1,7 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import { computeBill } from "./pricing";
-import { round2 } from "./utils";
+import { computeBill, lineTotal } from "./pricing";
 import { nanoid } from "nanoid";
 import { Prisma } from "@prisma/client";
 import type { CartLine, PaymentMethod, SplitType } from "./types";
@@ -44,23 +43,23 @@ export async function createOrderFromCart(input: {
       guestPhone: input.guestPhone,
       notes: input.notes,
       currency: vendor.currency,
-      subtotal: BigInt(Math.round(bill.subtotal)),
-      serviceCharge: BigInt(Math.round(bill.serviceCharge)),
-      tax: BigInt(Math.round(bill.tax)),
-      total: BigInt(Math.round(bill.total)),
+      subtotal: bill.subtotal,
+      serviceCharge: bill.serviceCharge,
+      tax: bill.tax,
+      total: bill.total,
       items: {
-        create: input.lines.map((l) => {
-          const modSum = l.modifiers.reduce((s, m) => s + m.priceDelta, 0);
-          return {
-            itemId: l.itemId,
-            name: l.name,
-            unitPrice: BigInt(Math.round(l.unitPrice)),
-            quantity: l.quantity,
-            modifiers: JSON.stringify(l.modifiers),
-            notes: l.notes,
-            lineTotal: BigInt(Math.round(round2((l.unitPrice + modSum) * l.quantity))),
-          };
-        }),
+        create: input.lines.map((l) => ({
+          itemId: l.itemId,
+          name: l.name,
+          unitPrice: BigInt(l.unitPrice),
+          quantity: l.quantity,
+          modifiers: JSON.stringify(l.modifiers.map((m) => ({
+            ...m,
+            priceDelta: Number(m.priceDelta),
+          }))),
+          notes: l.notes,
+          lineTotal: lineTotal(l),
+        })),
       },
     },
     include: { items: true, vendor: true, table: true },
@@ -77,8 +76,8 @@ export async function createOrderFromCart(input: {
 
 export async function recordPayment(input: {
   orderId: string;
-  amount: number;
-  tipAmount?: number;
+  amount: bigint;
+  tipAmount?: bigint;
   method: PaymentMethod;
   splitType?: SplitType;
   splitMeta?: Record<string, unknown> | null;
@@ -91,16 +90,16 @@ export async function recordPayment(input: {
   });
   if (!order) throw new Error("Order not found");
 
-  const tip = round2(input.tipAmount ?? 0);
-  const total = round2(input.amount + tip);
+  const tip = input.tipAmount ?? 0n;
+  const total = input.amount + tip;
 
   const payment = await db.payment.create({
     data: {
       vendorId: order.vendorId,
       orderId: order.id,
-      amount: BigInt(Math.round(input.amount)),
-      tipAmount: BigInt(Math.round(tip)),
-      total: BigInt(Math.round(total)),
+      amount: input.amount,
+      tipAmount: tip,
+      total,
       currency: order.currency,
       method: input.method,
       status: "succeeded",
@@ -114,19 +113,19 @@ export async function recordPayment(input: {
     },
   });
 
-  const prevAmountPaid = Number(order.amountPaid);
-  const prevTipAmount = Number(order.tipAmount);
-  const prevTotal = Number(order.total);
+  const prevAmountPaid = order.amountPaid;
+  const prevTipAmount = order.tipAmount;
+  const prevTotal = order.total;
 
-  const amountPaid = round2(prevAmountPaid + input.amount);
-  const fullyPaid = amountPaid >= prevTotal - 0.01;
+  const amountPaid = prevAmountPaid + input.amount;
+  const fullyPaid = amountPaid >= prevTotal;
 
   await db.order.update({
     where: { id: order.id },
     data: {
-      amountPaid: BigInt(Math.round(amountPaid)),
-      tipAmount: BigInt(Math.round(round2(prevTipAmount + tip))),
-      total: BigInt(Math.round(round2(prevTotal + tip))),
+      amountPaid,
+      tipAmount: prevTipAmount + tip,
+      total: prevTotal + tip,
       status: fullyPaid ? "paid" : order.status,
     },
   });

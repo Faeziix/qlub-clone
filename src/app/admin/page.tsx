@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 const DAY_MS = 86400000;
 const REVENUE_WINDOW_DAYS = 14;
 
-type DashboardPayment = { createdAt: Date; total: bigint | number };
+type DashboardPayment = { createdAt: Date; total: bigint };
 
 function buildRevenueSeries(payments: DashboardPayment[]) {
   const series: { day: string; revenue: number; orders: number }[] = [];
@@ -30,9 +30,10 @@ function buildRevenueSeries(payments: DashboardPayment[]) {
     const dayPayments = payments.filter(
       (p) => p.createdAt.toISOString().slice(0, 10) === dayKey
     );
+    const rialTotal = dayPayments.reduce((s, p) => s + p.total, 0n);
     series.push({
       day: label,
-      revenue: Math.round(dayPayments.reduce((s, p) => s + Number(p.total), 0) * 100) / 100,
+      revenue: Number(rialTotal),
       orders: dayPayments.length,
     });
   }
@@ -81,7 +82,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
           label="Revenue"
-          value={formatMoney(stats.revenue, currency)}
+          value={formatMoney(stats.revenue)}
           icon={<DollarSign size={18} />}
           delta={{ value: "+12.4%", positive: true }}
           hint="vs last month"
@@ -95,13 +96,13 @@ export default async function DashboardPage() {
         />
         <StatCard
           label="Avg. order"
-          value={formatMoney(stats.avgOrder || 0, currency)}
+          value={formatMoney(stats.avgOrder || 0)}
           icon={<TrendingUp size={18} />}
           hint="per paid bill"
         />
         <StatCard
           label="Tips collected"
-          value={formatMoney(stats.tips, currency)}
+          value={formatMoney(stats.tips)}
           icon={<Coins size={18} />}
           hint="staff tips"
         />
@@ -155,7 +156,7 @@ export default async function DashboardPage() {
                       <StatusPill status={o.status} />
                     </td>
                     <td className="py-2.5 text-right font-semibold tabular-nums">
-                      {formatMoney(Number(o.total), currency)}
+                      {formatMoney(o.total)}
                     </td>
                     <td className="py-2.5 text-right text-xs text-muted">
                       {timeAgo(o.createdAt)}

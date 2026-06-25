@@ -6,7 +6,7 @@ import type { ItemWithModifiers } from "@/lib/queries";
 import type { SelectedModifier } from "@/lib/types";
 import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
-import { cn, formatAmount, parseJSON, round2 } from "@/lib/utils";
+import { cn, formatAmount, parseJSON } from "@/lib/utils";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -75,7 +75,7 @@ export function ItemSheet({
 
   const unitWithMods =
     item.price + chosenModifiers.reduce((s, m) => s + m.priceDelta, 0);
-  const lineTotalValue = round2(unitWithMods * qty);
+  const lineTotalValue = unitWithMods * qty;
 
   const missingRequired = item.modifierGroups.some(
     (g) => g.required && (selected[g.id]?.length ?? 0) < Math.max(1, g.minSelect)

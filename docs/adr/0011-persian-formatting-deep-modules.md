@@ -61,7 +61,16 @@ Jalali calendar formatting and arithmetic, always in Asia/Tehran:
 
 Iranian banking calendar for settlement-day math:
 - `IRANIAN_BANKING_HOLIDAYS` — static array of `{ jalaliDate, name }` for years 1403–1405
-  (Jalali YYYY-MM-DD keys, verified against official Iranian government decrees)
+  (Jalali YYYY-MM-DD keys). Includes all major lunar and solar holidays:
+  - Fixed solar: Nowruz (4 days), Islamic Republic Day, Sizdah Be-dar, Imam Khomeini anniversary,
+    15 Khordad, 22 Bahman, 29 Esfand
+  - Lunar (shift ~10-11 days/year): عید فطر (2 days), عید قربان (2 days), عید غدیر, مبعث,
+    تاسوعا, عاشورا, اربعین, رحلت پیامبر/شهادت امام حسن, شهادت امام رضا,
+    شهادت امام محمد تقی, شهادت امام علی النقی, میلاد پیامبر/امام جعفر صادق,
+    شهادت حضرت فاطمه زهرا
+  - 1403 and 1404 entries are from official Iranian government calendar announcements.
+  - 1405 lunar entries are estimated from the ~10-day annual regression and must be
+    verified against the government's official 1405 Nowruz announcement.
 - `isIranianWeekend(date)` — true for Thursday (پنجشنبه) and Friday (جمعه)
 - `isOfficialHoliday(date)` — true for dates in the static calendar
 - `isBankingHoliday(date)` — combined check
@@ -75,5 +84,7 @@ Iranian banking calendar for settlement-day math:
 - All digit normalization for validation goes through `digit-normalizer.ts`
 - All Jalali date operations use `jalali.ts` which enforces `Asia/Tehran` by construction
 - Settlement projection uses `banking-holidays.ts`; the exact facilitator T+N delay is the caller's concern
-- The holiday calendar must be updated annually (religious holidays shift ~10 days per Jalali year)
-- 100 unit tests cover these modules (digit-normalizer: 24, toman-formatter: 26, jalali: 21, banking-holidays: 29)
+- The holiday calendar must be updated at each Nowruz: 1403 and 1404 lunar entries reflect
+  official Iranian government announcements; 1405 lunar entries are estimated and must be
+  replaced with the official 1405 release (March 2026).
+- 369 unit tests cover these modules across all 14 test files.

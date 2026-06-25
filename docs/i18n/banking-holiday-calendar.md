@@ -2,8 +2,12 @@
 
 ## Source
 
-Official Iranian public holidays sourced from government decrees published by the Office of the
-Supreme Leader and the Cabinet of Iran, cross-referenced with the Iranian civil calendar.
+Iranian public holidays sourced from official government calendar announcements published at
+Nowruz by the Cabinet of Iran and the Office of the Supreme Leader. The 1403 and 1404 lunar
+holiday dates reflect the announced observance dates (which may differ by 1-2 days from
+astronomical calculations due to moon-sighting criteria). The 1405 lunar holiday dates are
+estimated by subtracting approximately 10-11 days from the 1404 official dates and must be
+replaced with official 1405 government-published dates at Nowruz 1405 (March 2026).
 
 The static calendar is in `src/lib/banking-holidays.ts` as `IRANIAN_BANKING_HOLIDAYS`.
 
@@ -36,8 +40,10 @@ The static calendar is in `src/lib/banking-holidays.ts` as `IRANIAN_BANKING_HOLI
    - Imam Ali al-Naqi martyrdom
    - Prophet's birthday / Imam Sadiq birthday
    - Fatimah Zahra martyrdom
-   - Eid al-Fitr (2 days)
-   - Eid al-Adha (2 days — not always included)
+   - Eid al-Fitr / عید فطر (2 days)
+   - Eid al-Adha / عید قربان (2 days)
+   - Eid al-Ghadir / عید غدیر
+   - Mab'ath / مبعث
 7. **Islamic Revolution Victory**: 22 Bahman
 8. **Nationalisation of Oil Industry**: 29 Esfand
 

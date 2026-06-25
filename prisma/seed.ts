@@ -5,8 +5,17 @@
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { randomInt, randomBytes } from "node:crypto";
 
 const db = new PrismaClient();
+
+function randomTablePasscode() {
+  return String(randomInt(0, 10000)).padStart(4, "0");
+}
+
+function randomStaffPassword() {
+  return randomBytes(18).toString("base64url");
+}
 
 const CDN = "https://cdn-customerapp.qlub.io/digital_menu/menu";
 const UNS = (id: string) => `https://images.unsplash.com/${id}?w=600&q=80&auto=format&fit=crop`;
@@ -669,7 +678,7 @@ async function seedVendor(opts: {
         vendorId: vendor.id,
         code: String(t),
         label: `Table ${t}`,
-        passcode: String(1000 + t * 7).slice(-4),
+        passcode: randomTablePasscode(),
         seats: 2 + (t % 4),
         area: areas[t % areas.length],
         status: t <= 3 ? "occupied" : "available",
@@ -817,44 +826,31 @@ async function main() {
   });
   await seedOrders(bistro.vendor.id, bistro.items, bistro.tables, 1000);
 
-  // Staff users
-  const pw = await bcrypt.hash("password123", 10);
-  await db.staffUser.createMany({
-    data: [
-      {
-        email: "admin@qlub.io",
-        passwordHash: pw,
-        name: "Platform Admin",
-        role: "superadmin",
-        vendorId: null,
-      },
-      {
-        email: "owner@paul.ae",
-        passwordHash: pw,
-        name: "Pierre Dubois",
-        role: "owner",
-        vendorId: paul.vendor.id,
-      },
-      {
-        email: "manager@paul.ae",
-        passwordHash: pw,
-        name: "Yara Haddad",
-        role: "manager",
-        vendorId: paul.vendor.id,
-      },
-      {
-        email: "owner@olive.ae",
-        passwordHash: pw,
-        name: "Elena Rossi",
-        role: "owner",
-        vendorId: bistro.vendor.id,
-      },
-    ],
-  });
+  // Staff users — each gets a unique cryptographically-random password,
+  // printed once so the operator can sign in. No shared/static credential.
+  const demoStaff = [
+    { email: "admin@qlub.io", name: "Platform Admin", role: "superadmin", vendorId: null },
+    { email: "owner@paul.ae", name: "Pierre Dubois", role: "owner", vendorId: paul.vendor.id },
+    { email: "manager@paul.ae", name: "Yara Haddad", role: "manager", vendorId: paul.vendor.id },
+    { email: "owner@olive.ae", name: "Elena Rossi", role: "owner", vendorId: bistro.vendor.id },
+  ];
+
+  const generatedCredentials: { email: string; password: string }[] = [];
+  for (const staff of demoStaff) {
+    const password = randomStaffPassword();
+    await db.staffUser.create({
+      data: { ...staff, passwordHash: await bcrypt.hash(password, 10) },
+    });
+    generatedCredentials.push({ email: staff.email, password });
+  }
 
   console.log("✅ Seed complete.");
   console.log("   Customer: /qr/ae/paul-uae");
-  console.log("   Admin:    /admin/login  (owner@paul.ae / password123)");
+  console.log("   Admin:    /admin/login");
+  console.log("   Generated staff credentials (shown once — copy them now):");
+  for (const { email, password } of generatedCredentials) {
+    console.log(`     ${email}  ${password}`);
+  }
 }
 
 main()

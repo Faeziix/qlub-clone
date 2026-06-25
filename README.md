@@ -12,14 +12,14 @@ A production-ready clone of [qlub.io](https://qlub.io): a contactless **scan →
 ## Quick start
 
 ```bash
-pnpm install
-pnpm setup     # prisma generate + db push + seed
-pnpm dev       # http://localhost:3000
+cp .env.example .env   # then set AUTH_SECRET (e.g. openssl rand -base64 48)
+bun install
+bun run setup          # prisma generate + db push + seed
+bun run dev            # http://localhost:3000
 ```
 
-> If `pnpm` refuses to run native build scripts, this repo ships a
-> `pnpm-workspace.yaml` with `onlyBuiltDependencies` and an `.npmrc` with
-> `verify-deps-before-run=false` to keep `pnpm dev` non-interactive.
+`AUTH_SECRET` is required — the app refuses to start without it. `.env` is
+gitignored and must never be committed.
 
 ## What to open
 
@@ -29,9 +29,9 @@ pnpm dev       # http://localhost:3000
 | **Guest app** (Paul UAE) | `/qr/ae/paul-uae` | Full scan→pay flow |
 | Guest app (2nd venue) | `/qr/ae/olive-bistro` | Multi-tenant demo |
 | Table-scoped entry | `/qr/ae/paul-uae?table=5&theme=darkgold` | Dine-in mode |
-| **Admin dashboard** | `/admin/login` | `owner@paul.ae` / `password123` |
+| **Admin dashboard** | `/admin/login` | Use a seeded staff account (see below) |
 
-Other demo logins (all `password123`): `manager@paul.ae`, `admin@qlub.io` (platform superadmin, sees all venues).
+Demo staff accounts (`admin@qlub.io`, `owner@paul.ae`, `manager@paul.ae`, `owner@olive.ae`) are created only when seeding. Each is assigned a unique, cryptographically-random password printed once by `bun run db:seed` — copy it from that output to sign in. There is no shared/static password. The login page only lists these accounts when `SEED_DEMO=true` in a non-production environment.
 
 ## Customer features
 

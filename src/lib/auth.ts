@@ -3,11 +3,13 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import type { SessionUser } from "./types";
+import { requireAuthSecret } from "./env";
 
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "dev-secret-change-me-in-production-please-32chars"
-);
 const COOKIE = "qlub_admin_session";
+
+function authSigningKey() {
+  return new TextEncoder().encode(requireAuthSecret());
+}
 
 export async function hashPassword(pw: string) {
   return bcrypt.hash(pw, 10);
@@ -22,7 +24,7 @@ export async function createSession(user: SessionUser) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(secret);
+    .sign(authSigningKey());
 
   const jar = await cookies();
   jar.set(COOKIE, token, {
@@ -39,7 +41,7 @@ export async function getSession(): Promise<SessionUser | null> {
   const token = jar.get(COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, authSigningKey());
     return {
       id: payload.id as string,
       email: payload.email as string,

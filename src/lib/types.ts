@@ -16,7 +16,7 @@ export interface SelectedModifier {
   groupName: string;
   optionId: string;
   optionName: string;
-  priceDelta: number;
+  priceDelta: bigint;
 }
 
 export interface CartLine {
@@ -25,7 +25,7 @@ export interface CartLine {
   itemId: string;
   name: string;
   imageUrl?: string | null;
-  unitPrice: number; // base price
+  unitPrice: bigint;
   quantity: number;
   modifiers: SelectedModifier[];
   notes?: string;

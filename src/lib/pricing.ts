@@ -20,8 +20,8 @@ function pct(amount: bigint, percent: number): bigint {
 }
 
 export function lineTotal(line: CartLine): bigint {
-  const modifiers = line.modifiers.reduce((s, m) => s + BigInt(m.priceDelta), 0n);
-  return (BigInt(line.unitPrice) + modifiers) * BigInt(line.quantity);
+  const modifiers = line.modifiers.reduce((s, m) => s + m.priceDelta, 0n);
+  return (line.unitPrice + modifiers) * BigInt(line.quantity);
 }
 
 export function cartSubtotal(lines: CartLine[]): bigint {

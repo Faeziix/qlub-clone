@@ -15,6 +15,8 @@
  *   Gateway wire      rialForGateway / rialFromGateway  BigInt ↔ string (IPG integer string)
  *   JSON body         bigintToJson / bigintFromJson     BigInt ↔ string (fetch request bodies)
  *   localStorage      cartMoneyReplacer / cartMoneyReviver  BigInt ↔ tagged string (zustand persist)
+ *   RSC→client wire   bigintToNumber(rial)             BigInt → number (Next.js App Router prop boundary)
+ *   User toman input  parseTomanInput(tomanStr)        string toman → BigInt rial (payment UI)
  */
 
 export const MONETARY_UNIT = 10n;
@@ -61,6 +63,25 @@ export function bigintToJson(rial: bigint): string {
 export function bigintFromJson(value: string | number): bigint {
   return BigInt(value);
 }
+
+/**
+ * RSC → client-component wire boundary.
+ * Next.js App Router cannot serialise BigInt across the RSC/client boundary.
+ * This is the one permitted escape hatch: the result is used ONLY for display
+ * or for later re-wrapping via BigInt(). Never perform financial arithmetic on
+ * the returned number.
+ */
+export function bigintToNumber(rial: bigint): number {
+  return Number(rial);
+}
+
+/**
+ * Payment UI input boundary (customer app).
+ * The user enters an amount in toman; the function converts it to integer rial.
+ * Identical semantics to parseRialFromInput but named distinctly to make the
+ * call-site intent explicit in UI code.
+ */
+export const parseTomanInput = parseRialFromInput;
 
 const BIGINT_TAG = "__bigint__";
 

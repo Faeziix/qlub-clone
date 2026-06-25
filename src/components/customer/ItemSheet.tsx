@@ -68,14 +68,15 @@ export function ItemSheet({
         groupName: g.name,
         optionId: opt.id,
         optionName: opt.name,
-        priceDelta: opt.priceDelta,
+        priceDelta: BigInt(opt.priceDelta),
       };
     })
   );
 
+  const unitPriceRial = BigInt(item.price);
   const unitWithMods =
-    item.price + chosenModifiers.reduce((s, m) => s + m.priceDelta, 0);
-  const lineTotalValue = unitWithMods * qty;
+    unitPriceRial + chosenModifiers.reduce((s, m) => s + m.priceDelta, 0n);
+  const lineTotalValue = unitWithMods * BigInt(qty);
 
   const missingRequired = item.modifierGroups.some(
     (g) => g.required && (selected[g.id]?.length ?? 0) < Math.max(1, g.minSelect)
@@ -86,7 +87,7 @@ export function ItemSheet({
       itemId: item.id,
       name: item.name,
       imageUrl: item.imageUrl,
-      unitPrice: item.price,
+      unitPrice: unitPriceRial,
       quantity: qty,
       modifiers: chosenModifiers,
       notes: notes.trim() || undefined,

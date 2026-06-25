@@ -15,6 +15,7 @@ import {
   rialToToman,
   tomanToRial,
   parseRialFromInput,
+  parseTomanInput,
   rialForStorage,
   rialFromStorage,
   rialForGateway,
@@ -22,6 +23,7 @@ import {
   formatRialAsToman,
   bigintFromJson,
   bigintToJson,
+  bigintToNumber,
   cartMoneyReplacer,
   cartMoneyReviver,
 } from "@/lib/money";
@@ -273,5 +275,57 @@ describe("zero-drift guard — no ×10 or ×1000 scale errors", () => {
 
   it("parseRialFromInput('1000') returns 10000 rial (×10), not 1000 rial", () => {
     expect(parseRialFromInput("1000")).toBe(10_000n);
+  });
+});
+
+describe("parseTomanInput — payment UI toman input boundary", () => {
+  it("is identical to parseRialFromInput: '15000' toman → 150000 rial", () => {
+    expect(parseTomanInput("15000")).toBe(150_000n);
+    expect(parseTomanInput("15000")).toBe(parseRialFromInput("15000"));
+  });
+
+  it("correctly converts a custom split amount: '5000' toman → 50000 rial (not 5000 rial)", () => {
+    expect(parseTomanInput("5000")).toBe(50_000n);
+    expect(parseTomanInput("5000")).not.toBe(5_000n);
+  });
+
+  it("correctly converts a custom tip: '1000' toman → 10000 rial (not 1000 rial)", () => {
+    expect(parseTomanInput("1000")).toBe(10_000n);
+    expect(parseTomanInput("1000")).not.toBe(1_000n);
+  });
+
+  it("returns 0n for empty input", () => {
+    expect(parseTomanInput("")).toBe(0n);
+  });
+
+  it("property: no ×10 drift — result is always ×10 of integer-toman input", () => {
+    fc.assert(
+      fc.property(fc.bigInt({ min: 1n, max: 100_000_000n }), (toman) => {
+        const rial = parseTomanInput(toman.toString());
+        expect(rial).toBe(toman * 10n);
+      })
+    );
+  });
+});
+
+describe("bigintToNumber — RSC→client wire boundary", () => {
+  it("converts rial bigint to number for prop passing", () => {
+    expect(bigintToNumber(150_000n)).toBe(150_000);
+  });
+
+  it("result is a JS number (not bigint)", () => {
+    expect(typeof bigintToNumber(42n)).toBe("number");
+  });
+
+  it("property: BigInt(bigintToNumber(n)) recovers original for safe integer rial amounts", () => {
+    fc.assert(
+      fc.property(fc.bigInt({ min: 0n, max: BigInt(Number.MAX_SAFE_INTEGER) }), (rial) => {
+        expect(BigInt(bigintToNumber(rial))).toBe(rial);
+      })
+    );
+  });
+
+  it("0n → 0", () => {
+    expect(bigintToNumber(0n)).toBe(0);
   });
 });

@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { PageHeader, StatCard, Card, StatusPill } from "@/components/admin/ui";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { formatMoney, timeAgo } from "@/lib/utils";
+import { bigintToNumber } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ function buildRevenueSeries(payments: DashboardPayment[]) {
     const rialTotal = dayPayments.reduce((s, p) => s + p.total, 0n);
     series.push({
       day: label,
-      revenue: Number(rialTotal),
+      revenue: bigintToNumber(rialTotal),
       orders: dayPayments.length,
     });
   }
@@ -43,7 +44,11 @@ function buildRevenueSeries(payments: DashboardPayment[]) {
 export default async function DashboardPage() {
   const session = await requireSession();
   const stats = await getDashboardStats(session.vendorId);
-  const currency = "AED";
+
+  const vendorCurrency = session.vendorId
+    ? (await db.vendor.findUnique({ where: { id: session.vendorId }, select: { currency: true } }))?.currency ?? "IRR"
+    : "IRR";
+  const currency = vendorCurrency;
 
   const days = buildRevenueSeries(stats.payments);
 

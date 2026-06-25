@@ -1,6 +1,4 @@
-function bigintToNumber(value: bigint): number {
-  return Number(value);
-}
+import { bigintToNumber } from "./money";
 
 type WithBigintMoney<T extends object> = T & {
   amount?: bigint;

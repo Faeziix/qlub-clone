@@ -32,20 +32,30 @@ The original codebase stored all money as `Float` (IEEE 754 double), used a `rou
 | Boundary | Function | Direction |
 |---|---|---|
 | Admin price input (toman string) | `parseRialFromInput(tomanInput)` | string toman → bigint rial |
+| Payment UI toman input | `parseTomanInput(tomanInput)` | string toman → bigint rial (alias of parseRialFromInput) |
 | UI display (toman) | `formatRialAsToman(rial)` | bigint rial → string toman |
 | DB storage (Prisma coercion) | `rialForStorage` / `rialFromStorage` | bigint ↔ string |
 | Payment gateway wire | `rialForGateway` / `rialFromGateway` | bigint ↔ string |
 | JSON request body | `bigintToJson` / `bigintFromJson` | bigint ↔ string |
 | localStorage (zustand persist) | `cartMoneyReplacer` / `cartMoneyReviver` | bigint ↔ tagged string `__bigint__N` |
+| RSC → client prop wire | `bigintToNumber(rial)` | bigint rial → number (display only, never financial arithmetic) |
 
 ## Consequences
 
 - All money operations are exact: no float drift, no epsilon hacks.
-- The `pricing.ts` module uses `bigint` arithmetic throughout (`lineTotal`, `cartSubtotal`, `computeBill`, `evenSplit`, `tipFromPct`).
+- `CartLine.unitPrice` and `SelectedModifier.priceDelta` are `bigint` throughout the domain — cart store, pricing, and API route.
+- The `pricing.ts` module uses native `bigint` arithmetic throughout (`lineTotal`, `cartSubtotal`, `computeBill`, `evenSplit`, `tipFromPct`).
 - `orders.ts` `recordPayment` uses pure `bigint` arithmetic for `fullyPaid`.
+- `orders.ts` stores modifier `priceDelta` as a string in the persisted JSON blob so no lossy `Number()` cast occurs at write time.
 - Admin price inputs accept toman integers; the UI labels are updated from "Price (AED)" to "Price (toman)"; `step="0.01"` float inputs are gone.
-- Property-based tests in `tests/money.test.ts` (35 tests, fast-check) cover all six boundaries and the ×10/×1000 zero-drift invariant.
-- RSC (server) → client component boundaries continue to pass money as `number` (via `bigintToNumber` in `api-serializers.ts` and `queries.ts`) since Next.js App Router cannot serialise `BigInt` over the wire. This is correct: those numbers are rial display values, not used for financial computation.
+- Dashboard stats (`getDashboardStats`) compute revenue/tips/avgOrder in bigint rial before converting to number once at the RSC boundary via `bigintToNumber`.
+- Dashboard revenue chart (`buildRevenueSeries`) uses `bigintToNumber` from `money.ts` — not raw `Number()`.
+- RevenueChart tooltip uses `formatMoney` (toman display) instead of `v.toFixed(2)`.
+- OrdersBoard modifier priceDelta displays in toman via `formatMoney` — no `.toFixed(2)`.
+- Admin dashboard reads vendor `currency` from DB instead of hardcoding `"AED"`.
+- `PaymentFlow` custom split amount and custom tip inputs are parsed via `parseTomanInput` — the 10× toman→rial conversion is now applied, eliminating the previous 10× undercharge on those paths.
+- `bigintToNumber` is the only permitted site for bigint→number conversion of financial values; it lives in `money.ts` and is explicitly documented as display-only.
+- Property-based tests in `tests/money.test.ts` (44 tests, fast-check) cover all eight boundaries including the new `parseTomanInput` and `bigintToNumber` boundaries, plus the ×10/×1000 zero-drift invariant.
 
 ## References
 

@@ -43,10 +43,10 @@ export async function POST(req: Request) {
     const data = schema.parse(body);
     const normalizedLines = data.lines.map((l) => ({
       ...l,
-      unitPrice: Number(bigintFromJson(l.unitPrice)),
+      unitPrice: bigintFromJson(l.unitPrice),
       modifiers: l.modifiers.map((m) => ({
         ...m,
-        priceDelta: Number(bigintFromJson(m.priceDelta)),
+        priceDelta: bigintFromJson(m.priceDelta),
       })),
     }));
     const order = await createOrderFromCart({ ...data, lines: normalizedLines });

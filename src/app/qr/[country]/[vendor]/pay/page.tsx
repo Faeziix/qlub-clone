@@ -26,7 +26,7 @@ export default async function PayPage({
     id: i.id,
     name: i.name,
     quantity: i.quantity,
-    lineTotal: Number(i.lineTotal),
+    lineTotal: i.lineTotal,
     modifiers: parseJSON<{ optionName: string }[]>(i.modifiers as string | null, []),
   }));
 
@@ -43,11 +43,11 @@ export default async function PayPage({
       order={{
         id: order.id,
         orderNumber: order.orderNumber,
-        subtotal: Number(order.subtotal),
-        serviceCharge: Number(order.serviceCharge),
-        tax: Number(order.tax),
-        total: Number(order.total),
-        amountPaid: Number(order.amountPaid),
+        subtotal: order.subtotal,
+        serviceCharge: order.serviceCharge,
+        tax: order.tax,
+        total: order.total,
+        amountPaid: order.amountPaid,
         tableLabel: order.table?.label ?? null,
         items,
       }}

@@ -15,7 +15,7 @@ import type { SplitType } from "@/lib/types";
 import { makeT, dirFor } from "@/lib/i18n";
 import { cn, formatAmount } from "@/lib/utils";
 import { evenSplit, tipFromPct } from "@/lib/pricing";
-import { bigintToJson } from "@/lib/money";
+import { bigintToJson, parseTomanInput } from "@/lib/money";
 import { Button } from "@/components/ui/Button";
 import { StarRating } from "@/components/ui/StarRating";
 
@@ -104,8 +104,7 @@ export function PaymentFlow({
     const charges = BigInt(order.serviceCharge) + BigInt(order.tax);
     baseAmountRial = subtotalRial === 0n ? sum : sum + (charges * sum) / subtotalRial;
   } else if (split === "custom") {
-    const n = Number(customAmount);
-    baseAmountRial = Number.isFinite(n) && n > 0 ? BigInt(Math.round(n)) : 0n;
+    baseAmountRial = parseTomanInput(customAmount);
   } else {
     baseAmountRial = remainingRial;
   }
@@ -114,8 +113,7 @@ export function PaymentFlow({
   if (!tippingEnabled || tipPct == null) {
     tipRial = 0n;
   } else if (tipPct === "custom") {
-    const n = Number(customTip);
-    tipRial = Number.isFinite(n) && n > 0 ? BigInt(Math.round(n)) : 0n;
+    tipRial = parseTomanInput(customTip);
   } else {
     tipRial = tipFromPct(baseAmountRial, tipPct);
   }

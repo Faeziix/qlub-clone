@@ -51,11 +51,11 @@ export async function createOrderFromCart(input: {
         create: input.lines.map((l) => ({
           itemId: l.itemId,
           name: l.name,
-          unitPrice: BigInt(l.unitPrice),
+          unitPrice: l.unitPrice,
           quantity: l.quantity,
           modifiers: JSON.stringify(l.modifiers.map((m) => ({
             ...m,
-            priceDelta: Number(m.priceDelta),
+            priceDelta: m.priceDelta.toString(),
           }))),
           notes: l.notes,
           lineTotal: lineTotal(l),

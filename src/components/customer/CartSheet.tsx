@@ -45,10 +45,10 @@ export function CartSheet({
     try {
       const serializedLines = lines.map((l) => ({
         ...l,
-        unitPrice: bigintToJson(BigInt(l.unitPrice)),
+        unitPrice: bigintToJson(l.unitPrice),
         modifiers: l.modifiers.map((m) => ({
           ...m,
-          priceDelta: bigintToJson(BigInt(m.priceDelta)),
+          priceDelta: bigintToJson(m.priceDelta),
         })),
       }));
       const res = await fetch("/api/orders", {

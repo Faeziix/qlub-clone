@@ -1,10 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { parseJSON } from "./utils";
-
-function bigintToNumber(value: bigint): number {
-  return Number(value);
-}
+import { bigintToNumber } from "./money";
 
 /** Full vendor + menu tree for the customer app. */
 export async function getVendorBySlug(slug: string) {
@@ -146,19 +143,20 @@ export async function getDashboardStats(vendorId: string | null) {
     db.diningTable.count({ where }),
   ]);
 
-  const revenue = payments.reduce((s, p) => s + bigintToNumber(p.total), 0);
-  const tips = payments.reduce((s, p) => s + bigintToNumber(p.tipAmount), 0);
-  const avgOrder = orders.length ? revenue / payments.length || 0 : 0;
+  const revenueRial = payments.reduce((s, p) => s + p.total, 0n);
+  const tipsRial = payments.reduce((s, p) => s + p.tipAmount, 0n);
+  const avgOrderRial =
+    payments.length > 0 ? revenueRial / BigInt(payments.length) : 0n;
   const avgRating = reviews.length
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
     : 0;
 
   return {
-    revenue,
-    tips,
+    revenue: bigintToNumber(revenueRial),
+    tips: bigintToNumber(tipsRial),
     orderCount: orders.length,
     paidCount: payments.length,
-    avgOrder,
+    avgOrder: bigintToNumber(avgOrderRial),
     avgRating,
     reviewCount: reviews.length,
     itemCount: items,

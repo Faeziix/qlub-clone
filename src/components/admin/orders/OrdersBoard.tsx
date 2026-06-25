@@ -17,7 +17,7 @@ import { updateOrderStatus, cancelOrder } from "@/app/admin/orders/actions";
 
 // --- Types -------------------------------------------------------------------
 
-type OrderModifier = { name?: string; priceDelta?: number };
+type OrderModifier = { name?: string; priceDelta?: string | number };
 
 export interface BoardItem {
   id: string;
@@ -297,7 +297,7 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                       {mods
                         .map((m) =>
                           m.priceDelta
-                            ? `${m.name} (+${m.priceDelta.toFixed(2)})`
+                            ? `${m.name} (+${formatMoney(Number(m.priceDelta))} تومان)`
                             : m.name
                         )
                         .filter(Boolean)

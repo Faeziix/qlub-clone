@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createOrderFromCart } from "@/lib/orders";
+import { serializeOrder } from "@/lib/api-serializers";
 
 const schema = z.object({
   vendorSlug: z.string(),
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = schema.parse(body);
     const order = await createOrderFromCart(data);
-    return NextResponse.json({ ok: true, order });
+    return NextResponse.json({ ok: true, order: serializeOrder(order) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bad request";
     return NextResponse.json({ ok: false, error: message }, { status: 400 });

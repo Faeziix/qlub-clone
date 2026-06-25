@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { recordPayment } from "@/lib/orders";
+import { serializePaymentResult } from "@/lib/api-serializers";
 
 const schema = z.object({
   orderId: z.string(),
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     const data = schema.parse(await req.json());
     // Simulate gateway latency / settlement
     const result = await recordPayment(data);
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...serializePaymentResult(result) });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Payment failed";
     return NextResponse.json({ ok: false, error: message }, { status: 400 });

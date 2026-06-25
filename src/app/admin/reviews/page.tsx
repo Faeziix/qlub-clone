@@ -19,7 +19,7 @@ export default async function ReviewsPage() {
   const reviews = await db.review.findMany({
     where: session.vendorId ? { vendorId: session.vendorId } : undefined,
     orderBy: { createdAt: "desc" },
-    include: { order: { select: { orderNumber: true } } },
+    include: { payment: { select: { order: { select: { orderNumber: true } } } } },
   });
 
   const total = reviews.length;
@@ -48,7 +48,7 @@ export default async function ReviewsPage() {
     comment: r.comment,
     guestName: r.guestName,
     createdAt: r.createdAt.toISOString(),
-    orderNumber: r.order?.orderNumber ?? null,
+    orderNumber: r.payment?.order?.orderNumber ?? null,
   }));
 
   return (

@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/admin/actions";
 
-const STATUSES = ["available", "occupied", "bill-requested"] as const;
-type TableStatus = (typeof STATUSES)[number];
+import { TABLE_STATUSES, type TableStatus as SchemaTableStatus } from "@/lib/schema-types";
+const STATUSES = TABLE_STATUSES;
+type TableStatus = SchemaTableStatus;
 
 function randomPasscode(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
@@ -84,7 +85,7 @@ export async function updateTableStatus(tableId: string, status: string) {
   await requireOwnedTable(tableId);
   await db.diningTable.update({
     where: { id: tableId },
-    data: { status },
+    data: { status: status as TableStatus },
   });
   revalidatePath("/admin/tables");
 }

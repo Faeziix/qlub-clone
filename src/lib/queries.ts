@@ -1,6 +1,5 @@
 import "server-only";
 import { db } from "./db";
-import { parseJSON } from "./utils";
 
 /** Full vendor + menu tree for the customer app. */
 export async function getVendorBySlug(slug: string) {
@@ -33,8 +32,12 @@ export async function getVendorBySlug(slug: string) {
   if (!vendor) return null;
   return {
     ...vendor,
-    supportedLangs: parseJSON<string[]>(vendor.supportedLangs, ["en"]),
-    tipPresets: parseJSON<number[]>(vendor.tipPresets, [10, 15, 20]),
+    supportedLangs: Array.isArray(vendor.supportedLangs)
+      ? (vendor.supportedLangs as string[])
+      : ["fa"],
+    tipPresets: Array.isArray(vendor.tipPresets)
+      ? (vendor.tipPresets as number[])
+      : [5, 10, 15],
   };
 }
 

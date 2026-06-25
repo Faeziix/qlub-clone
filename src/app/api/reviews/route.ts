@@ -4,7 +4,7 @@ import { createReview } from "@/lib/orders";
 
 const schema = z.object({
   vendorSlug: z.string(),
-  orderId: z.string().optional(),
+  paymentId: z.string(),
   rating: z.number().int().min(1).max(5),
   foodRating: z.number().int().min(1).max(5).optional(),
   serviceRating: z.number().int().min(1).max(5).optional(),

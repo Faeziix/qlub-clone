@@ -1,5 +1,7 @@
-// Qlub clone — data model for QR pay-at-table ordering + restaurant management.
-// SQLite for zero-config local/dev; swap `provider` to "postgresql" for production.
+// Qlub Iran — data model for QR pay-at-table ordering + restaurant management.
+// SQLite for zero-config local/dev; switch provider to "postgresql" for production.
+// Issue #8: native enums, native Json, Iran defaults, translation tables,
+//           per-vendor orderNumber sequence, AuditLog, sub-merchant fields.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,58 +12,138 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ──────────────────────────────── Enums ──────────────────────────────────────
+
+enum OrderStatus {
+  open
+  placed
+  preparing
+  ready
+  served
+  paid
+  cancelled
+}
+
+enum OrderType {
+  qsr
+  dinein
+}
+
+enum OrderSource {
+  qr
+  pos
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
+  expired
+}
+
+/// Iran-legal payment methods.
+/// card_to_card is excluded — it is not a settled split method (PRD §6).
+/// UAE-era methods (tabby, benefit, apple_pay, google_pay) are removed.
+enum PaymentMethod {
+  ipg
+  cash
+}
+
+enum SplitType {
+  full
+  even
+  items
+  custom
+}
+
+enum StaffRole {
+  superadmin
+  owner
+  manager
+  staff
+}
+
+enum TableStatus {
+  available
+  occupied
+  bill_requested
+}
+
+/// eNamad onboarding state for a vendor sub-merchant.
+enum EnamadStatus {
+  none
+  pending
+  verified
+  rejected
+}
+
 // ─────────────────────────── Tenancy & branding ───────────────────────────
 
 model Vendor {
   id              String   @id @default(cuid())
   slug            String   @unique
   name            String
-  country         String   @default("ae") // ISO country used in QR URL
-  currency        String   @default("AED")
-  locale          String   @default("en")
+  country         String   @default("ir")
+  currency        String   @default("IRR")
+  locale          String   @default("fa")
   description     String?
   logoUrl         String?
   coverUrl        String?
   theme           String   @default("darkgold")
-  supportedLangs  String   @default("[\"en\",\"ar\"]") // JSON array
+  supportedLangs  Json     @default("[\"fa\",\"en\"]")
   address         String?
   phone           String?
   email           String?
-  timezone        String   @default("Asia/Dubai")
+  timezone        String   @default("Asia/Tehran")
 
-  // Billing config
-  serviceChargePct Float   @default(0)   // percentage (not money — stays Float)
-  taxPct           Float   @default(0)   // percentage (not money — stays Float)
+  // Billing config — percentages stay Float; money columns use BigInt
+  serviceChargePct Float   @default(0)
+  taxPct           Float   @default(0)
   taxInclusive     Boolean @default(true)
+  // VAT is off by default; must be enabled per-vendor by the owner (pending Iranian accountant sign-off)
+  vatEnabled       Boolean @default(false)
+  vatPct           Float   @default(0)
   tippingEnabled   Boolean @default(true)
-  tipPresets       String  @default("[10,15,20]") // JSON array of %
+  tipPresets       Json    @default("[5,10,15]")
   payAtTable       Boolean @default(true)
   qsrOrdering      Boolean @default(true)
+
+  // Per-vendor monotonic order-number counter.
+  // Incremented inside a SELECT … FOR UPDATE transaction in createOrderFromCart.
+  vendorOrderSeq   Int     @default(0)
+
+  // Sub-merchant onboarding fields (Phase 4/5 gateway integration)
+  gatewaySubMerchantId String?
+  payoutIban           String?
+  ibanVerifiedAt       DateTime?
+  nationalId           String?
+  eNamadStatus         EnamadStatus @default(none)
 
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  menus    Menu[]
-  items    MenuItem[]
-  tables   DiningTable[]
-  orders   Order[]
-  payments Payment[]
-  reviews  Review[]
-  staff    StaffUser[]
+  menus      Menu[]
+  items      MenuItem[]
+  tables     DiningTable[]
+  orders     Order[]
+  payments   Payment[]
+  reviews    Review[]
+  staff      StaffUser[]
+  auditLogs  AuditLog[]
 }
 
 // ───────────────────────────── Menu structure ─────────────────────────────
 
 model Menu {
-  id        String  @id @default(cuid())
-  vendorId  String
-  name      String
-  imageUrl  String?
-  sortOrder Int     @default(0)
-  active    Boolean @default(true)
-  // availability window, JSON: {days:[1..7], start:"08:00", end:"12:00"} or null = always
-  availability String?
+  id           String  @id @default(cuid())
+  vendorId     String
+  name         String
+  imageUrl     String?
+  sortOrder    Int     @default(0)
+  active       Boolean @default(true)
+  availability Json?
 
   vendor     Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   categories Category[]
@@ -75,10 +157,23 @@ model Category {
   name      String
   sortOrder Int    @default(0)
 
-  menu  Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  items MenuItem[]
+  menu         Menu                  @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  items        MenuItem[]
+  translations CategoryTranslation[]
 
   @@index([menuId])
+}
+
+model CategoryTranslation {
+  id         String @id @default(cuid())
+  categoryId String
+  locale     String
+  name       String
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+  @@index([categoryId])
 }
 
 model MenuItem {
@@ -92,15 +187,28 @@ model MenuItem {
   sortOrder   Int     @default(0)
   available   Boolean @default(true)
   calories    Int?
-  // dietary tags JSON array: ["vegetarian","vegan","gluten-free","spicy","new","popular","contains-nuts"]
-  tags        String  @default("[]")
+  tags        Json    @default("[]")
 
-  vendor         Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  vendor         Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  category       Category              @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   modifierGroups ModifierGroup[]
+  translations   MenuItemTranslation[]
 
   @@index([categoryId])
   @@index([vendorId])
+}
+
+model MenuItemTranslation {
+  id          String  @id @default(cuid())
+  menuItemId  String
+  locale      String
+  name        String
+  description String?
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, locale])
+  @@index([menuItemId])
 }
 
 model ModifierGroup {
@@ -112,10 +220,23 @@ model ModifierGroup {
   required  Boolean @default(false)
   sortOrder Int     @default(0)
 
-  item    MenuItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  options ModifierOption[]
+  item         MenuItem                    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  options      ModifierOption[]
+  translations ModifierGroupTranslation[]
 
   @@index([itemId])
+}
+
+model ModifierGroupTranslation {
+  id              String @id @default(cuid())
+  modifierGroupId String
+  locale          String
+  name            String
+
+  modifierGroup ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([modifierGroupId, locale])
+  @@index([modifierGroupId])
 }
 
 model ModifierOption {
@@ -134,15 +255,15 @@ model ModifierOption {
 // ─────────────────────────── Tables & QR codes ────────────────────────────
 
 model DiningTable {
-  id         String  @id @default(cuid())
-  vendorId   String
-  code       String // table number/label e.g. "12"
-  label      String?
-  passcode   String // QR passcode shown on the gate
-  seats      Int     @default(2)
-  area       String? // "Terrace", "Main Hall"
-  status     String  @default("available") // available | occupied | bill-requested
-  createdAt  DateTime @default(now())
+  id        String      @id @default(cuid())
+  vendorId  String
+  code      String
+  label     String?
+  passcode  String
+  seats     Int         @default(2)
+  area      String?
+  status    TableStatus @default(available)
+  createdAt DateTime    @default(now())
 
   vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   orders Order[]
@@ -154,49 +275,51 @@ model DiningTable {
 // ──────────────────────────── Orders & payments ───────────────────────────
 
 model Order {
-  id            String  @id @default(cuid())
-  vendorId      String
-  tableId       String?
-  orderNumber   String  @unique
-  type          String  @default("qsr") // qsr | dinein
-  status        String  @default("open") // open | placed | preparing | ready | served | paid | cancelled
-  source        String  @default("qr")
+  id          String      @id @default(cuid())
+  vendorId    String
+  tableId     String?
+  /// Per-vendor monotonic order number. Unique only within a vendor.
+  /// Formatted as "V-000001". See Vendor.vendorOrderSeq.
+  orderNumber String
+  type        OrderType   @default(qsr)
+  status      OrderStatus @default(open)
+  source      OrderSource @default(qr)
 
   guestName  String?
   guestPhone String?
   notes      String?
 
-  currency       String @default("AED")
-  subtotal       BigInt @default(0)
-  serviceCharge  BigInt @default(0)
-  tax            BigInt @default(0)
-  discount       BigInt @default(0)
-  tipAmount      BigInt @default(0)
-  total          BigInt @default(0)
-  amountPaid     BigInt @default(0)
+  currency      String @default("IRR")
+  subtotal      BigInt @default(0)
+  serviceCharge BigInt @default(0)
+  tax           BigInt @default(0)
+  discount      BigInt @default(0)
+  tipAmount     BigInt @default(0)
+  total         BigInt @default(0)
+  amountPaid    BigInt @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  vendor   Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor   Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   table    DiningTable? @relation(fields: [tableId], references: [id])
   items    OrderItem[]
   payments Payment[]
-  review   Review?
 
+  /// Per-vendor orderNumber is unique — no two orders for the same vendor share a number.
+  @@unique([vendorId, orderNumber])
   @@index([vendorId])
   @@index([status])
 }
 
 model OrderItem {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
   itemId    String?
   name      String
   unitPrice BigInt
-  quantity  Int    @default(1)
-  // selected modifiers JSON: [{groupName,optionName,priceDelta}]
-  modifiers String @default("[]")
+  quantity  Int     @default(1)
+  modifiers Json    @default("[]")
   notes     String?
   lineTotal BigInt
 
@@ -206,43 +329,46 @@ model OrderItem {
 }
 
 model Payment {
-  id          String  @id @default(cuid())
-  vendorId    String
-  orderId     String
-  amount      BigInt  // portion of bill paid (integer rial)
-  tipAmount   BigInt  @default(0)
-  total       BigInt
-  currency    String  @default("AED")
-  method      String  @default("card") // card | apple_pay | google_pay | tabby | benefit | cash
-  status      String  @default("succeeded") // pending | succeeded | failed | refunded
-  splitType   String  @default("full") // full | even | items | custom
-  splitMeta   String? // JSON: {parts, partIndex, items:[]}
-  payerName   String?
-  payerEmail  String?
-  reference   String  @unique
-  createdAt   DateTime @default(now())
+  id        String        @id @default(cuid())
+  vendorId  String
+  orderId   String
+  amount    BigInt
+  tipAmount BigInt        @default(0)
+  total     BigInt
+  currency  String        @default("IRR")
+  method    PaymentMethod @default(ipg)
+  status    PaymentStatus @default(pending)
+  splitType SplitType     @default(full)
+  splitMeta Json?
+  payerName  String?
+  payerEmail String?
+  reference  String        @unique
+  createdAt  DateTime      @default(now())
 
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  review Review?
 
   @@index([orderId])
   @@index([vendorId])
 }
 
+/// Review is per-Payment (not per-Order) — resolves split-bill review ownership (ADR-0007).
+/// Each verified payer may review exactly once via their Payment.
 model Review {
-  id           String  @id @default(cuid())
-  vendorId     String
-  orderId      String? @unique
-  rating       Int // overall 1-5
-  foodRating   Int?
-  serviceRating Int?
+  id             String   @id @default(cuid())
+  vendorId       String
+  paymentId      String   @unique
+  rating         Int
+  foodRating     Int?
+  serviceRating  Int?
   ambienceRating Int?
-  comment      String?
-  guestName    String?
-  createdAt    DateTime @default(now())
+  comment        String?
+  guestName      String?
+  createdAt      DateTime @default(now())
 
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  order  Order? @relation(fields: [orderId], references: [id])
+  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  payment Payment @relation(fields: [paymentId], references: [id])
 
   @@index([vendorId])
 }
@@ -250,16 +376,41 @@ model Review {
 // ──────────────────────────── Admin / staff auth ──────────────────────────
 
 model StaffUser {
-  id           String  @id @default(cuid())
+  id           String    @id @default(cuid())
   vendorId     String?
-  email        String  @unique
+  email        String    @unique
   passwordHash String
   name         String
-  role         String  @default("manager") // superadmin | owner | manager | staff
-  active       Boolean @default(true)
-  createdAt    DateTime @default(now())
+  role         StaffRole @default(manager)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
 
-  vendor Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor    Vendor?    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  auditLogs AuditLog[]
 
   @@index([vendorId])
+}
+
+// ──────────────────────────── Audit log ──────────────────────────────────
+
+/// Append-only audit trail for admin mutations and logins.
+/// actorId references StaffUser.id. vendorId is null for superadmin cross-tenant actions.
+model AuditLog {
+  id       String   @id @default(cuid())
+  actorId  String
+  vendorId String?
+  action   String
+  entity   String
+  entityId String
+  before   Json?
+  after    Json?
+  at       DateTime @default(now())
+
+  actor  StaffUser @relation(fields: [actorId], references: [id])
+  vendor Vendor?   @relation(fields: [vendorId], references: [id])
+
+  @@index([actorId])
+  @@index([vendorId])
+  @@index([entity, entityId])
+  @@index([at])
 }

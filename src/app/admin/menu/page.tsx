@@ -63,12 +63,11 @@ export default async function MenuPage() {
     },
   });
 
-  // Map to a serializable tree for the client component.
   const menus: MenuTree[] = menusRaw.map((m) => ({
     id: m.id,
     name: m.name,
     active: m.active,
-    availability: m.availability,
+    availability: m.availability != null ? JSON.stringify(m.availability) : null,
     categories: m.categories.map((c) => ({
       id: c.id,
       name: c.name,
@@ -80,7 +79,7 @@ export default async function MenuPage() {
         imageUrl: it.imageUrl,
         available: it.available,
         calories: it.calories,
-        tags: it.tags,
+        tags: JSON.stringify(it.tags),
         modifierGroupCount: it.modifierGroups.length,
         modifierOptionCount: it.modifierGroups.reduce(
           (s, g) => s + g.options.length,

@@ -49,13 +49,7 @@ export type OrderStatus =
   | "paid"
   | "cancelled";
 
-export type PaymentMethod =
-  | "card"
-  | "apple_pay"
-  | "google_pay"
-  | "tabby"
-  | "benefit"
-  | "cash";
+export type PaymentMethod = "ipg" | "cash";
 
 export type SplitType = "full" | "even" | "items" | "custom";
 

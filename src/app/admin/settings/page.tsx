@@ -1,6 +1,5 @@
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/admin/actions";
-import { parseJSON } from "@/lib/utils";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { Building2 } from "lucide-react";
 import { SettingsForm } from "@/components/admin/settings/SettingsForm";
@@ -41,8 +40,12 @@ export default async function SettingsPage() {
     );
   }
 
-  const tipPresets = parseJSON<number[]>(vendor.tipPresets, [10, 15, 20]);
-  const supportedLangs = parseJSON<string[]>(vendor.supportedLangs, ["en", "ar"]);
+  const tipPresets = Array.isArray(vendor.tipPresets)
+    ? (vendor.tipPresets as number[])
+    : [5, 10, 15];
+  const supportedLangs = Array.isArray(vendor.supportedLangs)
+    ? (vendor.supportedLangs as string[])
+    : ["fa", "en"];
 
   const initial = {
     name: vendor.name ?? "",

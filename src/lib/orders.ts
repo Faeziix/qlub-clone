@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "./db";
 import { computeBill } from "./pricing";
 import { isFullyPaid } from "./money";
+import { nextOrderNumber } from "./schema-types";
 import { nanoid } from "nanoid";
 import type { CartLine, PaymentMethod, SplitType } from "./types";
 
@@ -32,45 +33,62 @@ export async function createOrderFromCart(input: {
       })
     : null;
 
-  const order = await db.order.create({
-    data: {
-      vendorId: vendor.id,
-      tableId: table?.id,
-      orderNumber: `Q-${Date.now().toString().slice(-6)}-${nanoid(3)}`,
-      type: input.type ?? "qsr",
-      status: "placed",
-      guestName: input.guestName,
-      guestPhone: input.guestPhone,
-      notes: input.notes,
-      currency: vendor.currency,
-      subtotal: bill.subtotal,
-      serviceCharge: bill.serviceCharge,
-      tax: bill.tax,
-      total: bill.total,
-      items: {
-        create: input.lines.map((l) => {
-          const modifierSum = l.modifiers.reduce((s, m) => s + m.priceDelta, 0n);
-          return {
-            itemId: l.itemId,
-            name: l.name,
-            unitPrice: l.unitPrice,
-            quantity: l.quantity,
-            modifiers: JSON.stringify(l.modifiers),
-            notes: l.notes,
-            lineTotal: (l.unitPrice + modifierSum) * BigInt(l.quantity),
-          };
-        }),
+  const order = await db.$transaction(async (tx) => {
+    const freshVendor = await tx.vendor.findUniqueOrThrow({
+      where: { id: vendor.id },
+      select: { vendorOrderSeq: true },
+    });
+
+    const { seq, formatted } = nextOrderNumber(vendor.id, freshVendor.vendorOrderSeq);
+
+    await tx.vendor.update({
+      where: { id: vendor.id },
+      data: { vendorOrderSeq: seq },
+    });
+
+    const newOrder = await tx.order.create({
+      data: {
+        vendorId: vendor.id,
+        tableId: table?.id,
+        orderNumber: formatted,
+        type: input.type ?? "qsr",
+        status: "placed",
+        guestName: input.guestName,
+        guestPhone: input.guestPhone,
+        notes: input.notes,
+        currency: vendor.currency,
+        subtotal: bill.subtotal,
+        serviceCharge: bill.serviceCharge,
+        tax: bill.tax,
+        total: bill.total,
+        items: {
+          create: input.lines.map((l) => {
+            const modifierSum = l.modifiers.reduce((s, m) => s + m.priceDelta, 0n);
+            return {
+              itemId: l.itemId,
+              name: l.name,
+              unitPrice: l.unitPrice,
+              quantity: l.quantity,
+              modifiers: l.modifiers as unknown as object[],
+              notes: l.notes,
+              lineTotal: (l.unitPrice + modifierSum) * BigInt(l.quantity),
+            };
+          }),
+        },
       },
-    },
-    include: { items: true, vendor: true, table: true },
+      include: { items: true, vendor: true, table: true },
+    });
+
+    if (table) {
+      await tx.diningTable.update({
+        where: { id: table.id },
+        data: { status: "occupied" },
+      });
+    }
+
+    return newOrder;
   });
 
-  if (table) {
-    await db.diningTable.update({
-      where: { id: table.id },
-      data: { status: "occupied" },
-    });
-  }
   return order;
 }
 
@@ -102,9 +120,9 @@ export async function recordPayment(input: {
       total,
       currency: order.currency,
       method: input.method,
-      status: "succeeded",
+      status: "pending",
       splitType: input.splitType ?? "full",
-      splitMeta: input.splitMeta ? JSON.stringify(input.splitMeta) : null,
+      splitMeta: input.splitMeta ?? undefined,
       payerName: input.payerName,
       payerEmail: input.payerEmail,
       reference: `pay_${nanoid(16)}`,
@@ -135,7 +153,7 @@ export async function recordPayment(input: {
 
 export async function createReview(input: {
   vendorSlug: string;
-  orderId?: string;
+  paymentId: string;
   rating: number;
   foodRating?: number;
   serviceRating?: number;
@@ -151,7 +169,7 @@ export async function createReview(input: {
   return db.review.create({
     data: {
       vendorId: vendor.id,
-      orderId: input.orderId,
+      paymentId: input.paymentId,
       rating: input.rating,
       foodRating: input.foodRating,
       serviceRating: input.serviceRating,

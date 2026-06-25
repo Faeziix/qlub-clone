@@ -82,18 +82,6 @@ const eggStyle = {
     { name: "Omelette" },
   ],
 };
-const breadChoice = {
-  name: "Choice of bread",
-  required: true,
-  minSelect: 1,
-  maxSelect: 1,
-  options: [
-    { name: "Sourdough", isDefault: true },
-    { name: "Flûte à l'ancienne" },
-    { name: "Multigrain" },
-    { name: "Brioche", priceDelta: 3 },
-  ],
-};
 const extras = {
   name: "Add extras",
   minSelect: 0,
@@ -591,25 +579,28 @@ async function seedVendor(opts: {
     data: {
       slug: opts.slug,
       name: opts.name,
-      country: "ae",
-      currency: "AED",
+      country: "ir",
+      currency: "IRR",
+      locale: "fa",
+      timezone: "Asia/Tehran",
       theme: opts.theme,
       logoUrl: opts.logoUrl,
       coverUrl: opts.coverUrl,
       description: opts.description,
-      supportedLangs: JSON.stringify(["en", "ar", "fr", "es", "tr", "ru"]),
-      address: "The Dubai Mall, Downtown Dubai, UAE",
-      phone: "+971 4 000 0000",
-      email: "hello@example.com",
-      serviceChargePct: opts.serviceChargePct ?? 7,
-      taxPct: opts.taxPct ?? 5,
+      supportedLangs: ["fa", "en"],
+      address: "تهران، خیابان ولیعصر",
+      phone: "+98 21 0000 0000",
+      email: "hello@example.ir",
+      serviceChargePct: opts.serviceChargePct ?? 0,
+      taxPct: opts.taxPct ?? 0,
+      vatEnabled: false,
       taxInclusive: true,
       tippingEnabled: true,
-      tipPresets: JSON.stringify([10, 15, 20]),
+      tipPresets: [5, 10, 15],
     },
   });
 
-  const createdItems: { id: string; price: number; name: string }[] = [];
+  const createdItems: { id: string; price: bigint; name: string }[] = [];
 
   for (let m = 0; m < opts.menus.length; m++) {
     const menu = opts.menus[m];
@@ -628,15 +619,16 @@ async function seedVendor(opts: {
       });
       for (let i = 0; i < cat.items.length; i++) {
         const it = cat.items[i];
+        const priceRial = BigInt(it.price) * 1000n;
         const createdItem = await db.menuItem.create({
           data: {
             vendorId: vendor.id,
             categoryId: createdCat.id,
             name: it.name,
             description: it.description,
-            price: it.price,
+            price: priceRial,
             imageUrl: it.imageUrl,
-            tags: JSON.stringify(it.tags ?? []),
+            tags: it.tags ?? [],
             calories: it.calories,
             sortOrder: i,
             modifierGroups: it.modifierGroups
@@ -650,7 +642,7 @@ async function seedVendor(opts: {
                     options: {
                       create: g.options.map((o, oi) => ({
                         name: o.name,
-                        priceDelta: o.priceDelta ?? 0,
+                        priceDelta: BigInt(o.priceDelta ?? 0) * 1000n,
                         isDefault: o.isDefault ?? false,
                         sortOrder: oi,
                       })),
@@ -662,22 +654,21 @@ async function seedVendor(opts: {
         });
         createdItems.push({
           id: createdItem.id,
-          price: it.price,
+          price: priceRial,
           name: it.name,
         });
       }
     }
   }
 
-  // Tables with QR passcodes
   const tables = [];
-  const areas = ["Main Hall", "Terrace", "Main Hall", "Window", "Terrace"];
+  const areas = ["سالن اصلی", "تراس", "سالن اصلی", "پنجره", "تراس"];
   for (let t = 1; t <= 12; t++) {
     const table = await db.diningTable.create({
       data: {
         vendorId: vendor.id,
         code: String(t),
-        label: `Table ${t}`,
+        label: `میز ${t}`,
         passcode: randomTablePasscode(),
         seats: 2 + (t % 4),
         area: areas[t % areas.length],
@@ -692,22 +683,23 @@ async function seedVendor(opts: {
 
 async function seedOrders(
   vendorId: string,
-  items: { id: string; price: number; name: string }[],
+  items: { id: string; price: bigint; name: string }[],
   tables: { id: string }[],
-  offset = 0
+  orderSeqStart = 0
 ) {
-  const names = ["Sara", "Omar", "Layla", "James", "Fatima", "Noah", "Aisha", "Liam"];
-  const methods = ["card", "apple_pay", "google_pay", "tabby"];
+  const names = ["سارا", "عمر", "لیلا", "فاطمه", "نوح", "عائشه", "علی", "مریم"];
   const now = Date.now();
+
+  let currentSeq = orderSeqStart;
 
   for (let o = 0; o < 24; o++) {
     const pick = items
       .sort(() => 0.5 - Math.random())
       .slice(0, 1 + Math.floor(Math.random() * 3));
-    let subtotal = 0;
+    let subtotal = 0n;
     const orderItems = pick.map((p) => {
       const qty = 1 + Math.floor(Math.random() * 2);
-      const line = p.price * qty;
+      const line = p.price * BigInt(qty);
       subtotal += line;
       return {
         itemId: p.id,
@@ -717,63 +709,65 @@ async function seedOrders(
         lineTotal: line,
       };
     });
-    const serviceCharge = Math.round(subtotal * 0.07 * 100) / 100;
-    const tax = Math.round((subtotal + serviceCharge) * 0.05 * 100) / 100;
-    const tip = o % 3 === 0 ? Math.round(subtotal * 0.1 * 100) / 100 : 0;
-    const total = Math.round((subtotal + serviceCharge + tip) * 100) / 100;
+    const serviceCharge = (subtotal * 700n) / 10_000n;
+    const tip = o % 3 === 0 ? (subtotal * 1000n) / 10_000n : 0n;
+    const total = subtotal + serviceCharge + tip;
     const daysAgo = Math.floor(o / 3);
     const createdAt = new Date(now - daysAgo * 86400000 - o * 1800000);
-    const paid = o > 4; // a few still open
+    const paid = o > 4;
+
+    currentSeq += 1;
+    const orderNumber = `V-${String(currentSeq).padStart(6, "0")}`;
 
     const order = await db.order.create({
       data: {
         vendorId,
         tableId: tables[o % tables.length].id,
-        orderNumber: `Q-${String(10240 + offset + o)}`,
+        orderNumber,
         type: o % 2 === 0 ? "dinein" : "qsr",
-        status: paid ? "paid" : ["placed", "preparing", "ready"][o % 3],
+        status: paid ? "paid" : (["placed", "preparing", "ready"] as const)[o % 3],
         guestName: names[o % names.length],
-        currency: "AED",
+        currency: "IRR",
         subtotal,
         serviceCharge,
-        tax,
         tipAmount: tip,
         total,
-        amountPaid: paid ? total : 0,
+        amountPaid: paid ? total : 0n,
         createdAt,
         items: { create: orderItems },
       },
     });
 
     if (paid) {
-      await db.payment.create({
+      const payment = await db.payment.create({
         data: {
           vendorId,
           orderId: order.id,
           amount: subtotal + serviceCharge,
           tipAmount: tip,
           total,
-          method: methods[o % methods.length],
+          method: "ipg",
           status: "succeeded",
           splitType: "full",
           payerName: names[o % names.length],
-          reference: `pay_${order.orderNumber}_${o}`,
+          reference: `pay_${orderNumber}_${o}`,
           createdAt,
         },
       });
+
       if (o % 2 === 0) {
         await db.review.create({
           data: {
             vendorId,
-            orderId: order.id,
+            paymentId: payment.id,
             rating: 4 + (o % 2),
             foodRating: 4 + (o % 2),
             serviceRating: 5 - (o % 2),
             ambienceRating: 4 + (o % 2),
             comment: [
-              "Lovely brunch, the steak frites was perfect!",
-              "Quick service and easy payment via QR.",
-              "Great coffee and pastries. Will return.",
+              "عالی بود، استیک فوق العاده!",
+              "سرویس سریع و پرداخت آسان با QR.",
+              "قهوه و شیرینی خوب. حتماً برمی‌گردیم.",
               "",
             ][o % 4],
             guestName: names[o % names.length],
@@ -783,6 +777,8 @@ async function seedOrders(
       }
     }
   }
+
+  return currentSeq;
 }
 
 async function main() {
@@ -801,38 +797,41 @@ async function main() {
   await db.vendor.deleteMany();
 
   const paul = await seedVendor({
-    slug: "paul-uae",
-    name: "Paul - UAE",
+    slug: "paul-ir",
+    name: "پل — رستوران فرانسوی",
     theme: "darkgold",
     description:
-      "French bakery & café, depuis 1889. Freshly baked breads, viennoiseries and all-day brunch.",
+      "کافه و نانوایی فرانسوی، از سال ۱۸۸۹. نان تازه، شیرینی و صبحانه تمام روز.",
     logoUrl: UNS("photo-1559925393-8be0ec4767c8"),
     coverUrl: `${CDN}/372604/mo9oanvaspd80xtxea8_Entrecote%20Steak%20Frites.jpg`,
-    serviceChargePct: 7,
-    taxPct: 5,
     menus: paulMenus,
   });
-  await seedOrders(paul.vendor.id, paul.items, paul.tables);
+  const paulFinalSeq = await seedOrders(paul.vendor.id, paul.items, paul.tables, 0);
+  await db.vendor.update({
+    where: { id: paul.vendor.id },
+    data: { vendorOrderSeq: paulFinalSeq },
+  });
 
-  // Second demo vendor so the platform feels multi-tenant
   const bistro = await seedVendor({
-    slug: "olive-bistro",
-    name: "Olive & Thyme Bistro",
+    slug: "olive-bistro-ir",
+    name: "رستوران زیتون",
     theme: "emerald",
-    description: "Mediterranean small plates & wood-fired mains.",
+    description: "پیش‌غذاهای مدیترانه‌ای و غذاهای تنوری.",
     logoUrl: UNS("photo-1552566626-52f8b828add9"),
     coverUrl: UNS("photo-1414235077428-338989a2e8c0"),
     menus: [paulMenus[1], paulMenus[3]],
   });
-  await seedOrders(bistro.vendor.id, bistro.items, bistro.tables, 1000);
+  const bistroFinalSeq = await seedOrders(bistro.vendor.id, bistro.items, bistro.tables, 0);
+  await db.vendor.update({
+    where: { id: bistro.vendor.id },
+    data: { vendorOrderSeq: bistroFinalSeq },
+  });
 
-  // Staff users — each gets a unique cryptographically-random password,
-  // printed once so the operator can sign in. No shared/static credential.
   const demoStaff = [
-    { email: "admin@qlub.io", name: "Platform Admin", role: "superadmin", vendorId: null },
-    { email: "owner@paul.ae", name: "Pierre Dubois", role: "owner", vendorId: paul.vendor.id },
-    { email: "manager@paul.ae", name: "Yara Haddad", role: "manager", vendorId: paul.vendor.id },
-    { email: "owner@olive.ae", name: "Elena Rossi", role: "owner", vendorId: bistro.vendor.id },
+    { email: "admin@qlub.ir", name: "مدیر پلتفرم", role: "superadmin" as const, vendorId: null },
+    { email: "owner@paul.ir", name: "پیر دوبوا", role: "owner" as const, vendorId: paul.vendor.id },
+    { email: "manager@paul.ir", name: "یارا حداد", role: "manager" as const, vendorId: paul.vendor.id },
+    { email: "owner@olive.ir", name: "النا روسی", role: "owner" as const, vendorId: bistro.vendor.id },
   ];
 
   const generatedCredentials: { email: string; password: string }[] = [];
@@ -845,7 +844,7 @@ async function main() {
   }
 
   console.log("✅ Seed complete.");
-  console.log("   Customer: /qr/ae/paul-uae");
+  console.log("   Customer: /qr/ir/paul-ir");
   console.log("   Admin:    /admin/login");
   console.log("   Generated staff credentials (shown once — copy them now):");
   for (const { email, password } of generatedCredentials) {

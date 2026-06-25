@@ -49,6 +49,10 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ `Float` money columns with `round2` and epsilon comparisons → ✅ `BigInt` integer rial only; conversions only via `money.ts`; exact `isFullyPaid` comparison.
 - ❌ `bigint` cannot be JSON-serialized → ✅ Serialize to `String(bigintValue)` at the server/client boundary; convert back with `BigInt(str)` at point of use. Never pass raw `bigint` props to client components.
 - ❌ Explicit type parameters on `React.useMemo<bigint>()` block React Compiler → ✅ Let TypeScript infer from the return type; remove explicit type parameter.
+- ❌ `JSON.stringify` in seed/queries for Json columns → ✅ With native Prisma `Json`, pass the array/object directly; no stringify needed.
+- ❌ `parseJSON` assumes string input → ✅ Updated to accept `unknown`; non-string values pass through as-is (already parsed by Prisma).
+- ❌ `Review.orderId` creates split-bill conflict → ✅ `Review.paymentId @unique`: each payer has one Payment and can review once.
+- ❌ `JSON.stringify` for `OrderItem.modifiers` on write → ✅ Pass array directly; Prisma handles Json serialization.
 
 ## Dependencies & Tooling
 
@@ -68,6 +72,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/auth.ts` — JWT session management
 - `src/lib/money.ts` — ALL money conversions: `MONETARY_UNIT`, `rialToToman`, `tomanToRial`, `rialToGatewayUnit`, `gatewayUnitToRial`, `formatRialAsToman`, `parseRialFromInput`, `isFullyPaid`
 - `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip) — all `bigint` arithmetic
+- `src/lib/schema-types.ts` — Enum value sets, type guards, Iran defaults, `nextOrderNumber`, `AuditLogEntry`
 - `src/lib/orders.ts` — Order/payment/review service layer
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
 
@@ -83,6 +88,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - #3 — Tables actions IDOR fix (auth + vendor scoping)
 - #4 — Tooling standardisation (bun, Node pin, CI, env example)
 - #7 — Integer-rial money model (money.ts deep module + property tests)
+- #8 — Schema modernization (native enums, native Json, Iran defaults, translation tables, orderNumber sequence, AuditLog, sub-merchant fields)
 
 **In progress / next:**
 - M2 remaining issues on branch `feat/m2-data-money-core`

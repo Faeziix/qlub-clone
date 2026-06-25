@@ -39,11 +39,8 @@ interface OrderData {
 }
 
 const METHODS: { id: PaymentMethod; label: string; emoji: string }[] = [
-  { id: "apple_pay", label: "Apple Pay", emoji: "" },
-  { id: "google_pay", label: "Google Pay", emoji: "🅖" },
-  { id: "card", label: "Credit / Debit Card", emoji: "💳" },
-  { id: "tabby", label: "Tabby — Pay in 4", emoji: "🟢" },
-  { id: "benefit", label: "Benefit Pay", emoji: "🔵" },
+  { id: "ipg", label: "درگاه پرداخت اینترنتی", emoji: "💳" },
+  { id: "cash", label: "پرداخت نقدی", emoji: "💵" },
 ];
 
 type Step = "pay" | "success" | "review" | "done";
@@ -89,9 +86,10 @@ export function PaymentFlow({
   const [customAmount, setCustomAmount] = React.useState("");
   const [tipPct, setTipPct] = React.useState<number | "custom" | null>(null);
   const [customTip, setCustomTip] = React.useState("");
-  const [method, setMethod] = React.useState<PaymentMethod>("apple_pay");
+  const [method, setMethod] = React.useState<PaymentMethod>("ipg");
   const [processing, setProcessing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [completedPaymentId, setCompletedPaymentId] = React.useState<string | null>(null);
 
   // ── compute the base amount this guest pays (before tip) ──
   const baseAmount = React.useMemo(() => {
@@ -152,6 +150,7 @@ export function PaymentFlow({
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error ?? "Payment failed");
+      setCompletedPaymentId(data.payment?.id ?? null);
       setStep("success");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Payment failed");
@@ -199,7 +198,7 @@ export function PaymentFlow({
         t={t}
         dir={dir}
         vendorSlug={vendorSlug}
-        orderId={order.id}
+        paymentId={completedPaymentId ?? ""}
         onDone={() => setStep("done")}
       />
     );
@@ -449,7 +448,7 @@ export function PaymentFlow({
                   method === m.id ? "border-brand bg-brand-soft" : "border-line"
                 )}
               >
-                <span className="text-xl">{m.id === "apple_pay" ? "" : m.emoji}</span>
+                <span className="text-xl">{m.emoji}</span>
                 <span className="flex-1 font-semibold">{m.label}</span>
                 <span
                   className={cn(
@@ -501,13 +500,13 @@ function ReviewScreen({
   t,
   dir,
   vendorSlug,
-  orderId,
+  paymentId,
   onDone,
 }: {
   t: (k: string) => string;
   dir: string;
   vendorSlug: string;
-  orderId: string;
+  paymentId: string;
   onDone: () => void;
 }) {
   const [rating, setRating] = React.useState(0);
@@ -526,7 +525,7 @@ function ReviewScreen({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           vendorSlug,
-          orderId,
+          paymentId,
           rating: rating || 5,
           foodRating: food || undefined,
           serviceRating: service || undefined,

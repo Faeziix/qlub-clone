@@ -81,7 +81,7 @@ export default async function OrdersPage() {
       name: it.name,
       unitPrice: String(it.unitPrice),
       quantity: it.quantity,
-      modifiers: it.modifiers,
+      modifiers: it.modifiers != null ? JSON.stringify(it.modifiers) : null,
       notes: it.notes,
       lineTotal: String(it.lineTotal),
     })),

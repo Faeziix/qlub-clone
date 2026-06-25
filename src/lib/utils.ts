@@ -28,7 +28,9 @@ export function formatAmount(amount: number): string {
   return amount.toFixed(2);
 }
 
-export function parseJSON<T>(value: string | null | undefined, fallback: T): T {
+export function parseJSON<T>(value: string | null | undefined | unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== "string") return value as T;
   if (!value) return fallback;
   try {
     return JSON.parse(value) as T;

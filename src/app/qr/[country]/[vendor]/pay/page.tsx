@@ -1,7 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getOrder, getVendorBySlug } from "@/lib/queries";
 import { PaymentFlow } from "@/components/customer/PaymentFlow";
-import { parseJSON } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +26,7 @@ export default async function PayPage({
     name: i.name,
     quantity: i.quantity,
     lineTotal: String(i.lineTotal),
-    modifiers: parseJSON<{ optionName: string }[]>(i.modifiers, []),
+    modifiers: Array.isArray(i.modifiers) ? (i.modifiers as { optionName: string }[]) : [],
   }));
 
   return (

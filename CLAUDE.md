@@ -18,6 +18,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - **ADR 0008** — Schema modernization: native Postgres enums, JSONB columns, Iran defaults (IRR/fa/Asia/Tehran/ir), translation tables, monotonic per-vendor orderNumber, AuditLog, sub-merchant fields.
 - **ADR 0009** — Server-authoritative pricing: re-fetch DB prices at order creation; honored-price rule with `priceChanged` flag; `$transaction` wrapping for all money writes; `initiatePaymentLeg` with TTL reservation; idempotency keys persisted and deduplicated.
 - **ADR 0010** — next-intl Farsi-first RTL foundation: `[locale]` path segment; default locale `fa`; `app/[locale]/layout.tsx` sets `<html lang dir>` server-side; middleware handles cookie + Accept-Language; removed 6 dead locales; Vazirmatn font; imperative DOM dir mutations removed.
+- **ADR 0011** — Persian formatting deep modules: `toman-formatter.ts` owns Toman display (never IRR Intl style), `digit-normalizer.ts` normalizes both Persian (U+06F0) and Arabic-Indic (U+0660) digit families, `jalali.ts` enforces Asia/Tehran via TZDate, `banking-holidays.ts` provides the static holiday calendar and settlement-day arithmetic.
 - **Dual-track architecture** — Track A (Vercel + Neon, synthetic data only, separate repo/brand) vs Track B (domestic Iran infra, production). See PRD issue #1.
 - **Integer-rial money** — All monetary values are BigInt rial with no floats. Conversion only via `money.ts` at named boundaries.
 - **Server-authoritative pricing** — Bill computed from DB prices at order creation, snapshotted onto `OrderItem`. Payment verifies against the snapshot.
@@ -68,6 +69,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ Order/payment writes were non-transactional → ✅ `createOrderFromCart`, `recordPayment`, and `initiatePaymentLeg` all use `db.$transaction`.
 - ❌ `nextVendorOrderNumber` used `db.$queryRaw` directly → ✅ Accepts a transaction client `tx` so the increment is atomic within the order creation transaction.
 - ❌ `createOrderFromCart` returned the order directly → ✅ Returns `{ order, priceChanged }` tuple; update all callers to destructure.
+- ❌ `new TZDate(Date | number, tz)` does not work — TS overloads require `Date` or `number` separately → ✅ Use a conditional branch: `typeof date === "number" ? new TZDate(date, tz) : new TZDate(date, tz)`
+- ❌ `Intl.NumberFormat` with `style: 'currency', currency: 'IRR'` renders incorrectly for Iranian users → ✅ Use `toman-formatter.ts` exclusively; never IRR currency style.
+- ❌ Banking-holiday calendar must be updated annually (religious holidays shift ~10 days/year) → ✅ Update `IRANIAN_BANKING_HOLIDAYS` in `banking-holidays.ts` at each Nowruz; see `docs/i18n/banking-holiday-calendar.md`.
 
 ## Dependencies & Tooling
 
@@ -86,6 +90,10 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/auth.ts` — JWT session management
 - `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip)
 - `src/lib/orders.ts` — `createOrderFromCart` (server-authoritative, returns `{order, priceChanged}`), `initiatePaymentLeg` (pending reservation with TTL), `recordPayment` (idempotent, transactional), `createReview`
+- `src/lib/toman-formatter.ts` — Persian toman display: `formatRialAsTomanPersian`, `formatTomanAmountPersian`, `latinDigitsToPersian`, `persianDigitsToLatin`, `TOMAN_HEZAR_THRESHOLD_RIAL`
+- `src/lib/digit-normalizer.ts` — Digit normalization: `normalizeDigits`, `normalizePhoneForValidation`, `isPersianDigit`, `isArabicIndicDigit`
+- `src/lib/jalali.ts` — Jalali dates in Tehran: `toTehranDate`, `getJalaliParts`, `formatJalaliDate`, `formatJalaliDateTime`, `isTehranFriday`, `isTehranThursday`, `addDaysTehran`
+- `src/lib/banking-holidays.ts` — Iranian banking holidays: `isBankingHoliday`, `isIranianWeekend`, `isOfficialHoliday`, `nextBankingDay`, `addBankingDays`, `settlementDueDate`, `IRANIAN_BANKING_HOLIDAYS`
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
 
 ## API & Data Layer
@@ -109,6 +117,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 **Done (M3 issues):**
 - #10 — next-intl Farsi-first RTL foundation: `[locale]` segment, server-side `<html lang dir>`, middleware, fa/en only
+- #11 — Persian formatting deep modules: toman-formatter, digit-normalizer, jalali, banking-holidays
 
 **In progress / next:**
 - M3: remaining issues (design system, Vazirmatn, tokens)

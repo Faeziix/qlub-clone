@@ -80,7 +80,7 @@ export default async function MenuPage() {
         imageUrl: it.imageUrl,
         available: it.available,
         calories: it.calories,
-        tags: it.tags as string,
+        tags: Array.isArray(it.tags) ? (it.tags as string[]) : [],
         modifierGroupCount: it.modifierGroups.length,
         modifierOptionCount: it.modifierGroups.reduce(
           (s, g) => s + g.options.length,

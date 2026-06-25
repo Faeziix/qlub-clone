@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { DietBadge } from "@/components/ui/Badge";
 import { EmptyRow } from "@/components/admin/ui";
-import { cn, formatMoney, parseJSON } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 import { formatRialAsToman } from "@/lib/money";
 import {
   toggleItemAvailability,
@@ -36,7 +36,7 @@ export interface MenuItemNode {
   imageUrl: string | null;
   available: boolean;
   calories: number | null;
-  tags: string;
+  tags: string[];
   modifierGroupCount: number;
   modifierOptionCount: number;
 }
@@ -203,7 +203,7 @@ function ItemRow({
   onEdit: () => void;
 }) {
   const [isPending, startTransition] = React.useTransition();
-  const tags = parseJSON<string[]>(item.tags, []);
+  const tags = item.tags;
 
   const [editingPrice, setEditingPrice] = React.useState(false);
   const currentToman = formatRialAsToman(BigInt(item.priceRialStr));

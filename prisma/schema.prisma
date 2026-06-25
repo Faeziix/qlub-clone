@@ -1,265 +1,368 @@
-// Qlub clone — data model for QR pay-at-table ordering + restaurant management.
-// SQLite for zero-config local/dev; swap `provider` to "postgresql" for production.
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
-
-// ─────────────────────────── Tenancy & branding ───────────────────────────
 
 model Vendor {
-  id              String   @id @default(cuid())
-  slug            String   @unique
-  name            String
-  country         String   @default("ae") // ISO country used in QR URL
-  currency        String   @default("AED")
-  locale          String   @default("en")
-  description     String?
-  logoUrl         String?
-  coverUrl        String?
-  theme           String   @default("darkgold")
-  supportedLangs  String   @default("[\"en\",\"ar\"]") // JSON array
-  address         String?
-  phone           String?
-  email           String?
-  timezone        String   @default("Asia/Dubai")
-
-  // Billing config
-  serviceChargePct Float   @default(0)
-  taxPct           Float   @default(0)   // VAT
-  taxInclusive     Boolean @default(true)
-  tippingEnabled   Boolean @default(true)
-  tipPresets       String  @default("[10,15,20]") // JSON array of %
-  payAtTable       Boolean @default(true)
-  qsrOrdering      Boolean @default(true)
-
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  menus    Menu[]
-  items    MenuItem[]
-  tables   DiningTable[]
-  orders   Order[]
-  payments Payment[]
-  reviews  Review[]
-  staff    StaffUser[]
+  id                   String        @id @default(cuid())
+  slug                 String        @unique
+  name                 String
+  country              String        @default("ir")
+  currency             String        @default("IRR")
+  locale               String        @default("fa")
+  description          String?
+  logoUrl              String?
+  coverUrl             String?
+  theme                String        @default("darkgold")
+  supportedLangs       Json          @default("[\"fa\", \"en\"]")
+  address              String?
+  phone                String?
+  email                String?
+  timezone             String        @default("Asia/Tehran")
+  serviceChargePct     Float         @default(0)
+  taxPct               Float         @default(0)
+  taxInclusive         Boolean       @default(true)
+  vatEnabled           Boolean       @default(false)
+  vatPct               Float         @default(0)
+  tippingEnabled       Boolean       @default(true)
+  tipPresets           Json          @default("[5, 10, 15]")
+  payAtTable           Boolean       @default(true)
+  qsrOrdering          Boolean       @default(true)
+  vendorOrderSeq       Int           @default(0)
+  gatewaySubMerchantId String?
+  payoutIban           String?
+  ibanVerifiedAt       DateTime?
+  nationalId           String?
+  eNamadStatus         EnamadStatus  @default(none)
+  active               Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  AuditLog             AuditLog[]
+  tables               DiningTable[]
+  menus                Menu[]
+  items                MenuItem[]
+  orders               Order[]
+  payments             Payment[]
+  reviews              Review[]
+  staff                StaffUser[]
 }
 
-// ───────────────────────────── Menu structure ─────────────────────────────
-
 model Menu {
-  id        String  @id @default(cuid())
-  vendorId  String
-  name      String
-  imageUrl  String?
-  sortOrder Int     @default(0)
-  active    Boolean @default(true)
-  // availability window, JSON: {days:[1..7], start:"08:00", end:"12:00"} or null = always
-  availability String?
-
-  vendor     Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  categories Category[]
+  id           String     @id @default(cuid())
+  vendorId     String
+  name         String
+  imageUrl     String?
+  sortOrder    Int        @default(0)
+  active       Boolean    @default(true)
+  availability Json?
+  categories   Category[]
+  vendor       Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@index([vendorId])
 }
 
 model Category {
-  id        String @id @default(cuid())
-  menuId    String
-  name      String
-  sortOrder Int    @default(0)
-
-  menu  Menu       @relation(fields: [menuId], references: [id], onDelete: Cascade)
-  items MenuItem[]
+  id                  String                @id @default(cuid())
+  menuId              String
+  name                String
+  sortOrder           Int                   @default(0)
+  menu                Menu                  @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  CategoryTranslation CategoryTranslation[]
+  items               MenuItem[]
 
   @@index([menuId])
 }
 
 model MenuItem {
-  id          String  @id @default(cuid())
-  vendorId    String
-  categoryId  String
-  name        String
-  description String?
-  price       Float
-  imageUrl    String?
-  sortOrder   Int     @default(0)
-  available   Boolean @default(true)
-  calories    Int?
-  // dietary tags JSON array: ["vegetarian","vegan","gluten-free","spicy","new","popular","contains-nuts"]
-  tags        String  @default("[]")
-
-  vendor         Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  category       Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  modifierGroups ModifierGroup[]
+  id                  String                @id @default(cuid())
+  vendorId            String
+  categoryId          String
+  name                String
+  description         String?
+  price               BigInt
+  imageUrl            String?
+  sortOrder           Int                   @default(0)
+  available           Boolean               @default(true)
+  calories            Int?
+  tags                Json                  @default("[]")
+  category            Category              @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  vendor              Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  MenuItemTranslation MenuItemTranslation[]
+  modifierGroups      ModifierGroup[]
 
   @@index([categoryId])
   @@index([vendorId])
 }
 
 model ModifierGroup {
-  id        String  @id @default(cuid())
-  itemId    String
-  name      String
-  minSelect Int     @default(0)
-  maxSelect Int     @default(1)
-  required  Boolean @default(false)
-  sortOrder Int     @default(0)
-
-  item    MenuItem         @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  options ModifierOption[]
+  id                       String                     @id @default(cuid())
+  itemId                   String
+  name                     String
+  minSelect                Int                        @default(0)
+  maxSelect                Int                        @default(1)
+  required                 Boolean                    @default(false)
+  sortOrder                Int                        @default(0)
+  item                     MenuItem                   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  ModifierGroupTranslation ModifierGroupTranslation[]
+  options                  ModifierOption[]
 
   @@index([itemId])
 }
 
 model ModifierOption {
-  id         String  @id @default(cuid())
+  id         String        @id @default(cuid())
   groupId    String
   name       String
-  priceDelta Float   @default(0)
-  isDefault  Boolean @default(false)
-  sortOrder  Int     @default(0)
-
-  group ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  priceDelta BigInt        @default(0)
+  isDefault  Boolean       @default(false)
+  sortOrder  Int           @default(0)
+  group      ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@index([groupId])
 }
 
-// ─────────────────────────── Tables & QR codes ────────────────────────────
-
 model DiningTable {
-  id         String  @id @default(cuid())
-  vendorId   String
-  code       String // table number/label e.g. "12"
-  label      String?
-  passcode   String // QR passcode shown on the gate
-  seats      Int     @default(2)
-  area       String? // "Terrace", "Main Hall"
-  status     String  @default("available") // available | occupied | bill-requested
-  createdAt  DateTime @default(now())
-
-  vendor Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  orders Order[]
+  id        String      @id @default(cuid())
+  vendorId  String
+  code      String
+  label     String?
+  passcode  String
+  seats     Int         @default(2)
+  area      String?
+  status    TableStatus @default(available)
+  createdAt DateTime    @default(now())
+  vendor    Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orders    Order[]
 
   @@unique([vendorId, code])
   @@index([vendorId])
 }
 
-// ──────────────────────────── Orders & payments ───────────────────────────
-
 model Order {
-  id            String  @id @default(cuid())
+  id            String       @id @default(cuid())
   vendorId      String
   tableId       String?
-  orderNumber   String  @unique
-  type          String  @default("qsr") // qsr | dinein
-  status        String  @default("open") // open | placed | preparing | ready | served | paid | cancelled
-  source        String  @default("qr")
+  orderNumber   String
+  type          OrderType    @default(qsr)
+  status        OrderStatus  @default(open)
+  source        OrderSource  @default(qr)
+  guestName     String?
+  guestPhone    String?
+  notes         String?
+  currency      String       @default("IRR")
+  subtotal      BigInt       @default(0)
+  serviceCharge BigInt       @default(0)
+  tax           BigInt       @default(0)
+  discount      BigInt       @default(0)
+  tipAmount     BigInt       @default(0)
+  total         BigInt       @default(0)
+  amountPaid    BigInt       @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  table         DiningTable? @relation(fields: [tableId], references: [id])
+  vendor        Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items         OrderItem[]
+  payments      Payment[]
 
-  guestName  String?
-  guestPhone String?
-  notes      String?
-
-  currency       String @default("AED")
-  subtotal       Float  @default(0)
-  serviceCharge  Float  @default(0)
-  tax            Float  @default(0)
-  discount       Float  @default(0)
-  tipAmount      Float  @default(0)
-  total          Float  @default(0)
-  amountPaid     Float  @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  vendor   Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  table    DiningTable? @relation(fields: [tableId], references: [id])
-  items    OrderItem[]
-  payments Payment[]
-  review   Review?
-
+  @@unique([vendorId, orderNumber])
   @@index([vendorId])
   @@index([status])
 }
 
 model OrderItem {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
   itemId    String?
   name      String
-  unitPrice Float
-  quantity  Int    @default(1)
-  // selected modifiers JSON: [{groupName,optionName,priceDelta}]
-  modifiers String @default("[]")
+  unitPrice BigInt
+  quantity  Int     @default(1)
+  modifiers Json    @default("[]")
   notes     String?
-  lineTotal Float
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lineTotal BigInt
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
 }
 
 model Payment {
-  id          String  @id @default(cuid())
-  vendorId    String
-  orderId     String
-  amount      Float // portion of bill paid
-  tipAmount   Float   @default(0)
-  total       Float
-  currency    String  @default("AED")
-  method      String  @default("card") // card | apple_pay | google_pay | tabby | benefit | cash
-  status      String  @default("succeeded") // pending | succeeded | failed | refunded
-  splitType   String  @default("full") // full | even | items | custom
-  splitMeta   String? // JSON: {parts, partIndex, items:[]}
-  payerName   String?
-  payerEmail  String?
-  reference   String  @unique
-  createdAt   DateTime @default(now())
-
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id               String        @id @default(cuid())
+  vendorId         String
+  orderId          String
+  amount           BigInt
+  tipAmount        BigInt        @default(0)
+  total            BigInt
+  currency         String        @default("IRR")
+  method           PaymentMethod @default(ipg)
+  status           PaymentStatus @default(pending)
+  splitType        SplitType     @default(full)
+  splitMeta        Json?
+  payerName        String?
+  payerEmail       String?
+  reference        String        @unique
+  idempotencyKey   String?       @unique
+  trackId          String?
+  gatewayReference String?       @unique
+  expiresAt        DateTime?
+  verifiedAt       DateTime?
+  parentPaymentId  String?
+  createdAt        DateTime      @default(now())
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  vendor           Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  Review           Review?
 
   @@index([orderId])
   @@index([vendorId])
+  @@index([expiresAt])
+  @@index([idempotencyKey])
+  @@index([status])
 }
 
 model Review {
-  id           String  @id @default(cuid())
-  vendorId     String
-  orderId      String? @unique
-  rating       Int // overall 1-5
-  foodRating   Int?
-  serviceRating Int?
+  id             String   @id @default(cuid())
+  vendorId       String
+  paymentId      String   @unique
+  rating         Int
+  foodRating     Int?
+  serviceRating  Int?
   ambienceRating Int?
-  comment      String?
-  guestName    String?
-  createdAt    DateTime @default(now())
-
-  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  order  Order? @relation(fields: [orderId], references: [id])
+  comment        String?
+  guestName      String?
+  createdAt      DateTime @default(now())
+  Payment        Payment  @relation(fields: [paymentId], references: [id])
+  vendor         Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@index([vendorId])
 }
 
-// ──────────────────────────── Admin / staff auth ──────────────────────────
-
 model StaffUser {
-  id           String  @id @default(cuid())
+  id           String     @id @default(cuid())
   vendorId     String?
-  email        String  @unique
+  email        String     @unique
   passwordHash String
   name         String
-  role         String  @default("manager") // superadmin | owner | manager | staff
-  active       Boolean @default(true)
-  createdAt    DateTime @default(now())
-
-  vendor Vendor? @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  role         StaffRole  @default(manager)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  AuditLog     AuditLog[]
+  vendor       Vendor?    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
 
   @@index([vendorId])
+}
+
+model AuditLog {
+  id        String    @id @default(cuid())
+  actorId   String
+  vendorId  String?
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  at        DateTime  @default(now())
+  StaffUser StaffUser @relation(fields: [actorId], references: [id])
+  Vendor    Vendor?   @relation(fields: [vendorId], references: [id])
+
+  @@index([actorId])
+  @@index([at])
+  @@index([entity, entityId])
+  @@index([vendorId])
+}
+
+model CategoryTranslation {
+  id         String   @id @default(cuid())
+  categoryId String
+  locale     String
+  name       String
+  Category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+  @@index([categoryId])
+}
+
+model MenuItemTranslation {
+  id          String   @id @default(cuid())
+  menuItemId  String
+  locale      String
+  name        String
+  description String?
+  MenuItem    MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, locale])
+  @@index([menuItemId])
+}
+
+model ModifierGroupTranslation {
+  id              String        @id @default(cuid())
+  modifierGroupId String
+  locale          String
+  name            String
+  ModifierGroup   ModifierGroup @relation(fields: [modifierGroupId], references: [id], onDelete: Cascade)
+
+  @@unique([modifierGroupId, locale])
+  @@index([modifierGroupId])
+}
+
+enum EnamadStatus {
+  none
+  pending
+  verified
+  rejected
+}
+
+enum OrderSource {
+  qr
+  pos
+}
+
+enum OrderStatus {
+  open
+  placed
+  preparing
+  ready
+  served
+  paid
+  cancelled
+}
+
+enum OrderType {
+  qsr
+  dinein
+}
+
+enum PaymentMethod {
+  ipg
+  cash
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
+  expired
+}
+
+enum SplitType {
+  full
+  even
+  items
+  custom
+}
+
+enum StaffRole {
+  superadmin
+  owner
+  manager
+  staff
+}
+
+enum TableStatus {
+  available
+  occupied
+  bill_requested
 }

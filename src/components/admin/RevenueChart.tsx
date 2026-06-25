@@ -9,6 +9,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import { formatMoney } from "@/lib/utils";
 
 export function RevenueChart({
   data,
@@ -41,7 +42,7 @@ export function RevenueChart({
             width={48}
           />
           <Tooltip
-            formatter={(v: number) => [`${currency} ${v.toFixed(2)}`, "Revenue"]}
+            formatter={(v: number) => [`${currency} ${formatMoney(v)}`, "Revenue (toman)"]}
             contentStyle={{
               borderRadius: 12,
               border: "1px solid hsl(var(--line))",

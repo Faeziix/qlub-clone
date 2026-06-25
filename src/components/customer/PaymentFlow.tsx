@@ -11,10 +11,11 @@ import {
   Sparkles,
   PartyPopper,
 } from "lucide-react";
-import type { PaymentMethod, SplitType } from "@/lib/types";
+import type { SplitType } from "@/lib/types";
 import { makeT, dirFor } from "@/lib/i18n";
-import { cn, formatAmount, round2 } from "@/lib/utils";
+import { cn, formatAmount } from "@/lib/utils";
 import { evenSplit, tipFromPct } from "@/lib/pricing";
+import { bigintToJson, parseTomanInput } from "@/lib/money";
 import { Button } from "@/components/ui/Button";
 import { StarRating } from "@/components/ui/StarRating";
 
@@ -37,12 +38,11 @@ interface OrderData {
   items: OrderItem[];
 }
 
-const METHODS: { id: PaymentMethod; label: string; emoji: string }[] = [
-  { id: "apple_pay", label: "Apple Pay", emoji: "" },
-  { id: "google_pay", label: "Google Pay", emoji: "🅖" },
-  { id: "card", label: "Credit / Debit Card", emoji: "💳" },
-  { id: "tabby", label: "Tabby — Pay in 4", emoji: "🟢" },
-  { id: "benefit", label: "Benefit Pay", emoji: "🔵" },
+type UiPaymentMethod = "ipg" | "cash";
+
+const METHODS: { id: UiPaymentMethod; label: string; emoji: string }[] = [
+  { id: "ipg", label: "Online Payment (IPG)", emoji: "💳" },
+  { id: "cash", label: "Cash", emoji: "💵" },
 ];
 
 type Step = "pay" | "success" | "review" | "done";
@@ -78,7 +78,7 @@ export function PaymentFlow({
     root.setAttribute("dir", dir);
   }, [theme, dir]);
 
-  const remaining = round2(order.total - order.amountPaid);
+  const remainingRial = BigInt(order.total) - BigInt(order.amountPaid);
 
   const [step, setStep] = React.useState<Step>("pay");
   const [split, setSplit] = React.useState<SplitType>("full");
@@ -88,49 +88,54 @@ export function PaymentFlow({
   const [customAmount, setCustomAmount] = React.useState("");
   const [tipPct, setTipPct] = React.useState<number | "custom" | null>(null);
   const [customTip, setCustomTip] = React.useState("");
-  const [method, setMethod] = React.useState<PaymentMethod>("apple_pay");
+  const [method, setMethod] = React.useState<UiPaymentMethod>("ipg");
+  const [paymentId, setPaymentId] = React.useState<string | null>(null);
   const [processing, setProcessing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // ── compute the base amount this guest pays (before tip) ──
-  const baseAmount = React.useMemo(() => {
-    if (split === "even") return evenSplit(remaining, parts)[partIndex] ?? 0;
-    if (split === "items") {
-      const sum = order.items
-        .filter((i) => selectedItems.includes(i.id))
-        .reduce((s, i) => s + i.lineTotal, 0);
-      // approximate service/tax share proportionally
-      const ratio = order.subtotal ? sum / order.subtotal : 0;
-      return round2(sum + (order.serviceCharge + order.tax) * ratio);
-    }
-    if (split === "custom") return round2(Number(customAmount) || 0);
-    return remaining;
-  }, [split, parts, partIndex, selectedItems, customAmount, remaining, order]);
+  let baseAmountRial: bigint;
+  if (split === "even") {
+    baseAmountRial = evenSplit(remainingRial, parts)[partIndex] ?? 0n;
+  } else if (split === "items") {
+    const sum = order.items
+      .filter((i) => selectedItems.includes(i.id))
+      .reduce((s, i) => s + BigInt(i.lineTotal), 0n);
+    const subtotalRial = BigInt(order.subtotal);
+    const charges = BigInt(order.serviceCharge) + BigInt(order.tax);
+    baseAmountRial = subtotalRial === 0n ? sum : sum + (charges * sum) / subtotalRial;
+  } else if (split === "custom") {
+    baseAmountRial = parseTomanInput(customAmount);
+  } else {
+    baseAmountRial = remainingRial;
+  }
 
-  const tip = React.useMemo(() => {
-    if (!tippingEnabled || tipPct == null) return 0;
-    if (tipPct === "custom") return round2(Number(customTip) || 0);
-    return tipFromPct(baseAmount, tipPct);
-  }, [tipPct, customTip, baseAmount, tippingEnabled]);
+  let tipRial: bigint;
+  if (!tippingEnabled || tipPct == null) {
+    tipRial = 0n;
+  } else if (tipPct === "custom") {
+    tipRial = parseTomanInput(customTip);
+  } else {
+    tipRial = tipFromPct(baseAmountRial, tipPct);
+  }
 
-  const payTotal = round2(baseAmount + tip);
+  const payTotalRial = baseAmountRial + tipRial;
 
   async function pay() {
-    if (baseAmount <= 0) {
+    if (baseAmountRial <= 0n) {
       setError("Enter an amount to pay.");
       return;
     }
     setProcessing(true);
     setError(null);
     try {
-      await new Promise((r) => setTimeout(r, 1200)); // simulate gateway
+      await new Promise((r) => setTimeout(r, 1200));
       const res = await fetch("/api/payments", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           orderId: order.id,
-          amount: baseAmount,
-          tipAmount: tip,
+          amount: bigintToJson(baseAmountRial),
+          tipAmount: bigintToJson(tipRial),
           method,
           splitType: split,
           splitMeta:
@@ -143,6 +148,7 @@ export function PaymentFlow({
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error ?? "Payment failed");
+      if (data.payment?.id) setPaymentId(data.payment.id);
       setStep("success");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Payment failed");
@@ -151,7 +157,6 @@ export function PaymentFlow({
     }
   }
 
-  // ─────────────────────────── SUCCESS ───────────────────────────
   if (step === "success") {
     return (
       <Centered dir={dir}>
@@ -161,7 +166,7 @@ export function PaymentFlow({
           </div>
           <h1 className="mt-5 text-2xl font-extrabold">{t("paymentSuccess")}</h1>
           <p className="mt-1 text-muted">
-            {currency} {formatAmount(payTotal)} · {vendorName}
+            {currency} {formatAmount(payTotalRial)} · {vendorName}
           </p>
           <p className="mt-1 text-sm text-muted">
             {t("receipt")} #{order.orderNumber}
@@ -183,14 +188,13 @@ export function PaymentFlow({
     );
   }
 
-  // ─────────────────────────── REVIEW ───────────────────────────
   if (step === "review") {
     return (
       <ReviewScreen
         t={t}
         dir={dir}
         vendorSlug={vendorSlug}
-        orderId={order.id}
+        paymentId={paymentId}
         onDone={() => setStep("done")}
       />
     );
@@ -219,7 +223,6 @@ export function PaymentFlow({
     );
   }
 
-  // ─────────────────────────── PAY ───────────────────────────
   return (
     <div dir={dir} className="min-h-screen bg-bg pb-40">
       <div className="mx-auto max-w-app">
@@ -239,7 +242,6 @@ export function PaymentFlow({
           </div>
         </header>
 
-        {/* Bill */}
         <div className="px-4 pt-4">
           <div className="rounded-2xl bg-surface p-4 shadow-card">
             <div className="space-y-2">
@@ -284,7 +286,6 @@ export function PaymentFlow({
           </div>
         </div>
 
-        {/* Split */}
         <Section title={t("splitBill")} icon={<Users size={18} />}>
           <div className="grid grid-cols-2 gap-2">
             <SplitOption
@@ -375,17 +376,16 @@ export function PaymentFlow({
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-3">
               <span className="font-bold text-muted">{currency}</span>
               <input
-                inputMode="decimal"
+                inputMode="numeric"
                 value={customAmount}
                 onChange={(e) => setCustomAmount(e.target.value)}
-                placeholder="0.00"
+                placeholder="0"
                 className="w-full bg-transparent text-lg font-bold outline-none"
               />
             </div>
           )}
         </Section>
 
-        {/* Tip */}
         {tippingEnabled && (
           <Section title={t("addTip")} icon={<Sparkles size={18} />}>
             <div className="grid grid-cols-4 gap-2">
@@ -400,7 +400,7 @@ export function PaymentFlow({
                   active={tipPct === p}
                   onClick={() => setTipPct(p)}
                   label={`${p}%`}
-                  sub={`${formatAmount(tipFromPct(baseAmount, p))}`}
+                  sub={formatAmount(tipFromPct(baseAmountRial, p))}
                 />
               ))}
             </div>
@@ -417,10 +417,10 @@ export function PaymentFlow({
               <div className="mt-2 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-3">
                 <span className="font-bold text-muted">{currency}</span>
                 <input
-                  inputMode="decimal"
+                  inputMode="numeric"
                   value={customTip}
                   onChange={(e) => setCustomTip(e.target.value)}
-                  placeholder="0.00"
+                  placeholder="0"
                   className="w-full bg-transparent text-lg font-bold outline-none"
                 />
               </div>
@@ -428,7 +428,6 @@ export function PaymentFlow({
           </Section>
         )}
 
-        {/* Payment method */}
         <Section title={t("paymentMethod")} icon={<CreditCard size={18} />}>
           <div className="space-y-2">
             {METHODS.map((m) => (
@@ -440,7 +439,7 @@ export function PaymentFlow({
                   method === m.id ? "border-brand bg-brand-soft" : "border-line"
                 )}
               >
-                <span className="text-xl">{m.id === "apple_pay" ? "" : m.emoji}</span>
+                <span className="text-xl">{m.emoji}</span>
                 <span className="flex-1 font-semibold">{m.label}</span>
                 <span
                   className={cn(
@@ -458,7 +457,6 @@ export function PaymentFlow({
         </Section>
       </div>
 
-      {/* Pay bar */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface safe-bottom">
         <div className="mx-auto max-w-app p-4">
           {error && (
@@ -468,11 +466,11 @@ export function PaymentFlow({
             <span className="text-muted">You pay</span>
             <span className="text-right">
               <span className="text-lg font-extrabold">
-                {currency} {formatAmount(payTotal)}
+                {currency} {formatAmount(payTotalRial)}
               </span>
-              {tip > 0 && (
+              {tipRial > 0n && (
                 <span className="block text-xs text-muted">
-                  incl. {formatAmount(tip)} tip
+                  incl. {formatAmount(tipRial)} tip
                 </span>
               )}
             </span>
@@ -480,7 +478,7 @@ export function PaymentFlow({
           <Button fullWidth size="lg" loading={processing} onClick={pay}>
             {processing
               ? "Processing…"
-              : `${t("payNow")} · ${currency} ${formatAmount(payTotal)}`}
+              : `${t("payNow")} · ${currency} ${formatAmount(payTotalRial)}`}
           </Button>
         </div>
       </div>
@@ -492,13 +490,13 @@ function ReviewScreen({
   t,
   dir,
   vendorSlug,
-  orderId,
+  paymentId,
   onDone,
 }: {
   t: (k: string) => string;
   dir: string;
   vendorSlug: string;
-  orderId: string;
+  paymentId: string | null;
   onDone: () => void;
 }) {
   const [rating, setRating] = React.useState(0);
@@ -517,7 +515,7 @@ function ReviewScreen({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           vendorSlug,
-          orderId,
+          paymentId,
           rating: rating || 5,
           foodRating: food || undefined,
           serviceRating: service || undefined,
@@ -589,7 +587,6 @@ function ReviewScreen({
   );
 }
 
-// ── small presentational helpers ──
 function Centered({
   children,
   dir,

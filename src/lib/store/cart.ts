@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { CartLine, SelectedModifier } from "@/lib/types";
 import { lineTotal } from "@/lib/pricing";
+import { cartMoneyReplacer, cartMoneyReviver } from "@/lib/money";
 
 function signature(itemId: string, mods: SelectedModifier[], notes?: string) {
   const m = [...mods]
@@ -22,8 +23,13 @@ interface CartState {
   removeLine: (lineId: string) => void;
   clear: () => void;
   count: () => number;
-  subtotal: () => number;
+  subtotal: () => bigint;
 }
+
+const bigintStorage = createJSONStorage(() => localStorage, {
+  replacer: cartMoneyReplacer,
+  reviver: cartMoneyReviver,
+});
 
 export const useCart = create<CartState>()(
   persist(
@@ -34,7 +40,6 @@ export const useCart = create<CartState>()(
 
       init: (vendorSlug, tableCode) => {
         const cur = get();
-        // Reset cart if switching restaurants
         if (cur.vendorSlug && cur.vendorSlug !== vendorSlug) {
           set({ vendorSlug, tableCode, lines: [] });
         } else {
@@ -76,11 +81,11 @@ export const useCart = create<CartState>()(
       clear: () => set({ lines: [] }),
 
       count: () => get().lines.reduce((s, l) => s + l.quantity, 0),
-      subtotal: () => get().lines.reduce((s, l) => s + lineTotal(l), 0),
+      subtotal: () => get().lines.reduce((s, l) => s + lineTotal(l), 0n),
     }),
     {
       name: "qlub-cart",
-      storage: createJSONStorage(() => localStorage),
+      storage: bigintStorage,
       partialize: (s) => ({
         vendorSlug: s.vendorSlug,
         tableCode: s.tableCode,

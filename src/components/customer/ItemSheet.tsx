@@ -6,7 +6,7 @@ import type { ItemWithModifiers } from "@/lib/queries";
 import type { SelectedModifier } from "@/lib/types";
 import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
-import { cn, formatAmount, parseJSON, round2 } from "@/lib/utils";
+import { cn, formatAmount } from "@/lib/utils";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -32,7 +32,7 @@ export function ItemSheet({
   const addLine = useCart((s) => s.addLine);
   const [qty, setQty] = React.useState(1);
   const [notes, setNotes] = React.useState("");
-  const tags = parseJSON<string[]>(item.tags, []);
+  const tags = Array.isArray(item.tags) ? item.tags : [];
 
   // selected option ids per group
   const [selected, setSelected] = React.useState<Record<string, string[]>>(
@@ -68,14 +68,15 @@ export function ItemSheet({
         groupName: g.name,
         optionId: opt.id,
         optionName: opt.name,
-        priceDelta: opt.priceDelta,
+        priceDelta: BigInt(opt.priceDelta),
       };
     })
   );
 
+  const unitPriceRial = BigInt(item.price);
   const unitWithMods =
-    item.price + chosenModifiers.reduce((s, m) => s + m.priceDelta, 0);
-  const lineTotalValue = round2(unitWithMods * qty);
+    unitPriceRial + chosenModifiers.reduce((s, m) => s + m.priceDelta, 0n);
+  const lineTotalValue = unitWithMods * BigInt(qty);
 
   const missingRequired = item.modifierGroups.some(
     (g) => g.required && (selected[g.id]?.length ?? 0) < Math.max(1, g.minSelect)
@@ -86,7 +87,7 @@ export function ItemSheet({
       itemId: item.id,
       name: item.name,
       imageUrl: item.imageUrl,
-      unitPrice: item.price,
+      unitPrice: unitPriceRial,
       quantity: qty,
       modifiers: chosenModifiers,
       notes: notes.trim() || undefined,

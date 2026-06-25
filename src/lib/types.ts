@@ -16,7 +16,7 @@ export interface SelectedModifier {
   groupName: string;
   optionId: string;
   optionName: string;
-  priceDelta: number;
+  priceDelta: bigint;
 }
 
 export interface CartLine {
@@ -25,20 +25,13 @@ export interface CartLine {
   itemId: string;
   name: string;
   imageUrl?: string | null;
-  unitPrice: number; // base price
+  unitPrice: bigint;
   quantity: number;
   modifiers: SelectedModifier[];
   notes?: string;
 }
 
-export interface BillBreakdown {
-  subtotal: number;
-  serviceCharge: number;
-  tax: number;
-  discount: number;
-  tip: number;
-  total: number;
-}
+export type { BillBreakdownRial as BillBreakdown } from "./pricing";
 
 export type OrderStatus =
   | "open"
@@ -49,13 +42,7 @@ export type OrderStatus =
   | "paid"
   | "cancelled";
 
-export type PaymentMethod =
-  | "card"
-  | "apple_pay"
-  | "google_pay"
-  | "tabby"
-  | "benefit"
-  | "cash";
+export type PaymentMethod = "ipg" | "cash";
 
 export type SplitType = "full" | "even" | "items" | "custom";
 

@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { DietBadge } from "@/components/ui/Badge";
 import { EmptyRow } from "@/components/admin/ui";
-import { cn, formatMoney, parseJSON, round2 } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
+import { formatRialAsToman } from "@/lib/money";
 import {
   toggleItemAvailability,
   updateItemPrice,
@@ -31,11 +32,11 @@ export interface MenuItemNode {
   id: string;
   name: string;
   description: string;
-  price: number;
+  priceRialStr: string;
   imageUrl: string | null;
   available: boolean;
   calories: number | null;
-  tags: string; // JSON string
+  tags: string[];
   modifierGroupCount: number;
   modifierOptionCount: number;
 }
@@ -202,29 +203,29 @@ function ItemRow({
   onEdit: () => void;
 }) {
   const [isPending, startTransition] = React.useTransition();
-  const tags = parseJSON<string[]>(item.tags, []);
+  const tags = item.tags;
 
-  // inline price editing
   const [editingPrice, setEditingPrice] = React.useState(false);
-  const [priceDraft, setPriceDraft] = React.useState(item.price.toString());
+  const currentToman = formatRialAsToman(BigInt(item.priceRialStr));
+  const [priceDraft, setPriceDraft] = React.useState(currentToman);
 
   React.useEffect(() => {
-    setPriceDraft(item.price.toString());
-  }, [item.price]);
+    setPriceDraft(formatRialAsToman(BigInt(item.priceRialStr)));
+  }, [item.priceRialStr]);
 
   const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   function commitPrice() {
-    const parsed = round2(parseFloat(priceDraft));
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      setPriceDraft(item.price.toString());
+    const n = Number(priceDraft.trim());
+    if (!Number.isFinite(n) || n < 0) {
+      setPriceDraft(formatRialAsToman(BigInt(item.priceRialStr)));
       setEditingPrice(false);
       return;
     }
     setEditingPrice(false);
-    if (parsed === item.price) return;
+    if (priceDraft.trim() === formatRialAsToman(BigInt(item.priceRialStr))) return;
     startTransition(async () => {
-      await updateItemPrice(item.id, parsed);
+      await updateItemPrice(item.id, priceDraft.trim());
     });
   }
 
@@ -303,13 +304,13 @@ function ItemRow({
               autoFocus
               type="number"
               min={0}
-              step="0.01"
+              step="1"
               value={priceDraft}
               onChange={(e) => setPriceDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") commitPrice();
                 if (e.key === "Escape") {
-                  setPriceDraft(item.price.toString());
+                  setPriceDraft(currentToman);
                   setEditingPrice(false);
                 }
               }}
@@ -321,9 +322,9 @@ function ItemRow({
           <button
             onClick={() => setEditingPrice(true)}
             className="rounded-lg px-2 py-1 text-sm font-bold tabular-nums hover:bg-surface-2"
-            title="Edit price"
+            title="Edit price (toman)"
           >
-            {formatMoney(item.price)}
+            {formatMoney(BigInt(item.priceRialStr))}
           </button>
         )}
       </div>
@@ -432,7 +433,7 @@ function EditItemSheet({
     if (item) {
       setName(item.name);
       setDescription(item.description);
-      setPrice(item.price.toString());
+      setPrice(formatRialAsToman(BigInt(item.priceRialStr)));
       setAvailable(item.available);
       setError(null);
     }
@@ -445,14 +446,12 @@ function EditItemSheet({
       setError("Name is required.");
       return;
     }
-    const parsed = round2(parseFloat(price));
-    const safePrice = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
     setError(null);
     startTransition(async () => {
       await updateItem(item.id, {
         name: name.trim(),
         description: description.trim(),
-        price: safePrice,
+        tomanInput: price.trim(),
         available,
       });
       onClose();
@@ -479,11 +478,11 @@ function EditItemSheet({
             placeholder="Short description shown to guests"
           />
         </Field>
-        <Field label="Price (AED)">
+        <Field label="Price (toman)">
           <input
             type="number"
             min={0}
-            step="0.01"
+            step="1"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className={cn(inputClass, "tabular-nums")}
@@ -557,14 +556,12 @@ function CreateItemSheet({
       setError("Name is required.");
       return;
     }
-    const parsed = round2(parseFloat(price));
-    const safePrice = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
     setError(null);
     startTransition(async () => {
       await createItem(category.id, vendorId, {
         name: name.trim(),
         description: description.trim(),
-        price: safePrice,
+        tomanInput: price.trim(),
       });
       onClose();
     });
@@ -596,15 +593,15 @@ function CreateItemSheet({
             placeholder="Short description shown to guests"
           />
         </Field>
-        <Field label="Price (AED)">
+        <Field label="Price (toman)">
           <input
             type="number"
             min={0}
-            step="0.01"
+            step="1"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className={cn(inputClass, "tabular-nums")}
-            placeholder="0.00"
+            placeholder="0"
           />
         </Field>
 

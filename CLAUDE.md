@@ -13,6 +13,10 @@ See `docs/adr/` for full ADRs. Key decisions:
 - **ADR 0001** — No committed secrets; `AUTH_SECRET` mandatory; no fallback; no backdoor scripts; hardened seed with crypto-random passwords.
 - **ADR 0002** — All table mutations require a valid admin session and vendor-scoped ownership check (IDOR fix).
 - **ADR 0003** — bun is the only package manager; Node ≥ 20 pinned via `engines` + `.nvmrc`; `eslint.ignoreDuringBuilds` removed; CI workflow enforces typecheck + lint on PRs.
+- **ADR 0006** — DR baseline: Neon-managed PITR/branching for Track A; restore runbook + RTO/RPO documented; Track B (domestic) DR deferred to Phase 5.
+- **ADR 0007** — Review is per-Payment (`paymentId @unique`): each split-bill payer can review once; no orderId on Review.
+- **ADR 0008** — Schema modernization: native Postgres enums, JSONB columns, Iran defaults (IRR/fa/Asia/Tehran/ir), translation tables, monotonic per-vendor orderNumber, AuditLog, sub-merchant fields.
+- **ADR 0009** — Server-authoritative pricing: re-fetch DB prices at order creation; honored-price rule with `priceChanged` flag; `$transaction` wrapping for all money writes; `initiatePaymentLeg` with TTL reservation; idempotency keys persisted and deduplicated.
 - **Dual-track architecture** — Track A (Vercel + Neon, synthetic data only, separate repo/brand) vs Track B (domestic Iran infra, production). See PRD issue #1.
 - **Integer-rial money** — All monetary values are BigInt rial with no floats. Conversion only via `money.ts` at named boundaries.
 - **Server-authoritative pricing** — Bill computed from DB prices at order creation, snapshotted onto `OrderItem`. Payment verifies against the snapshot.
@@ -46,6 +50,20 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ `pnpm` in README/scripts despite `bun.lockb` → ✅ bun everywhere, no exceptions.
 - ❌ No `.nvmrc` or `engines` field → ✅ Both required for Node version pinning.
 - ❌ Incomplete `.env.example` missing `DIRECT_URL` → ✅ Document every required env var with comments.
+- ❌ `prisma migrate dev --create-only` blocks with drift prompt on an existing DB → ✅ Use `prisma migrate diff --from-empty --to-schema-datamodel --script` to generate baseline SQL, then `prisma migrate resolve --applied <name>` to mark it applied.
+- ❌ `require()` inside test files causes `@typescript-eslint/no-require-imports` lint error → ✅ Use top-level ES import for all node:fs/path functions.
+- ❌ Prisma BigInt fields (`price`, `priceDelta`, `total`, etc.) are not assignable to `number` in TS → ✅ Convert at the server→client boundary using `Number()` in query wrapper functions (`getVendorBySlug`, `getItem`, `getOrder`); pass `number` to all client components.
+- ❌ `migration_lock.toml` must be committed alongside `prisma/migrations/` → ✅ Always commit `migration_lock.toml` with `provider = "postgresql"` when using a migrations workflow.
+- ❌ `prisma db push --force-reset` mixes push-based and migrations-based workflows → ✅ Use `prisma migrate reset --force` for local dev resets when the project uses a migrations workflow.
+- ❌ `Review` model has no `orderId` field; it links via `paymentId` → ✅ `createReview` accepts `paymentId`; the review API schema uses `paymentId`; the UI passes `paymentId` captured from the payment response.
+- ❌ `PaymentMethod` UI enum ("card", "apple_pay"...) diverges from DB enum ("ipg", "cash") → ✅ Use a local `UiPaymentMethod` type in `PaymentFlow.tsx`; align the Zod schema in the API route with the DB enum.
+- ❌ `Date.now()` orderNumber generation is non-monotonic and collision-prone → ✅ Use `nextVendorOrderNumber(vendorId)` which atomically increments `vendorOrderSeq` via `UPDATE ... RETURNING`.
+- ❌ Seed used UAE/AED defaults instead of Iran/IRR → ✅ Seed vendors use `country:"ir"`, `currency:"IRR"`, `locale:"fa"`, `timezone:"Asia/Tehran"`, `supportedLangs:["fa","en"]`.
+- ❌ Seed passed `JSON.stringify(array)` for JSONB columns → ✅ Pass native JS arrays/objects directly; Prisma serializes them to JSONB.
+- ❌ `createOrderFromCart` trusted client `unitPrice`/`priceDelta` → ✅ Always re-fetch from DB via `resolveLinePricesFromDb`; client values are never used for money.
+- ❌ Order/payment writes were non-transactional → ✅ `createOrderFromCart`, `recordPayment`, and `initiatePaymentLeg` all use `db.$transaction`.
+- ❌ `nextVendorOrderNumber` used `db.$queryRaw` directly → ✅ Accepts a transaction client `tx` so the increment is atomic within the order creation transaction.
+- ❌ `createOrderFromCart` returned the order directly → ✅ Returns `{ order, priceChanged }` tuple; update all callers to destructure.
 
 ## Dependencies & Tooling
 
@@ -63,7 +81,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/env.ts` — `requireAuthSecret`, `assertServerEnv`, `isDemoSeedingEnabled`
 - `src/lib/auth.ts` — JWT session management
 - `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip)
-- `src/lib/orders.ts` — Order/payment/review service layer
+- `src/lib/orders.ts` — `createOrderFromCart` (server-authoritative, returns `{order, priceChanged}`), `initiatePaymentLeg` (pending reservation with TTL), `recordPayment` (idempotent, transactional), `createReview`
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
 
 ## API & Data Layer
@@ -78,5 +96,12 @@ See `docs/adr/` for full ADRs. Key decisions:
 - #3 — Tables actions IDOR fix (auth + vendor scoping)
 - #4 — Tooling standardisation (bun, Node pin, CI, env example)
 
+**Done (M2 issues):**
+- #6 — Postgres migration + DR baseline (done on `feat/m2-data-money-core`)
+- #7 — Integer-rial money model (BigInt, money.ts, property tests)
+- #8 — Schema modernization (enums, JSONB, Iran defaults, translations, orderNumber seq, AuditLog, sub-merchant fields)
+
+- #9 — Server-authoritative pricing + honored-price rule + concurrency + idempotency
+
 **In progress / next:**
-- M1 remaining issues per milestone branch `feat/m1-foundation-safety`
+- M3: #10 (next-intl Farsi-first RTL foundation)

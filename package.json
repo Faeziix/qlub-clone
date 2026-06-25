@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -17,12 +17,13 @@
     "test:watch": "vitest",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma db push --force-reset && bun run db:seed",
+    "db:reset": "prisma migrate reset --force && bun run db:seed",
     "db:studio": "prisma studio",
-    "setup": "prisma generate && prisma db push && bun run db:seed"
+    "setup": "prisma generate && prisma migrate deploy && bun run db:seed"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "axios": "^1.18.1",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
@@ -45,6 +46,7 @@
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.5.2",
     "eslint": "^9",
+    "fast-check": "^4.8.0",
     "postcss": "^8.5.15",
     "prisma": "^6.19.3",
     "tailwindcss": "^3.4.19",

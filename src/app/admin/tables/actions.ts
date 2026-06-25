@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/admin/actions";
 
-const STATUSES = ["available", "occupied", "bill-requested"] as const;
-type TableStatus = (typeof STATUSES)[number];
+import { TableStatus } from "@prisma/client";
+
+const STATUSES = ["available", "occupied", "bill_requested"] as const;
+type AllowedTableStatus = (typeof STATUSES)[number];
 
 function randomPasscode(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
@@ -78,13 +80,13 @@ export async function createTable(
 }
 
 export async function updateTableStatus(tableId: string, status: string) {
-  if (!STATUSES.includes(status as TableStatus)) {
+  if (!STATUSES.includes(status as AllowedTableStatus)) {
     throw new Error("Invalid status.");
   }
   await requireOwnedTable(tableId);
   await db.diningTable.update({
     where: { id: tableId },
-    data: { status },
+    data: { status: status as TableStatus },
   });
   revalidatePath("/admin/tables");
 }

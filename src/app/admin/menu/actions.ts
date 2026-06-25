@@ -3,12 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/admin/actions";
-import { round2 } from "@/lib/utils";
+import { parseRialFromInput } from "@/lib/money";
 
-/** Ensure the current session is allowed to mutate the given vendor's data. */
 async function assertVendorAccess(vendorId: string) {
   const session = await requireSession();
-  // superadmin (vendorId null) may touch any vendor.
   if (session.vendorId && session.vendorId !== vendorId) {
     throw new Error("Forbidden: item belongs to another vendor.");
   }
@@ -29,7 +27,7 @@ export async function toggleItemAvailability(itemId: string, available: boolean)
   revalidatePath("/admin/menu");
 }
 
-export async function updateItemPrice(itemId: string, price: number) {
+export async function updateItemPrice(itemId: string, tomanInput: string) {
   const item = await db.menuItem.findUnique({
     where: { id: itemId },
     select: { vendorId: true },
@@ -37,10 +35,10 @@ export async function updateItemPrice(itemId: string, price: number) {
   if (!item) throw new Error("Item not found.");
   await assertVendorAccess(item.vendorId);
 
-  const safePrice = Number.isFinite(price) ? Math.max(0, round2(price)) : 0;
+  const priceRial = parseRialFromInput(tomanInput);
   await db.menuItem.update({
     where: { id: itemId },
-    data: { price: safePrice },
+    data: { price: priceRial },
   });
   revalidatePath("/admin/menu");
 }
@@ -50,7 +48,7 @@ export async function updateItem(
   data: {
     name: string;
     description: string;
-    price: number;
+    tomanInput: string;
     available: boolean;
   }
 ) {
@@ -63,16 +61,14 @@ export async function updateItem(
 
   const name = data.name.trim();
   if (!name) throw new Error("Name is required.");
-  const safePrice = Number.isFinite(data.price)
-    ? Math.max(0, round2(data.price))
-    : 0;
+  const priceRial = parseRialFromInput(data.tomanInput);
 
   await db.menuItem.update({
     where: { id: itemId },
     data: {
       name,
       description: data.description.trim(),
-      price: safePrice,
+      price: priceRial,
       available: data.available,
     },
   });
@@ -82,7 +78,7 @@ export async function updateItem(
 export async function createItem(
   categoryId: string,
   vendorId: string,
-  data: { name: string; price: number; description: string }
+  data: { name: string; tomanInput: string; description: string }
 ) {
   await assertVendorAccess(vendorId);
 
@@ -97,11 +93,8 @@ export async function createItem(
 
   const name = data.name.trim();
   if (!name) throw new Error("Name is required.");
-  const safePrice = Number.isFinite(data.price)
-    ? Math.max(0, round2(data.price))
-    : 0;
+  const priceRial = parseRialFromInput(data.tomanInput);
 
-  // place new item at the end of the category.
   const last = await db.menuItem.findFirst({
     where: { categoryId },
     orderBy: { sortOrder: "desc" },
@@ -114,10 +107,10 @@ export async function createItem(
       categoryId,
       name,
       description: data.description.trim(),
-      price: safePrice,
+      price: priceRial,
       sortOrder: (last?.sortOrder ?? 0) + 1,
       available: true,
-      tags: "[]",
+      tags: [],
     },
   });
   revalidatePath("/admin/menu");
@@ -131,7 +124,6 @@ export async function deleteItem(itemId: string) {
   if (!item) throw new Error("Item not found.");
   await assertVendorAccess(item.vendorId);
 
-  // remove dependent modifier groups/options first (SQLite has no cascade here).
   const groups = await db.modifierGroup.findMany({
     where: { itemId },
     select: { id: true },

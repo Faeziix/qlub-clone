@@ -116,7 +116,19 @@ export default async function ReviewsPage() {
       </div>
 
       <div className="mt-8">
-        <ReviewsList reviews={rows} />
+        <ReviewsList
+          reviews={rows}
+          t={{
+            allRatings: t("allRatings"),
+            noReviews: t("noReviews"),
+            noFilteredReviews: t("noFilteredReviews"),
+            anonymous: t("anonymous"),
+            order: t("order"),
+            food: t("food"),
+            service: t("service"),
+            ambience: t("ambience"),
+          }}
+        />
       </div>
     </div>
   );

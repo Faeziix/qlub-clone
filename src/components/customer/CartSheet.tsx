@@ -158,7 +158,7 @@ export function CartSheet({
                     <button
                       onClick={() => removeLine(l.lineId)}
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted hover:text-danger"
-                      aria-label="Remove"
+                      aria-label={t("remove")}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -169,6 +169,8 @@ export function CartSheet({
                       value={l.quantity}
                       onChange={(q) => setQty(l.lineId, q)}
                       min={0}
+                      decreaseLabel={t("decreaseQty")}
+                      increaseLabel={t("increaseQty")}
                     />
                     <span className="font-bold">
                       {vendor.currency} {formatAmount(lineTotal(l))}

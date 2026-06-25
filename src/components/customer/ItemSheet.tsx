@@ -130,7 +130,7 @@ export function ItemSheet({
               </p>
             )}
             {item.calories != null && (
-              <p className="mt-2 text-sm text-muted">{item.calories} kcal</p>
+              <p className="mt-2 text-sm text-muted">{item.calories} {t("kcal")}</p>
             )}
 
             {/* Modifier groups */}
@@ -211,7 +211,13 @@ export function ItemSheet({
         {/* Footer add bar */}
         <div className="shrink-0 border-t border-line bg-surface p-4 safe-bottom">
           <div className="flex items-center gap-3">
-            <QuantityStepper value={qty} onChange={setQty} min={1} />
+            <QuantityStepper
+                      value={qty}
+                      onChange={setQty}
+                      min={1}
+                      decreaseLabel={t("decreaseQty")}
+                      increaseLabel={t("increaseQty")}
+                    />
             <Button
               fullWidth
               size="lg"

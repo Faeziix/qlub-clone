@@ -135,7 +135,44 @@ export default async function OrdersPage() {
       </div>
 
       <div className="mt-6">
-        <OrdersBoard orders={boardOrders} />
+        <OrdersBoard
+          orders={boardOrders}
+          t={{
+            filterAll: t("filterAll"),
+            placed: t("placed"),
+            preparing: t("preparing"),
+            ready: t("ready"),
+            served: t("served"),
+            paid: t("paid"),
+            noOrders: t("noOrders"),
+            noFilteredOrders: t("noFilteredOrders"),
+            items: t("items"),
+            item: t("item"),
+            items_plural: t("items_plural"),
+            table: t("table"),
+            guest: t("guest"),
+            subtotal: t("subtotal"),
+            serviceCharge: t("serviceCharge"),
+            tax: t("tax"),
+            tip: t("tip"),
+            discount: t("discount"),
+            total: t("total"),
+            amountPaid: t("amountPaid"),
+            payments: t("payments"),
+            noPayments: t("noPayments"),
+            modifiers: t("modifiers"),
+            notes: t("notes"),
+            cancel: t("cancel"),
+            advance: t("advance"),
+            markPlaced: t("markPlaced"),
+            startPreparing: t("startPreparing"),
+            markReady: t("markReady"),
+            markServed: t("markServed"),
+            inclTip: t("inclTip"),
+            walkIn: t("walkIn"),
+            counter: t("counter"),
+          }}
+        />
       </div>
     </div>
   );

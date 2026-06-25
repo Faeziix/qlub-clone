@@ -79,9 +79,55 @@ export default async function SettingsPage() {
       <SettingsForm
         vendorId={vendor.id}
         initial={initial}
-        currency={vendor.currency ?? "AED"}
+        currency={vendor.currency ?? "IRR"}
         slug={vendor.slug}
         supportedLangs={supportedLangs}
+        t={{
+          profile: t("profile"),
+          profileSubtitle: t("profileSubtitle"),
+          branding: t("branding"),
+          brandingSubtitle: t("brandingSubtitle"),
+          billing: t("billing"),
+          billingSubtitle: t("billingSubtitle"),
+          tipping: t("tipping"),
+          tippingSubtitle: t("tippingSubtitle"),
+          name: t("name"),
+          description: t("description"),
+          address: t("address"),
+          phone: t("phone"),
+          email: t("email"),
+          namePlaceholder: t("namePlaceholder"),
+          emailPlaceholder: t("emailPlaceholder"),
+          phonePlaceholder: t("phonePlaceholder"),
+          addressPlaceholder: t("addressPlaceholder"),
+          descriptionPlaceholder: t("descriptionPlaceholder"),
+          theme: t("theme"),
+          themeHint: t("themeHint"),
+          logoUrl: t("logoUrl"),
+          logoUrlHint: t("logoUrlHint"),
+          coverUrl: t("coverUrl"),
+          coverUrlHint: t("coverUrlHint"),
+          logoPlaceholder: t("logoPlaceholder"),
+          coverPlaceholder: t("coverPlaceholder"),
+          supportedLanguages: t("supportedLanguages"),
+          serviceCharge: t("serviceCharge"),
+          taxPct: t("taxPct"),
+          currency: t("currency"),
+          currencyHint: t("currencyHint"),
+          taxInclusive: t("taxInclusive"),
+          taxInclusiveHint: t("taxInclusiveHint"),
+          tippingEnabled: t("tippingEnabled"),
+          tippingEnabledHint: t("tippingEnabledHint"),
+          tipPresets: t("tipPresets"),
+          tipPresetsHint: t("tipPresetsHint"),
+          saveChanges: t("saveChanges"),
+          saved: t("saved"),
+          darkgold: t("darkgold"),
+          classic: t("classic"),
+          emerald: t("emerald"),
+          rose: t("rose"),
+          midnight: t("midnight"),
+        }}
       />
     </div>
   );

@@ -30,6 +30,8 @@ interface SheetProps extends VariantProps<typeof sheetContentVariants> {
   description?: string;
   className?: string;
   dir?: "rtl" | "ltr";
+  closeLabel?: string;
+  accessibilityTitle?: string;
 }
 
 function Sheet({
@@ -41,6 +43,8 @@ function Sheet({
   className,
   height,
   dir,
+  closeLabel = "Close",
+  accessibilityTitle = "Dialog",
 }: SheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -68,7 +72,7 @@ function Sheet({
                 </Dialog.Title>
               ) : (
                 <VisuallyHidden.Root asChild>
-                  <Dialog.Title>Sheet</Dialog.Title>
+                  <Dialog.Title>{accessibilityTitle}</Dialog.Title>
                 </VisuallyHidden.Root>
               )}
               {description && (
@@ -83,7 +87,7 @@ function Sheet({
               )}
               <Dialog.Close
                 className="ms-auto mt-1 grid h-8 w-8 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
-                aria-label="بستن"
+                aria-label={closeLabel}
               >
                 <X size={18} aria-hidden />
               </Dialog.Close>

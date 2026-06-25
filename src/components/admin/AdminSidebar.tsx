@@ -43,12 +43,12 @@ export function AdminSidebar({
     <>
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
         <span className="text-lg font-black">
-          qlub<span className="text-brand">_</span>
+          {"qlub"}<span className="text-brand">{"_"}</span>
         </span>
         <button
           onClick={() => setOpen(true)}
           className="grid h-9 w-9 place-items-center rounded-lg bg-surface-2"
-          aria-label="Open menu"
+          aria-label={tCommon("openMenu")}
         >
           <MenuIcon size={20} />
         </button>
@@ -70,14 +70,14 @@ export function AdminSidebar({
         <div className="flex items-center justify-between px-5 py-5">
           <div>
             <span className="text-xl font-black">
-              qlub<span className="text-brand">_</span>
+              {"qlub"}<span className="text-brand">{"_"}</span>
             </span>
             <p className="mt-0.5 text-xs font-medium text-muted">{vendorName}</p>
           </div>
           <button
             onClick={() => setOpen(false)}
             className="grid h-8 w-8 place-items-center rounded-lg bg-surface-2 lg:hidden"
-            aria-label="Close menu"
+            aria-label={tCommon("closeMenu")}
           >
             <X size={18} />
           </button>

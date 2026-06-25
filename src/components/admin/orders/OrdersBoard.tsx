@@ -64,6 +64,42 @@ export interface BoardOrder {
   payments: BoardPayment[];
 }
 
+export type OrdersBoardTranslations = {
+  filterAll: string;
+  placed: string;
+  preparing: string;
+  ready: string;
+  served: string;
+  paid: string;
+  noOrders: string;
+  noFilteredOrders: string;
+  items: string;
+  item: string;
+  items_plural: string;
+  table: string;
+  guest: string;
+  subtotal: string;
+  serviceCharge: string;
+  tax: string;
+  tip: string;
+  discount: string;
+  total: string;
+  amountPaid: string;
+  payments: string;
+  noPayments: string;
+  modifiers: string;
+  notes: string;
+  cancel: string;
+  advance: string;
+  markPlaced: string;
+  startPreparing: string;
+  markReady: string;
+  markServed: string;
+  inclTip: string;
+  walkIn: string;
+  counter: string;
+};
+
 // --- Status flow -------------------------------------------------------------
 
 const NEXT_STATUS: Record<string, string | null> = {
@@ -75,22 +111,6 @@ const NEXT_STATUS: Record<string, string | null> = {
   paid: null,
   cancelled: null,
 };
-
-const NEXT_LABEL: Record<string, string> = {
-  open: "Mark placed",
-  placed: "Start preparing",
-  preparing: "Mark ready",
-  ready: "Mark served",
-};
-
-const FILTERS: { key: string; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "placed", label: "Placed" },
-  { key: "preparing", label: "Preparing" },
-  { key: "ready", label: "Ready" },
-  { key: "served", label: "Served" },
-  { key: "paid", label: "Paid" },
-];
 
 const PAYMENT_LABELS: Record<string, string> = {
   card: "Card",
@@ -106,15 +126,24 @@ const PAYMENT_LABELS: Record<string, string> = {
 function OrderActions({
   order,
   size = "sm",
+  t,
 }: {
   order: BoardOrder;
   size?: "sm" | "md";
+  t: OrdersBoardTranslations;
 }) {
   const [pending, startTransition] = React.useTransition();
   const next = NEXT_STATUS[order.status];
   const isTerminal = order.status === "paid" || order.status === "cancelled";
 
   if (isTerminal) return null;
+
+  const nextLabels: Record<string, string> = {
+    open: t.markPlaced,
+    placed: t.startPreparing,
+    preparing: t.markReady,
+    ready: t.markServed,
+  };
 
   return (
     <div className="flex items-center gap-2">
@@ -128,7 +157,7 @@ function OrderActions({
             startTransition(() => updateOrderStatus(order.id, next));
           }}
         >
-          {NEXT_LABEL[order.status] ?? "Advance"}
+          {nextLabels[order.status] ?? t.advance}
         </Button>
       )}
       <Button
@@ -141,7 +170,7 @@ function OrderActions({
         }}
       >
         <X size={15} />
-        Cancel
+        {t.cancel}
       </Button>
     </div>
   );
@@ -158,9 +187,11 @@ function itemSummary(items: BoardItem[]): string {
 function OrderRow({
   order,
   onOpen,
+  t,
 }: {
   order: BoardOrder;
   onOpen: (o: BoardOrder) => void;
+  t: OrdersBoardTranslations;
 }) {
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0);
 
@@ -193,7 +224,7 @@ function OrderRow({
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
             <span className="font-medium text-ink">
-              {order.tableLabel ?? (order.type === "qsr" ? "Counter" : "—")}
+              {order.tableLabel ?? (order.type === "qsr" ? t.counter : "—")}
             </span>
             {order.guestName && (
               <span className="inline-flex items-center gap-1">
@@ -202,7 +233,7 @@ function OrderRow({
             )}
             <span>•</span>
             <span>
-              {itemCount} {itemCount === 1 ? "item" : "items"}
+              {itemCount} {itemCount === 1 ? t.item : t.items_plural}
             </span>
           </div>
           <p className="mt-1 line-clamp-1 text-sm text-ink/80">
@@ -216,7 +247,7 @@ function OrderRow({
           {formatMoney(order.total)}
         </span>
         <div onClick={(e) => e.stopPropagation()}>
-          <OrderActions order={order} />
+          <OrderActions order={order} t={t} />
         </div>
         <ChevronRight
           size={18}
@@ -243,7 +274,7 @@ function totalRow(label: string, value: string, strong = false) {
   );
 }
 
-function OrderDetail({ order }: { order: BoardOrder }) {
+function OrderDetail({ order, t }: { order: BoardOrder; t: OrdersBoardTranslations }) {
   return (
     <div className="space-y-5 px-5 pb-8 pt-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -256,14 +287,14 @@ function OrderDetail({ order }: { order: BoardOrder }) {
 
       <div className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <p className="text-xs uppercase text-muted">Table</p>
+          <p className="text-xs uppercase text-muted">{t.table}</p>
           <p className="font-semibold">
-            {order.tableLabel ?? (order.type === "qsr" ? "Counter" : "—")}
+            {order.tableLabel ?? (order.type === "qsr" ? t.counter : "—")}
           </p>
         </div>
         <div>
-          <p className="text-xs uppercase text-muted">Guest</p>
-          <p className="font-semibold">{order.guestName ?? "Walk-in"}</p>
+          <p className="text-xs uppercase text-muted">{t.guest}</p>
+          <p className="font-semibold">{order.guestName ?? t.walkIn}</p>
           {order.guestPhone && (
             <p className="text-xs text-muted">{order.guestPhone}</p>
           )}
@@ -277,10 +308,9 @@ function OrderDetail({ order }: { order: BoardOrder }) {
         </div>
       )}
 
-      {/* Line items */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase text-muted">
-          Items
+          {t.items}
         </p>
         <div className="divide-y divide-line rounded-2xl border border-line">
           {order.items.map((it) => {
@@ -317,30 +347,28 @@ function OrderDetail({ order }: { order: BoardOrder }) {
         </div>
       </div>
 
-      {/* Totals */}
       <div className="rounded-2xl border border-line p-4">
-        {totalRow("Subtotal", formatMoney(order.subtotal))}
+        {totalRow(t.subtotal, formatMoney(order.subtotal))}
         {order.discount > 0 &&
-          totalRow("Discount", `- ${formatMoney(order.discount)}`)}
+          totalRow(t.discount, `- ${formatMoney(order.discount)}`)}
         {order.serviceCharge > 0 &&
-          totalRow("Service charge", formatMoney(order.serviceCharge))}
-        {order.tax > 0 && totalRow("Tax", formatMoney(order.tax))}
+          totalRow(t.serviceCharge, formatMoney(order.serviceCharge))}
+        {order.tax > 0 && totalRow(t.tax, formatMoney(order.tax))}
         {order.tipAmount > 0 &&
-          totalRow("Tip", formatMoney(order.tipAmount))}
-        {totalRow("Total", formatMoney(order.total), true)}
+          totalRow(t.tip, formatMoney(order.tipAmount))}
+        {totalRow(t.total, formatMoney(order.total), true)}
         {order.amountPaid > 0 &&
           order.amountPaid < order.total &&
-          totalRow("Paid", formatMoney(order.amountPaid))}
+          totalRow(t.amountPaid, formatMoney(order.amountPaid))}
       </div>
 
-      {/* Payments */}
       <div>
         <p className="mb-2 text-xs font-semibold uppercase text-muted">
-          Payments
+          {t.payments}
         </p>
         {order.payments.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line py-6 text-center text-sm text-muted">
-            No payments recorded yet.
+            {t.noPayments}
           </div>
         ) : (
           <div className="divide-y divide-line rounded-2xl border border-line">
@@ -362,7 +390,7 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                   </p>
                   {p.tipAmount > 0 && (
                     <p className="text-xs text-muted">
-                      incl. {formatMoney(p.tipAmount)} tip
+                      {t.inclTip.replace("{amount}", formatMoney(p.tipAmount))}
                     </p>
                   )}
                 </div>
@@ -372,10 +400,9 @@ function OrderDetail({ order }: { order: BoardOrder }) {
         )}
       </div>
 
-      {/* Actions */}
       {order.status !== "paid" && order.status !== "cancelled" && (
         <div className="flex justify-end pt-1">
-          <OrderActions order={order} size="md" />
+          <OrderActions order={order} size="md" t={t} />
         </div>
       )}
     </div>
@@ -384,9 +411,18 @@ function OrderDetail({ order }: { order: BoardOrder }) {
 
 // --- Board -------------------------------------------------------------------
 
-export function OrdersBoard({ orders }: { orders: BoardOrder[] }) {
+export function OrdersBoard({ orders, t }: { orders: BoardOrder[]; t: OrdersBoardTranslations }) {
   const [filter, setFilter] = React.useState<string>("all");
   const [selected, setSelected] = React.useState<BoardOrder | null>(null);
+
+  const FILTERS = React.useMemo(() => [
+    { key: "all", label: t.filterAll },
+    { key: "placed", label: t.placed },
+    { key: "preparing", label: t.preparing },
+    { key: "ready", label: t.ready },
+    { key: "served", label: t.served },
+    { key: "paid", label: t.paid },
+  ], [t]);
 
   const counts = React.useMemo(() => {
     const c: Record<string, number> = { all: orders.length };
@@ -399,7 +435,6 @@ export function OrdersBoard({ orders }: { orders: BoardOrder[] }) {
     [orders, filter]
   );
 
-  // Keep the open sheet in sync with refreshed server data.
   const selectedLive =
     selected && orders.find((o) => o.id === selected.id) ? selected : null;
   const liveOrder = selectedLive
@@ -442,12 +477,12 @@ export function OrdersBoard({ orders }: { orders: BoardOrder[] }) {
         {filtered.length === 0 ? (
           <EmptyRow>
             {filter === "all"
-              ? "No orders yet. New orders from tables will appear here."
-              : `No ${filter} orders right now.`}
+              ? t.noOrders
+              : t.noFilteredOrders.replace("{status}", filter)}
           </EmptyRow>
         ) : (
           filtered.map((o) => (
-            <OrderRow key={o.id} order={o} onOpen={setSelected} />
+            <OrderRow key={o.id} order={o} onOpen={setSelected} t={t} />
           ))
         )}
       </div>
@@ -455,10 +490,10 @@ export function OrdersBoard({ orders }: { orders: BoardOrder[] }) {
       <Sheet
         open={!!liveOrder}
         onClose={() => setSelected(null)}
-        title={liveOrder ? `Order #${liveOrder.orderNumber}` : undefined}
+        title={liveOrder ? `#${liveOrder.orderNumber}` : undefined}
         height="tall"
       >
-        {liveOrder && <OrderDetail order={liveOrder} />}
+        {liveOrder && <OrderDetail order={liveOrder} t={t} />}
       </Sheet>
     </Card>
   );

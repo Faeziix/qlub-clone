@@ -26,7 +26,7 @@ export default [
     files: ["src/**/*.tsx", "src/**/*.jsx"],
     plugins: { local: localI18nPlugin },
     rules: {
-      "local/no-raw-jsx-strings": "warn",
+      "local/no-raw-jsx-strings": "error",
     },
   },
 ];

@@ -25,7 +25,7 @@ export function LoginForm({ showDemoAccounts }: { showDemoAccounts: boolean }) {
             <Utensils size={26} />
           </div>
           <h1 className="text-3xl font-black tracking-tight">
-            qlub<span className="text-brand">_</span> Manager
+            {t("title")}
           </h1>
           <p className="mt-1 text-sm text-muted">{t("subtitle")}</p>
         </div>

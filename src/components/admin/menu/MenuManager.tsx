@@ -290,7 +290,7 @@ function ItemRow({
                 {item.modifierOptionCount} {t("options")}
               </span>
             )}
-            {item.calories != null && <span>{item.calories} kcal</span>}
+            {item.calories != null && <span>{item.calories} {"kcal"}</span>}
           </div>
         )}
       </div>

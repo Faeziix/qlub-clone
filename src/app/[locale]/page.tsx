@@ -11,98 +11,103 @@ import {
   ReceiptText,
   ShieldCheck,
 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const t = await getTranslations("landing");
+
+  const features = [
+    {
+      icon: <QrCode size={20} />,
+      title: t("featureQrTitle"),
+      body: t("featureQrBody"),
+    },
+    {
+      icon: <Users size={20} />,
+      title: t("featureSplitTitle"),
+      body: t("featureSplitBody"),
+    },
+    {
+      icon: <CreditCard size={20} />,
+      title: t("featurePayTitle"),
+      body: t("featurePayBody"),
+    },
+    {
+      icon: <ReceiptText size={20} />,
+      title: t("featureOrdersTitle"),
+      body: t("featureOrdersBody"),
+    },
+    {
+      icon: <Star size={20} />,
+      title: t("featureReviewsTitle"),
+      body: t("featureReviewsBody"),
+    },
+    {
+      icon: <ShieldCheck size={20} />,
+      title: t("featureManageTitle"),
+      body: t("featureManageBody"),
+    },
+  ];
+
+  const stats = [
+    ["2", t("statLanguages")],
+    ["2", t("statPayments")],
+    ["< 30s", t("statSpeed")],
+    ["100%", t("statNoApp")],
+  ] as const;
+
   return (
     <div className="min-h-screen bg-bg">
-      {/* Nav */}
       <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
         <span className="text-2xl font-black tracking-tight">
-          qlub<span className="text-brand">_</span>
+          {"qlub"}<span className="text-brand">{"_"}</span>
         </span>
         <nav className="flex items-center gap-3 text-sm font-semibold">
           <Link
             href="/admin/login"
             className="rounded-full px-4 py-2 text-muted hover:text-ink"
           >
-            Restaurant login
+            {t("restaurantLogin")}
           </Link>
           <Link
-            href="/qr/ae/paul-uae"
+            href="/qr/ir/demo-tehran"
             className="inline-flex items-center gap-1.5 rounded-full bg-brand px-4 py-2 text-brand-fg"
           >
-            Live demo <ArrowRight size={15} />
+            {t("liveDemo")} <ArrowRight size={15} />
           </Link>
         </nav>
       </header>
 
-      {/* Hero */}
       <section className="mx-auto max-w-6xl px-5 pt-12 pb-16 text-center">
         <span className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand">
-          <Sparkles size={14} /> Scan · Order · Split · Pay — in seconds
+          <Sparkles size={14} /> {t("tagline")}
         </span>
         <h1 className="mx-auto mt-6 max-w-3xl text-4xl font-black leading-tight tracking-tight sm:text-6xl">
-          The QR pay-at-table platform for modern restaurants
+          {t("heroTitle")}
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted">
-          Guests scan a QR code to browse the menu, order, split the bill, tip
-          and pay — no app, no waiting. You get a real-time dashboard for menus,
-          orders, tables, payments and reviews.
+          {t("heroBody")}
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
-            href="/qr/ae/paul-uae"
+            href="/qr/ir/demo-tehran"
             className="inline-flex items-center gap-2 rounded-2xl bg-brand px-6 py-3.5 font-bold text-brand-fg shadow-float"
           >
-            <QrCode size={18} /> Try the guest app
+            <QrCode size={18} /> {t("tryGuestApp")}
           </Link>
           <Link
             href="/admin/login"
             className="inline-flex items-center gap-2 rounded-2xl border border-line bg-surface px-6 py-3.5 font-bold"
           >
-            <LayoutDashboard size={18} /> Open the dashboard
+            <LayoutDashboard size={18} /> {t("openDashboard")}
           </Link>
         </div>
-        <p className="mt-4 text-xs text-muted">
-          Demo restaurant: Paul — UAE
-        </p>
+        <p className="mt-4 text-xs text-muted">{t("demoHint")}</p>
       </section>
 
-      {/* Feature grid */}
       <section className="mx-auto max-w-6xl px-5 pb-16">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            {
-              icon: <QrCode size={20} />,
-              title: "QR digital menu",
-              body: "Multi-menu, categories, modifiers, dietary tags, photos & 8 languages with RTL support.",
-            },
-            {
-              icon: <Users size={20} />,
-              title: "Split any way",
-              body: "Pay the full bill, split evenly, pay for your own items, or a custom amount.",
-            },
-            {
-              icon: <CreditCard size={20} />,
-              title: "Pay in one tap",
-              body: "Apple Pay, Google Pay, cards, Tabby and more — with tipping built in.",
-            },
-            {
-              icon: <ReceiptText size={20} />,
-              title: "Live order board",
-              body: "Watch orders flow in, advance them through the kitchen, and settle bills in real time.",
-            },
-            {
-              icon: <Star size={20} />,
-              title: "Reviews & feedback",
-              body: "Capture food, service and ambience ratings the moment guests pay.",
-            },
-            {
-              icon: <ShieldCheck size={20} />,
-              title: "Manage everything",
-              body: "Menus, prices, availability, tables & QR codes, branding and billing — all in one place.",
-            },
-          ].map((f) => (
+          {features.map((f) => (
             <div
               key={f.title}
               className="rounded-2xl border border-line bg-surface p-6 shadow-card"
@@ -117,15 +122,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Stats band */}
       <section className="border-y border-line bg-surface">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-5 py-12 text-center sm:grid-cols-4">
-          {[
-            ["8", "Languages"],
-            ["5", "Payment methods"],
-            ["< 30s", "To pay a bill"],
-            ["100%", "No app needed"],
-          ].map(([n, l]) => (
+          {stats.map(([n, l]) => (
             <div key={l}>
               <p className="text-3xl font-black text-brand">{n}</p>
               <p className="mt-1 text-sm text-muted">{l}</p>
@@ -136,17 +135,14 @@ export default function HomePage() {
 
       <footer className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-10 text-sm text-muted sm:flex-row">
         <span className="flex items-center gap-1.5">
-          <Globe size={15} /> A qlub.io clone — built for demonstration.
+          <Globe size={15} /> {t("footerCredit")}
         </span>
         <div className="flex gap-4">
-          <Link href="/qr/ae/paul-uae" className="hover:text-ink">
-            Guest app
-          </Link>
-          <Link href="/qr/ae/olive-bistro" className="hover:text-ink">
-            Second venue
+          <Link href="/qr/ir/demo-tehran" className="hover:text-ink">
+            {t("navGuestApp")}
           </Link>
           <Link href="/admin/login" className="hover:text-ink">
-            Dashboard
+            {t("navDashboard")}
           </Link>
         </div>
       </footer>

@@ -172,7 +172,7 @@ export function MenuExperience({
             <button
               onClick={() => setEntered(false)}
               className="grid h-9 w-9 place-items-center rounded-full bg-surface-2"
-              aria-label="Back"
+              aria-label={t("back")}
             >
               <ChevronLeft size={20} />
             </button>
@@ -180,7 +180,7 @@ export function MenuExperience({
             <button
               onClick={() => setLangOpen(true)}
               className="grid h-9 w-9 place-items-center rounded-full bg-surface-2"
-              aria-label="Language"
+              aria-label={t("language")}
             >
               <Globe size={18} />
             </button>
@@ -265,7 +265,7 @@ export function MenuExperience({
           ))}
           {filtered.length === 0 && (
             <p className="py-16 text-center text-muted">
-              No items match “{query}”.
+              {t("noSearchResults").replace("{query}", query)}
             </p>
           )}
           <Footer t={t} />
@@ -376,7 +376,7 @@ function ItemRow({
 function Footer({ t }: { t: (k: string) => string }) {
   return (
     <footer className="py-8 text-center">
-      <p className="text-2xl font-black tracking-tight text-muted/40">qlub_</p>
+      <p className="text-2xl font-black tracking-tight text-muted/40">{"qlub_"}</p>
       <p className="mt-1 text-xs text-muted">
         {t("termsPrefix")}{" "}
         <span className="underline">{t("terms")}</span>

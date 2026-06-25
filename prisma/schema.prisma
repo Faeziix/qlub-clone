@@ -1,5 +1,6 @@
 // Qlub Iran — data model for QR pay-at-table ordering + restaurant management.
-// SQLite for zero-config local/dev; switch provider to "postgresql" for production.
+// Postgres (Neon, Track A staging) — switched from SQLite in issue #9 since
+// the .env already points to the Neon instance provisioned for the branch.
 // Issue #8: native enums, native Json, Iran defaults, translation tables,
 //           per-vendor orderNumber sequence, AuditLog, sub-merchant fields.
 
@@ -8,8 +9,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ──────────────────────────────── Enums ──────────────────────────────────────
@@ -343,6 +345,27 @@ model Payment {
   payerName  String?
   payerEmail String?
   reference  String        @unique
+
+  /// Idempotency key — persisted and deduplicated so the same initiation
+  /// attempt never creates two Payment rows (PRD §5.4.2 / issue #9).
+  idempotencyKey  String?   @unique
+
+  /// Gateway-issued authority/trackId returned from the IPG request endpoint.
+  trackId         String?
+
+  /// Gateway-issued reference number returned after server-side verify.
+  gatewayReference String?  @unique
+
+  /// Split-leg reservation expiry (TTL). If exceeded, the leg is released
+  /// and the payment is moved to `expired` by the reconciliation sweep.
+  expiresAt  DateTime?
+
+  /// Verified timestamp set by the server-side gateway verify call.
+  verifiedAt DateTime?
+
+  /// For ceiling-split sub-charges: the parent payment that initiated the split.
+  parentPaymentId String?
+
   createdAt  DateTime      @default(now())
 
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -351,6 +374,9 @@ model Payment {
 
   @@index([orderId])
   @@index([vendorId])
+  @@index([status])
+  @@index([idempotencyKey])
+  @@index([expiresAt])
 }
 
 /// Review is per-Payment (not per-Order) — resolves split-bill review ownership (ADR-0007).

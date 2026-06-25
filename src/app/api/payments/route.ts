@@ -15,6 +15,7 @@ const schema = z.object({
   splitMeta: z.any().optional(),
   payerName: z.string().optional(),
   payerEmail: z.string().email().optional(),
+  idempotencyKey: z.string().optional(),
 });
 
 export async function POST(req: Request) {

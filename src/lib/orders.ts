@@ -1,16 +1,32 @@
 import "server-only";
 import { db } from "./db";
-import { computeBill } from "./pricing";
 import { isFullyPaid } from "./money";
 import { nextOrderNumber } from "./schema-types";
 import { nanoid } from "nanoid";
-import type { CartLine, PaymentMethod, SplitType } from "./types";
+import {
+  computeServerBill,
+  detectPriceChanges,
+  validatePaymentLegsAgainstSnapshot,
+} from "./pricing-authority";
+import type { PaymentMethod, SplitType } from "./types";
+import type { PriceChangeNotice } from "./pricing-authority";
+
+const SPLIT_LEG_TTL_MS = 15 * 60 * 1000;
+
+export type { PriceChangeNotice };
 
 export async function createOrderFromCart(input: {
   vendorSlug: string;
   tableCode?: string | null;
   type?: "qsr" | "dinein";
-  lines: CartLine[];
+  lines: Array<{
+    itemId: string;
+    quantity: number;
+    unitPrice: bigint;
+    modifiers: Array<{ optionId: string; priceDelta: bigint }>;
+    name: string;
+    notes?: string;
+  }>;
   guestName?: string;
   guestPhone?: string;
   notes?: string;
@@ -21,11 +37,45 @@ export async function createOrderFromCart(input: {
   if (!vendor) throw new Error("Vendor not found");
   if (!input.lines.length) throw new Error("Cart is empty");
 
-  const bill = computeBill(input.lines, {
+  const itemIds = [...new Set(input.lines.map((l) => l.itemId))];
+  const optionIds = [
+    ...new Set(input.lines.flatMap((l) => l.modifiers.map((m) => m.optionId))),
+  ];
+
+  const [dbItems, dbOptions] = await Promise.all([
+    db.menuItem.findMany({
+      where: { id: { in: itemIds }, vendorId: vendor.id },
+      select: { id: true, price: true, name: true, available: true },
+    }),
+    optionIds.length
+      ? db.modifierOption.findMany({
+          where: { id: { in: optionIds } },
+          select: { id: true, priceDelta: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const unavailable = dbItems.filter((i) => !i.available).map((i) => i.id);
+  if (unavailable.length) {
+    throw new Error(`Items no longer available: ${unavailable.join(", ")}`);
+  }
+
+  const dbItemPrices = dbItems.map((i) => ({ itemId: i.id, price: i.price }));
+  const dbModPrices = dbOptions.map((o) => ({
+    optionId: o.id,
+    priceDelta: o.priceDelta,
+  }));
+
+  const priceChanges = detectPriceChanges(input.lines, dbItemPrices, dbModPrices);
+
+  const bill = computeServerBill(input.lines, dbItemPrices, dbModPrices, {
     serviceChargePct: vendor.serviceChargePct,
     taxPct: vendor.taxPct,
     taxInclusive: vendor.taxInclusive,
   });
+
+  const itemMap = new Map(dbItems.map((i) => [i.id, i.price]));
+  const modMap = new Map(dbOptions.map((o) => [o.id, o.priceDelta]));
 
   const table = input.tableCode
     ? await db.diningTable.findFirst({
@@ -63,15 +113,18 @@ export async function createOrderFromCart(input: {
         total: bill.total,
         items: {
           create: input.lines.map((l) => {
-            const modifierSum = l.modifiers.reduce((s, m) => s + m.priceDelta, 0n);
+            const serverUnitPrice = itemMap.get(l.itemId) ?? l.unitPrice;
+            const modifierSum = l.modifiers.reduce((s, m) => {
+              return s + (modMap.get(m.optionId) ?? m.priceDelta);
+            }, 0n);
             return {
               itemId: l.itemId,
               name: l.name,
-              unitPrice: l.unitPrice,
+              unitPrice: serverUnitPrice,
               quantity: l.quantity,
               modifiers: l.modifiers as unknown as object[],
               notes: l.notes,
-              lineTotal: (l.unitPrice + modifierSum) * BigInt(l.quantity),
+              lineTotal: (serverUnitPrice + modifierSum) * BigInt(l.quantity),
             };
           }),
         },
@@ -89,7 +142,97 @@ export async function createOrderFromCart(input: {
     return newOrder;
   });
 
-  return order;
+  return { order, priceChanges };
+}
+
+export async function initiatePayment(input: {
+  orderId: string;
+  amount: bigint;
+  tipAmount?: bigint;
+  method: PaymentMethod;
+  splitType?: SplitType;
+  splitMeta?: unknown;
+  payerName?: string;
+  payerEmail?: string;
+  idempotencyKey: string;
+}) {
+  const existingByKey = await db.payment.findUnique({
+    where: { idempotencyKey: input.idempotencyKey },
+  });
+  if (existingByKey) {
+    return { payment: existingByKey, deduplicated: true };
+  }
+
+  const tip = input.tipAmount ?? 0n;
+
+  const payment = await db.$transaction(async (tx) => {
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: input.orderId },
+      include: { items: true, payments: true },
+    });
+
+    const succeededLegs = order.payments.filter((p) => p.status === "succeeded");
+    const reservedLegs = order.payments.filter(
+      (p) =>
+        p.status === "pending" &&
+        p.expiresAt !== null &&
+        p.expiresAt > new Date()
+    );
+
+    const alreadyPaid = succeededLegs.reduce((s, p) => s + p.amount, 0n);
+    const reserved = reservedLegs.reduce((s, p) => s + p.amount, 0n);
+    const committedOrReserved = alreadyPaid + reserved;
+
+    const remaining = order.total > committedOrReserved
+      ? order.total - committedOrReserved
+      : 0n;
+
+    if (input.amount > remaining) {
+      throw new Error(
+        `Payment amount ${input.amount} exceeds remaining balance ${remaining}`
+      );
+    }
+
+    const invariantCheck = validatePaymentLegsAgainstSnapshot(
+      order.total,
+      [
+        ...succeededLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
+        ...reservedLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
+        { amount: input.amount, tipAmount: tip },
+      ]
+    );
+
+    if (!invariantCheck.valid && input.method !== "cash") {
+      throw new Error(
+        `Payment legs do not reconcile to order snapshot. ` +
+          `Discrepancy: ${invariantCheck.discrepancy} rial`
+      );
+    }
+
+    const expiresAt = new Date(Date.now() + SPLIT_LEG_TTL_MS);
+
+    return tx.payment.create({
+      data: {
+        vendorId: order.vendorId,
+        orderId: order.id,
+        amount: input.amount,
+        tipAmount: tip,
+        total: input.amount + tip,
+        currency: order.currency,
+        method: input.method,
+        status: "pending",
+        splitType: input.splitType ?? "full",
+        splitMeta: input.splitMeta ?? undefined,
+        payerName: input.payerName,
+        payerEmail: input.payerEmail,
+        reference: `pay_${nanoid(16)}`,
+        idempotencyKey: input.idempotencyKey,
+        expiresAt,
+      },
+    });
+  });
+
+  return { payment, deduplicated: false };
 }
 
 export async function recordPayment(input: {
@@ -101,54 +244,95 @@ export async function recordPayment(input: {
   splitMeta?: unknown;
   payerName?: string;
   payerEmail?: string;
+  idempotencyKey?: string;
 }) {
-  const order = await db.order.findUnique({
-    where: { id: input.orderId },
-    include: { payments: true },
-  });
-  if (!order) throw new Error("Order not found");
-
-  const tip = input.tipAmount ?? 0n;
-  const total = input.amount + tip;
-
-  const payment = await db.payment.create({
-    data: {
-      vendorId: order.vendorId,
-      orderId: order.id,
-      amount: input.amount,
-      tipAmount: tip,
-      total,
-      currency: order.currency,
-      method: input.method,
-      status: "pending",
-      splitType: input.splitType ?? "full",
-      splitMeta: input.splitMeta ?? undefined,
-      payerName: input.payerName,
-      payerEmail: input.payerEmail,
-      reference: `pay_${nanoid(16)}`,
-    },
-  });
-
-  const amountPaid = order.amountPaid + input.amount;
-  const fullyPaid = isFullyPaid(amountPaid, order.total);
-  await db.order.update({
-    where: { id: order.id },
-    data: {
-      amountPaid,
-      tipAmount: order.tipAmount + tip,
-      total: order.total + tip,
-      status: fullyPaid ? "paid" : order.status,
-    },
-  });
-
-  if (fullyPaid && order.tableId) {
-    await db.diningTable.update({
-      where: { id: order.tableId },
-      data: { status: "available" },
+  if (input.idempotencyKey) {
+    const existingByKey = await db.payment.findUnique({
+      where: { idempotencyKey: input.idempotencyKey },
     });
+    if (existingByKey) {
+      const order = await db.order.findUniqueOrThrow({
+        where: { id: input.orderId },
+      });
+      return {
+        payment: existingByKey,
+        fullyPaid: isFullyPaid(order.amountPaid, order.total),
+        amountPaid: order.amountPaid,
+        deduplicated: true,
+      };
+    }
   }
 
-  return { payment, fullyPaid, amountPaid };
+  const tip = input.tipAmount ?? 0n;
+
+  const result = await db.$transaction(async (tx) => {
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: input.orderId },
+      include: { items: true, payments: true },
+    });
+
+    const succeededLegs = order.payments.filter((p) => p.status === "succeeded");
+    const alreadyPaid = succeededLegs.reduce((s, p) => s + p.amount, 0n);
+
+    const allLegs = [
+      ...succeededLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
+      { amount: input.amount, tipAmount: tip },
+    ];
+
+    const invariantCheck = validatePaymentLegsAgainstSnapshot(order.total, allLegs);
+
+    if (!invariantCheck.valid) {
+      throw new Error(
+        `Payment legs do not reconcile to order snapshot. ` +
+          `Snapshot total: ${invariantCheck.snapshotTotal}, ` +
+          `paid total: ${invariantCheck.paidTotal}, ` +
+          `discrepancy: ${invariantCheck.discrepancy} rial`
+      );
+    }
+
+    const payment = await tx.payment.create({
+      data: {
+        vendorId: order.vendorId,
+        orderId: order.id,
+        amount: input.amount,
+        tipAmount: tip,
+        total: input.amount + tip,
+        currency: order.currency,
+        method: input.method,
+        status: "succeeded",
+        splitType: input.splitType ?? "full",
+        splitMeta: input.splitMeta ?? undefined,
+        payerName: input.payerName,
+        payerEmail: input.payerEmail,
+        reference: `pay_${nanoid(16)}`,
+        idempotencyKey: input.idempotencyKey,
+        verifiedAt: new Date(),
+      },
+    });
+
+    const newAmountPaid = alreadyPaid + input.amount;
+    const fullyPaid = isFullyPaid(newAmountPaid, order.total);
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        amountPaid: newAmountPaid,
+        tipAmount: order.tipAmount + tip,
+        status: fullyPaid ? "paid" : order.status,
+      },
+    });
+
+    if (fullyPaid && order.tableId) {
+      await tx.diningTable.update({
+        where: { id: order.tableId },
+        data: { status: "available" },
+      });
+    }
+
+    return { payment, fullyPaid, amountPaid: newAmountPaid };
+  });
+
+  return { ...result, deduplicated: false };
 }
 
 export async function createReview(input: {

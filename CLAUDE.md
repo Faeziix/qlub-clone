@@ -53,6 +53,11 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ `parseJSON` assumes string input → ✅ Updated to accept `unknown`; non-string values pass through as-is (already parsed by Prisma).
 - ❌ `Review.orderId` creates split-bill conflict → ✅ `Review.paymentId @unique`: each payer has one Payment and can review once.
 - ❌ `JSON.stringify` for `OrderItem.modifiers` on write → ✅ Pass array directly; Prisma handles Json serialization.
+- ❌ `createOrderFromCart` trusted client-supplied `unitPrice`/`priceDelta` → ✅ Re-fetch DB prices by itemId/optionId, compute with `computeServerBill`, snapshot onto `OrderItem`.
+- ❌ `recordPayment` was non-transactional, no idempotency → ✅ Wrap in `$transaction`, check `idempotencyKey` before create, run invariant before write.
+- ❌ Prisma config only tried `.env`, not `.env.local` → ✅ `prisma.config.ts` now tries both; Next.js uses `.env.local` by convention.
+- ❌ `require()` inside property-based test functions fails with `@/` alias → ✅ Use top-level `import` statements; `require()` with path aliases is unreliable in vitest.
+- ❌ `validatePaymentLegsAgainstSnapshot` cannot re-add tax to a pre-computed total → ✅ Accept `snapshotTotal` (pre-computed `order.total`) directly; inclusive-tax totals would double-count if tax were added again.
 
 ## Dependencies & Tooling
 
@@ -72,8 +77,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/auth.ts` — JWT session management
 - `src/lib/money.ts` — ALL money conversions: `MONETARY_UNIT`, `rialToToman`, `tomanToRial`, `rialToGatewayUnit`, `gatewayUnitToRial`, `formatRialAsToman`, `parseRialFromInput`, `isFullyPaid`
 - `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip) — all `bigint` arithmetic
+- `src/lib/pricing-authority.ts` — Server-authoritative pricing: `computeServerBill`, `detectPriceChanges`, `validatePaymentLegsAgainstSnapshot`, `buildIdempotencyKey`
 - `src/lib/schema-types.ts` — Enum value sets, type guards, Iran defaults, `nextOrderNumber`, `AuditLogEntry`
-- `src/lib/orders.ts` — Order/payment/review service layer
+- `src/lib/orders.ts` — Order/payment/review service layer: `createOrderFromCart` (server-authoritative, returns `priceChanges`), `initiatePayment` (transactional with split-leg reservation + TTL + idempotency), `recordPayment` (transactional + invariant check + idempotency)
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
 
 ## API & Data Layer
@@ -89,6 +95,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - #4 — Tooling standardisation (bun, Node pin, CI, env example)
 - #7 — Integer-rial money model (money.ts deep module + property tests)
 - #8 — Schema modernization (native enums, native Json, Iran defaults, translation tables, orderNumber sequence, AuditLog, sub-merchant fields)
+- #9 — Server-authoritative pricing + honored-price rule + concurrency + idempotency (pricing-authority.ts; orders.ts rewrite; schema Payment fields; CartSheet price-change notice)
 
 **In progress / next:**
-- M2 remaining issues on branch `feat/m2-data-money-core`
+- M3 — Localization & Design (i18n, Farsi-first, Vazirmatn)

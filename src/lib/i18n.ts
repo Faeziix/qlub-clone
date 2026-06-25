@@ -1,0 +1,139 @@
+/** Lightweight i18n for the customer app. Supports qlub's language set with RTL. */
+
+export const LOCALES = [
+  { code: "en", label: "English", dir: "ltr" },
+  { code: "ar", label: "عربي", dir: "rtl" },
+  { code: "fr", label: "Français", dir: "ltr" },
+  { code: "es", label: "Español", dir: "ltr" },
+  { code: "tr", label: "Türkçe", dir: "ltr" },
+  { code: "pt", label: "Português", dir: "ltr" },
+  { code: "ru", label: "Русский", dir: "ltr" },
+  { code: "zh", label: "中文", dir: "ltr" },
+] as const;
+
+export type Locale = (typeof LOCALES)[number]["code"];
+
+export function dirFor(locale: string): "ltr" | "rtl" {
+  return locale === "ar" ? "rtl" : "ltr";
+}
+
+type Dict = Record<string, string>;
+
+const en: Dict = {
+  selectMenu: "Select a menu",
+  search: "Search",
+  addToOrder: "Add to order",
+  add: "Add",
+  yourOrder: "Your order",
+  viewOrder: "View order",
+  cart: "Cart",
+  empty: "Your cart is empty",
+  emptyHint: "Browse the menu and add items to get started.",
+  browseMenu: "Browse menu",
+  subtotal: "Subtotal",
+  serviceCharge: "Service charge",
+  tax: "VAT",
+  tip: "Tip",
+  total: "Total",
+  checkout: "Checkout",
+  placeOrder: "Place order",
+  payNow: "Pay now",
+  payBill: "Pay bill",
+  splitBill: "Split the bill",
+  splitEven: "Split evenly",
+  splitItems: "Pay for your items",
+  splitCustom: "Pay custom amount",
+  payFull: "Pay full amount",
+  addTip: "Add a tip",
+  noTip: "No tip",
+  custom: "Custom",
+  paymentMethod: "Payment method",
+  rateExperience: "Rate your experience",
+  food: "Food",
+  service: "Service",
+  ambience: "Ambience",
+  submitReview: "Submit review",
+  thankYou: "Thank you!",
+  orderPlaced: "Order placed",
+  paymentSuccess: "Payment successful",
+  required: "Required",
+  optional: "Optional",
+  chooseUpTo: "Choose up to",
+  special: "Special instructions",
+  qty: "Quantity",
+  changeLanguage: "Change language",
+  enterPasscode: "Enter QR passcode",
+  apply: "Apply",
+  termsPrefix: "By using qlub you accept our",
+  terms: "Terms and Conditions",
+  table: "Table",
+  receipt: "Receipt",
+  popular: "Popular",
+  new: "New",
+};
+
+const ar: Dict = {
+  selectMenu: "اختر قائمة",
+  search: "بحث",
+  addToOrder: "أضف إلى الطلب",
+  add: "أضف",
+  yourOrder: "طلبك",
+  viewOrder: "عرض الطلب",
+  cart: "السلة",
+  empty: "سلتك فارغة",
+  emptyHint: "تصفح القائمة وأضف الأصناف للبدء.",
+  browseMenu: "تصفح القائمة",
+  subtotal: "المجموع الفرعي",
+  serviceCharge: "رسوم الخدمة",
+  tax: "ضريبة القيمة المضافة",
+  tip: "إكرامية",
+  total: "الإجمالي",
+  checkout: "الدفع",
+  placeOrder: "تأكيد الطلب",
+  payNow: "ادفع الآن",
+  payBill: "دفع الفاتورة",
+  splitBill: "تقسيم الفاتورة",
+  splitEven: "تقسيم بالتساوي",
+  splitItems: "ادفع مقابل أصنافك",
+  splitCustom: "ادفع مبلغًا مخصصًا",
+  payFull: "ادفع المبلغ كاملاً",
+  addTip: "أضف إكرامية",
+  noTip: "بدون إكرامية",
+  custom: "مخصص",
+  paymentMethod: "طريقة الدفع",
+  rateExperience: "قيّم تجربتك",
+  food: "الطعام",
+  service: "الخدمة",
+  ambience: "الأجواء",
+  submitReview: "إرسال التقييم",
+  thankYou: "شكراً لك!",
+  orderPlaced: "تم تأكيد الطلب",
+  paymentSuccess: "تم الدفع بنجاح",
+  required: "مطلوب",
+  optional: "اختياري",
+  chooseUpTo: "اختر حتى",
+  special: "تعليمات خاصة",
+  qty: "الكمية",
+  changeLanguage: "تغيير اللغة",
+  enterPasscode: "أدخل رمز QR",
+  apply: "تطبيق",
+  termsPrefix: "باستخدامك qlub فإنك توافق على",
+  terms: "الشروط والأحكام",
+  table: "طاولة",
+  receipt: "الإيصال",
+  popular: "الأكثر طلباً",
+  new: "جديد",
+};
+
+const dicts: Record<string, Dict> = { en, ar };
+
+export function getDict(locale: string): Dict {
+  return dicts[locale] ?? en;
+}
+
+/** Server + client safe translator. Falls back to English then key. */
+export function makeT(locale: string) {
+  const d = getDict(locale);
+  return (key: keyof typeof en | string): string =>
+    d[key as string] ?? en[key as string] ?? (key as string);
+}

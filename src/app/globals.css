@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Inter", system-ui, sans-serif;
+
+  /* Base light surface (customer app default) */
+  --bg: 0 0% 97%;
+  --surface: 0 0% 100%;
+  --surface-2: 220 14% 96%;
+  --ink: 222 22% 12%;
+  --muted: 220 9% 46%;
+  --line: 220 13% 91%;
+
+  --brand: 38 52% 38%; /* darkgold default */
+  --brand-fg: 40 30% 98%;
+  --brand-soft: 40 45% 92%;
+
+  --success: 142 60% 38%;
+  --danger: 0 72% 51%;
+  --warning: 35 92% 50%;
+}
+
+/* ---- Customer themes (?theme=) ---- */
+.theme-darkgold {
+  --brand: 38 54% 36%;
+  --brand-fg: 40 33% 97%;
+  --brand-soft: 40 40% 93%;
+}
+.theme-classic {
+  --brand: 222 47% 31%;
+  --brand-fg: 0 0% 100%;
+  --brand-soft: 222 47% 95%;
+}
+.theme-emerald {
+  --brand: 160 64% 30%;
+  --brand-fg: 0 0% 100%;
+  --brand-soft: 160 50% 94%;
+}
+.theme-rose {
+  --brand: 343 70% 45%;
+  --brand-fg: 0 0% 100%;
+  --brand-soft: 343 70% 96%;
+}
+.theme-midnight {
+  --bg: 222 30% 9%;
+  --surface: 222 28% 13%;
+  --surface-2: 222 24% 18%;
+  --ink: 0 0% 98%;
+  --muted: 220 12% 65%;
+  --line: 222 20% 24%;
+  --brand: 41 70% 55%;
+  --brand-fg: 222 30% 9%;
+  --brand-soft: 222 24% 18%;
+}
+
+* {
+  border-color: hsl(var(--line));
+}
+
+html,
+body {
+  background: hsl(var(--bg));
+  color: hsl(var(--ink));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* Hide scrollbars on horizontal category strips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: hsl(var(--surface-2));
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsla(0, 0%, 100%, 0.45),
+    transparent
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

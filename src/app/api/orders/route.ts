@@ -49,8 +49,8 @@ export async function POST(req: Request) {
         priceDelta: bigintFromJson(m.priceDelta),
       })),
     }));
-    const order = await createOrderFromCart({ ...data, lines: normalizedLines });
-    return NextResponse.json({ ok: true, order: serializeOrder(order) });
+    const { order, priceChanged } = await createOrderFromCart({ ...data, lines: normalizedLines });
+    return NextResponse.json({ ok: true, order: serializeOrder(order), priceChanged });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Bad request";
     return NextResponse.json({ ok: false, error: message }, { status: 400 });

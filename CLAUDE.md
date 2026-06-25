@@ -16,6 +16,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - **ADR 0006** — DR baseline: Neon-managed PITR/branching for Track A; restore runbook + RTO/RPO documented; Track B (domestic) DR deferred to Phase 5.
 - **ADR 0007** — Review is per-Payment (`paymentId @unique`): each split-bill payer can review once; no orderId on Review.
 - **ADR 0008** — Schema modernization: native Postgres enums, JSONB columns, Iran defaults (IRR/fa/Asia/Tehran/ir), translation tables, monotonic per-vendor orderNumber, AuditLog, sub-merchant fields.
+- **ADR 0009** — Server-authoritative pricing: re-fetch DB prices at order creation; honored-price rule with `priceChanged` flag; `$transaction` wrapping for all money writes; `initiatePaymentLeg` with TTL reservation; idempotency keys persisted and deduplicated.
 - **Dual-track architecture** — Track A (Vercel + Neon, synthetic data only, separate repo/brand) vs Track B (domestic Iran infra, production). See PRD issue #1.
 - **Integer-rial money** — All monetary values are BigInt rial with no floats. Conversion only via `money.ts` at named boundaries.
 - **Server-authoritative pricing** — Bill computed from DB prices at order creation, snapshotted onto `OrderItem`. Payment verifies against the snapshot.
@@ -59,6 +60,10 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ `Date.now()` orderNumber generation is non-monotonic and collision-prone → ✅ Use `nextVendorOrderNumber(vendorId)` which atomically increments `vendorOrderSeq` via `UPDATE ... RETURNING`.
 - ❌ Seed used UAE/AED defaults instead of Iran/IRR → ✅ Seed vendors use `country:"ir"`, `currency:"IRR"`, `locale:"fa"`, `timezone:"Asia/Tehran"`, `supportedLangs:["fa","en"]`.
 - ❌ Seed passed `JSON.stringify(array)` for JSONB columns → ✅ Pass native JS arrays/objects directly; Prisma serializes them to JSONB.
+- ❌ `createOrderFromCart` trusted client `unitPrice`/`priceDelta` → ✅ Always re-fetch from DB via `resolveLinePricesFromDb`; client values are never used for money.
+- ❌ Order/payment writes were non-transactional → ✅ `createOrderFromCart`, `recordPayment`, and `initiatePaymentLeg` all use `db.$transaction`.
+- ❌ `nextVendorOrderNumber` used `db.$queryRaw` directly → ✅ Accepts a transaction client `tx` so the increment is atomic within the order creation transaction.
+- ❌ `createOrderFromCart` returned the order directly → ✅ Returns `{ order, priceChanged }` tuple; update all callers to destructure.
 
 ## Dependencies & Tooling
 
@@ -76,7 +81,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/env.ts` — `requireAuthSecret`, `assertServerEnv`, `isDemoSeedingEnabled`
 - `src/lib/auth.ts` — JWT session management
 - `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip)
-- `src/lib/orders.ts` — Order/payment/review service layer
+- `src/lib/orders.ts` — `createOrderFromCart` (server-authoritative, returns `{order, priceChanged}`), `initiatePaymentLeg` (pending reservation with TTL), `recordPayment` (idempotent, transactional), `createReview`
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
 
 ## API & Data Layer
@@ -96,5 +101,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - #7 — Integer-rial money model (BigInt, money.ts, property tests)
 - #8 — Schema modernization (enums, JSONB, Iran defaults, translations, orderNumber seq, AuditLog, sub-merchant fields)
 
+- #9 — Server-authoritative pricing + honored-price rule + concurrency + idempotency
+
 **In progress / next:**
-- M2 remaining: #9 (server-authoritative pricing)
+- M3: #10 (next-intl Farsi-first RTL foundation)

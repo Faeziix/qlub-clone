@@ -4,9 +4,9 @@
   "private": true,
   "description": "Production-ready clone of qlub.io — QR pay-at-table + ordering app and restaurant management platform",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "next start -p 3000",
+    "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
@@ -18,31 +18,31 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.1",
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
-    "jose": "^5.9.6",
+    "date-fns": "^4.4.0",
+    "jose": "^5.10.0",
     "lucide-react": "^0.469.0",
-    "nanoid": "^5.0.9",
+    "nanoid": "^5.1.16",
     "next": "15.1.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "recharts": "^2.15.0",
-    "tailwind-merge": "^2.6.0",
-    "zod": "^3.24.1",
-    "zustand": "^5.0.2"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "recharts": "^2.15.4",
+    "tailwind-merge": "^2.6.1",
+    "zod": "^3.25.76",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^22.10.5",
-    "@types/react": "^19.0.2",
-    "@types/react-dom": "^19.0.2",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "prisma": "^6.2.1",
-    "tailwindcss": "^3.4.17",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "@types/node": "^22.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.5.2",
+    "postcss": "^8.5.15",
+    "prisma": "^6.19.3",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.22.4",
+    "typescript": "^5.9.3"
   }
 }

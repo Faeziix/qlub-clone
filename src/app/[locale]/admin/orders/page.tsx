@@ -4,6 +4,7 @@ import {
   Banknote,
   Flame,
 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { PageHeader, StatCard } from "@/components/admin/ui";
@@ -14,6 +15,7 @@ import { OrdersBoard } from "@/components/admin/orders/OrdersBoard";
 export const dynamic = "force-dynamic";
 
 export default async function OrdersPage() {
+  const t = await getTranslations("admin.orders");
   const session = await requireSession();
 
   const orders = await db.order.findMany({
@@ -101,34 +103,34 @@ export default async function OrdersPage() {
   return (
     <div>
       <PageHeader
-        title="Orders"
-        subtitle="Live order board and recent history across your tables."
+        title={t("pageTitle")}
+        subtitle={t("pageSubtitle")}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          label="Active orders"
+          label={t("activeOrders")}
           value={String(activeCount)}
           icon={<ClipboardList size={18} />}
-          hint="not yet paid or cancelled"
+          hint={t("notYetPaid")}
         />
         <StatCard
-          label="Today's orders"
+          label={t("todaysOrders")}
           value={String(todaysCount)}
           icon={<Flame size={18} />}
-          hint="since midnight"
+          hint={t("sinceMidnight")}
         />
         <StatCard
-          label="Today's revenue"
+          label={t("todaysRevenue")}
           value={formatMoney(todaysRevenue)}
           icon={<Banknote size={18} />}
-          hint={`${paidToday.length} paid`}
+          hint={`${paidToday.length} ${t("paid")}`}
         />
         <StatCard
-          label="Avg prep time"
+          label={t("avgPrepTime")}
           value={avgPrepMins > 0 ? `${avgPrepMins} min` : "—"}
           icon={<Clock size={18} />}
-          hint="served & paid"
+          hint={t("servedAndPaid")}
         />
       </div>
 

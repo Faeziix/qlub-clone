@@ -5,10 +5,38 @@ import { db } from "@/lib/db";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { parseRialFromInput } from "@/lib/money";
 
+interface TranslationInput {
+  locale: string;
+  name: string;
+  description: string;
+}
+
 async function assertVendorAccess(vendorId: string) {
   const session = await requireSession();
   if (session.vendorId && session.vendorId !== vendorId) {
     throw new Error("Forbidden: item belongs to another vendor.");
+  }
+}
+
+async function upsertItemTranslations(
+  menuItemId: string,
+  translations: TranslationInput[]
+) {
+  for (const tx of translations) {
+    if (!tx.name.trim()) continue;
+    await db.menuItemTranslation.upsert({
+      where: { menuItemId_locale: { menuItemId, locale: tx.locale } },
+      create: {
+        menuItemId,
+        locale: tx.locale,
+        name: tx.name.trim(),
+        description: tx.description.trim() || null,
+      },
+      update: {
+        name: tx.name.trim(),
+        description: tx.description.trim() || null,
+      },
+    });
   }
 }
 
@@ -50,6 +78,7 @@ export async function updateItem(
     description: string;
     tomanInput: string;
     available: boolean;
+    translations?: TranslationInput[];
   }
 ) {
   const item = await db.menuItem.findUnique({
@@ -72,13 +101,23 @@ export async function updateItem(
       available: data.available,
     },
   });
+
+  if (data.translations?.length) {
+    await upsertItemTranslations(itemId, data.translations);
+  }
+
   revalidatePath("/admin/menu");
 }
 
 export async function createItem(
   categoryId: string,
   vendorId: string,
-  data: { name: string; tomanInput: string; description: string }
+  data: {
+    name: string;
+    tomanInput: string;
+    description: string;
+    translations?: TranslationInput[];
+  }
 ) {
   await assertVendorAccess(vendorId);
 
@@ -101,7 +140,7 @@ export async function createItem(
     select: { sortOrder: true },
   });
 
-  await db.menuItem.create({
+  const created = await db.menuItem.create({
     data: {
       vendorId,
       categoryId,
@@ -113,6 +152,11 @@ export async function createItem(
       tags: [],
     },
   });
+
+  if (data.translations?.length) {
+    await upsertItemTranslations(created.id, data.translations);
+  }
+
   revalidatePath("/admin/menu");
 }
 

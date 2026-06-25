@@ -201,7 +201,7 @@ export function ItemSheet({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                placeholder="e.g. no onions, allergy info…"
+                placeholder={t("specialPlaceholder")}
                 className="mt-2 w-full resize-none rounded-xl border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
               />
             </div>
@@ -223,7 +223,7 @@ export function ItemSheet({
           </div>
           {missingRequired && (
             <p className="mt-2 text-center text-xs text-danger">
-              Please complete the required choices.
+              {t("completeRequired")}
             </p>
           )}
         </div>

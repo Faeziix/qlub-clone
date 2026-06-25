@@ -40,9 +40,9 @@ interface OrderData {
 
 type UiPaymentMethod = "ipg" | "cash";
 
-const METHODS: { id: UiPaymentMethod; label: string; emoji: string }[] = [
-  { id: "ipg", label: "Online Payment (IPG)", emoji: "💳" },
-  { id: "cash", label: "Cash", emoji: "💵" },
+const PAYMENT_METHOD_IDS: { id: UiPaymentMethod; tKey: string; emoji: string }[] = [
+  { id: "ipg", tKey: "methodIpg", emoji: "💳" },
+  { id: "cash", tKey: "methodCash", emoji: "💵" },
 ];
 
 type Step = "pay" | "success" | "review" | "done";
@@ -114,7 +114,7 @@ export function PaymentFlow({
 
   async function pay() {
     if (baseAmountRial <= 0n) {
-      setError("Enter an amount to pay.");
+      setError(t("enterAmount"));
       return;
     }
     setProcessing(true);
@@ -139,11 +139,11 @@ export function PaymentFlow({
         }),
       });
       const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? "Payment failed");
+      if (!data.ok) throw new Error(data.error ?? t("paymentFailed"));
       if (data.payment?.id) setPaymentId(data.payment.id);
       setStep("success");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Payment failed");
+      setError(e instanceof Error ? e.message : t("paymentFailed"));
     } finally {
       setProcessing(false);
     }
@@ -172,7 +172,7 @@ export function PaymentFlow({
               variant="ghost"
               onClick={() => router.push(`/qr/${country}/${vendorSlug}`)}
             >
-              Back to menu
+              {t("backToMenu")}
             </Button>
           </div>
         </div>
@@ -201,7 +201,7 @@ export function PaymentFlow({
           </div>
           <h1 className="mt-5 text-2xl font-extrabold">{t("thankYou")}</h1>
           <p className="mt-1 text-muted">
-            Your feedback helps {vendorName} improve.
+            {t("feedbackHelps").replace("{name}", vendorName)}
           </p>
           <Button
             className="mt-8"
@@ -304,7 +304,7 @@ export function PaymentFlow({
 
           {split === "even" && (
             <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-2 px-4 py-3">
-              <span className="text-sm font-semibold">Number of people</span>
+              <span className="text-sm font-semibold">{t("numberOfPeople")}</span>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setParts(Math.max(2, parts - 1))}
@@ -422,7 +422,7 @@ export function PaymentFlow({
 
         <Section title={t("paymentMethod")} icon={<CreditCard size={18} />}>
           <div className="space-y-2">
-            {METHODS.map((m) => (
+            {PAYMENT_METHOD_IDS.map((m) => (
               <button
                 key={m.id}
                 onClick={() => setMethod(m.id)}
@@ -432,7 +432,7 @@ export function PaymentFlow({
                 )}
               >
                 <span className="text-xl">{m.emoji}</span>
-                <span className="flex-1 font-semibold">{m.label}</span>
+                <span className="flex-1 font-semibold">{t(m.tKey)}</span>
                 <span
                   className={cn(
                     "grid h-5 w-5 place-items-center rounded-full border-2",
@@ -455,21 +455,21 @@ export function PaymentFlow({
             <p className="mb-2 text-center text-sm text-danger">{error}</p>
           )}
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-muted">You pay</span>
+            <span className="text-muted">{t("youPay")}</span>
             <span className="text-end">
               <span className="text-lg font-extrabold">
                 {currency} {formatAmount(payTotalRial)}
               </span>
               {tipRial > 0n && (
                 <span className="block text-xs text-muted">
-                  incl. {formatAmount(tipRial)} tip
+                  {t("inclTip").replace("{amount}", formatAmount(tipRial))}
                 </span>
               )}
             </span>
           </div>
           <Button fullWidth size="lg" loading={processing} onClick={pay}>
             {processing
-              ? "Processing…"
+              ? t("processing")
               : `${t("payNow")} · ${currency} ${formatAmount(payTotalRial)}`}
           </Button>
         </div>
@@ -554,13 +554,13 @@ function ReviewScreen({
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={3}
-          placeholder="Tell us more (optional)…"
+          placeholder={t("tellUsMore")}
           className="mt-6 w-full resize-none rounded-xl border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
         />
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Your name (optional)"
+          placeholder={t("yourName")}
           className="mt-3 w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
         />
 

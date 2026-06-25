@@ -6,6 +6,7 @@ import {
   Coins,
   Users,
 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { requireSession } from "./actions";
 import { getDashboardStats } from "@/lib/queries";
 import { db } from "@/lib/db";
@@ -42,6 +43,7 @@ function buildRevenueSeries(payments: DashboardPayment[]) {
 }
 
 export default async function DashboardPage() {
+  const t = await getTranslations("admin.dashboard");
   const session = await requireSession();
   const stats = await getDashboardStats(session.vendorId);
 
@@ -80,76 +82,75 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader
-        title={`Welcome back, ${session.name.split(" ")[0]}`}
-        subtitle="Here's how your restaurant is performing — last 30 days."
+        title={t("pageTitle")}
+        subtitle={t("pageSubtitle")}
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          label="Revenue"
+          label={t("revenue")}
           value={formatMoney(stats.revenue)}
           icon={<DollarSign size={18} />}
           delta={{ value: "+12.4%", positive: true }}
-          hint="vs last month"
         />
         <StatCard
-          label="Orders"
+          label={t("orders")}
           value={String(stats.orderCount)}
           icon={<ReceiptText size={18} />}
           delta={{ value: "+8.1%", positive: true }}
-          hint={`${stats.paidCount} paid`}
+          hint={`${stats.paidCount} ${t("paid")}`}
         />
         <StatCard
-          label="Avg. order"
+          label={t("avgOrder")}
           value={formatMoney(stats.avgOrder || 0)}
           icon={<TrendingUp size={18} />}
-          hint="per paid bill"
+          hint={t("perPaidBill")}
         />
         <StatCard
-          label="Tips collected"
+          label={t("tips")}
           value={formatMoney(stats.tips)}
           icon={<Coins size={18} />}
-          hint="staff tips"
+          hint={t("staffTips")}
         />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-bold">Revenue trend</h2>
-            <span className="text-xs text-muted">Last 14 days</span>
+            <h2 className="font-bold">{t("revenueTrend")}</h2>
+            <span className="text-xs text-muted">{t("last14Days")}</span>
           </div>
           <RevenueChart data={days} currency={currency} />
         </Card>
 
         <div className="space-y-4">
           <StatCard
-            label="Rating"
+            label={t("rating")}
             value={`${stats.avgRating.toFixed(1)} ★`}
             icon={<Star size={18} />}
-            hint={`${stats.reviewCount} reviews`}
+            hint={`${stats.reviewCount} ${t("reviews")}`}
           />
           <StatCard
-            label="Tables occupied"
+            label={t("tablesOccupied")}
             value={`${occupied}/${tables.length}`}
             icon={<Users size={18} />}
-            hint="live"
+            hint={t("live")}
           />
         </div>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <h2 className="mb-4 font-bold">Recent orders</h2>
+          <h2 className="mb-4 font-bold">{t("recentOrders")}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-start text-xs uppercase text-muted">
-                  <th className="pb-2 font-semibold">Order</th>
-                  <th className="pb-2 font-semibold">Guest</th>
-                  <th className="pb-2 font-semibold">Status</th>
-                  <th className="pb-2 text-end font-semibold">Total</th>
-                  <th className="pb-2 text-end font-semibold">Time</th>
+                  <th className="pb-2 font-semibold">{t("order")}</th>
+                  <th className="pb-2 font-semibold">{t("guest")}</th>
+                  <th className="pb-2 font-semibold">{t("status")}</th>
+                  <th className="pb-2 text-end font-semibold">{t("total")}</th>
+                  <th className="pb-2 text-end font-semibold">{t("time")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,7 +175,7 @@ export default async function DashboardPage() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 font-bold">Top items</h2>
+          <h2 className="mb-4 font-bold">{t("topItems")}</h2>
           <div className="space-y-3">
             {topItems.map(([name, qty], i) => (
               <div key={name} className="flex items-center gap-3">
@@ -188,7 +189,7 @@ export default async function DashboardPage() {
               </div>
             ))}
             {topItems.length === 0 && (
-              <p className="text-sm text-muted">No data yet.</p>
+              <p className="text-sm text-muted">{t("noData")}</p>
             )}
           </div>
         </Card>

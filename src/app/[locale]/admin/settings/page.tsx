@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { getTranslations } from "next-intl/server";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { Building2 } from "lucide-react";
@@ -7,10 +8,9 @@ import { SettingsForm } from "@/components/admin/settings/SettingsForm";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
+  const t = await getTranslations("admin.settings");
   const session = await requireSession();
 
-  // Scope to the session's vendor. Superadmins (vendorId === null) edit the
-  // first vendor, with a note indicating there are others.
   const vendor = session.vendorId
     ? await db.vendor.findUnique({ where: { id: session.vendorId } })
     : await db.vendor.findFirst({ orderBy: { createdAt: "asc" } });
@@ -20,20 +20,14 @@ export default async function SettingsPage() {
   if (!vendor) {
     return (
       <div className="space-y-6">
-        <PageHeader
-          title="Settings"
-          subtitle="Restaurant profile, branding, billing and tipping."
-        />
+        <PageHeader title={t("pageTitle")} subtitle={t("pageSubtitle")} />
         <Card>
           <div className="flex flex-col items-center gap-3 py-10 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-soft text-brand">
               <Building2 className="h-6 w-6" />
             </div>
-            <p className="text-base font-semibold text-ink">No vendor found</p>
-            <p className="max-w-sm text-sm text-muted">
-              There is no restaurant connected to your account yet. Create a
-              vendor to configure its settings.
-            </p>
+            <p className="text-base font-semibold text-ink">{t("noVendor")}</p>
+            <p className="max-w-sm text-sm text-muted">{t("noVendorHint")}</p>
           </div>
         </Card>
       </div>
@@ -71,20 +65,13 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Settings"
-        subtitle={`Configure ${vendor.name}'s profile, branding, billing and tipping.`}
-      />
+      <PageHeader title={t("pageTitle")} subtitle={t("pageSubtitle")} />
 
       {isSuperadmin && totalVendors > 1 && (
         <div className="flex items-start gap-3 rounded-2xl border border-line bg-surface-2 p-4 text-sm">
           <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
           <p className="text-muted">
-            You are a superadmin. Showing the first of{" "}
-            <span className="font-semibold text-ink">{totalVendors}</span>{" "}
-            vendors —{" "}
-            <span className="font-semibold text-ink">{vendor.name}</span>. Edits
-            here apply only to this restaurant.
+            {t("superadminNote", { name: vendor.name })}
           </p>
         </div>
       )}

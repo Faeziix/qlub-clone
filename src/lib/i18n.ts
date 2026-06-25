@@ -70,6 +70,20 @@ const en: Dict = {
   confirmAndPay: "Confirm and pay",
   goBack: "Go back",
   orderFailed: "Failed to place order",
+  youPay: "You pay",
+  inclTip: "incl. {amount} tip",
+  processing: "Processing…",
+  backToMenu: "Back to menu",
+  numberOfPeople: "Number of people",
+  enterAmount: "Enter an amount to pay.",
+  paymentFailed: "Payment failed",
+  feedbackHelps: "Your feedback helps {name} improve.",
+  methodIpg: "Online Payment (IPG)",
+  methodCash: "Cash",
+  tellUsMore: "Tell us more (optional)…",
+  yourName: "Your name (optional)",
+  specialPlaceholder: "e.g. no onions, allergy info…",
+  completeRequired: "Please complete the required choices.",
 };
 
 const fa: Dict = {
@@ -129,6 +143,20 @@ const fa: Dict = {
   confirmAndPay: "تأیید و پرداخت",
   goBack: "بازگشت",
   orderFailed: "ثبت سفارش ناموفق بود",
+  youPay: "شما پرداخت می‌کنید",
+  inclTip: "شامل {amount} انعام",
+  processing: "در حال پردازش…",
+  backToMenu: "بازگشت به منو",
+  numberOfPeople: "تعداد نفرات",
+  enterAmount: "مبلغ پرداختی را وارد کنید.",
+  paymentFailed: "پرداخت ناموفق بود",
+  feedbackHelps: "نظر شما به {name} کمک می‌کند بهتر شود.",
+  methodIpg: "پرداخت آنلاین (IPG)",
+  methodCash: "پرداخت نقدی",
+  tellUsMore: "بیشتر توضیح دهید (اختیاری)…",
+  yourName: "نام شما (اختیاری)",
+  specialPlaceholder: "مثلاً: بدون پیاز، توضیح آلرژی…",
+  completeRequired: "لطفاً گزینه‌های اجباری را انتخاب کنید.",
 };
 
 const dicts: Record<string, Dict> = { fa, en };

@@ -1,4 +1,5 @@
 import { UtensilsCrossed, LayoutGrid, CheckCircle2, BookOpen } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { db } from "@/lib/db";
 import { PageHeader, StatCard, EmptyRow } from "@/components/admin/ui";
@@ -7,6 +8,7 @@ import { MenuManager, type MenuTree } from "@/components/admin/menu/MenuManager"
 export const dynamic = "force-dynamic";
 
 export default async function MenuPage() {
+  const t = await getTranslations("admin.menu");
   const session = await requireSession();
 
   // Resolve which vendor's menus to show.
@@ -31,11 +33,8 @@ export default async function MenuPage() {
   if (!vendorId) {
     return (
       <>
-        <PageHeader
-          title="Menu"
-          subtitle="Manage menus, categories and items."
-        />
-        <EmptyRow>No vendors found. Create a vendor to start building menus.</EmptyRow>
+        <PageHeader title={t("pageTitle")} subtitle={t("pageSubtitle")} />
+        <EmptyRow>{t("noVendor")}</EmptyRow>
       </>
     );
   }
@@ -50,6 +49,7 @@ export default async function MenuPage() {
           items: {
             orderBy: { sortOrder: "asc" },
             include: {
+              MenuItemTranslation: true,
               modifierGroups: {
                 orderBy: { sortOrder: "asc" },
                 include: {
@@ -63,7 +63,6 @@ export default async function MenuPage() {
     },
   });
 
-  // Map to a serializable tree for the client component.
   const menus: MenuTree[] = menusRaw.map((m) => ({
     id: m.id,
     name: m.name,
@@ -86,6 +85,11 @@ export default async function MenuPage() {
           (s, g) => s + g.options.length,
           0
         ),
+        translations: it.MenuItemTranslation.map((tx) => ({
+          locale: tx.locale,
+          name: tx.name,
+          description: tx.description,
+        })),
       })),
     })),
   }));
@@ -99,22 +103,22 @@ export default async function MenuPage() {
   return (
     <>
       <PageHeader
-        title="Menu"
+        title={t("pageTitle")}
         subtitle={
           crossVendorNote
-            ? `Viewing menus for ${vendorName}. As superadmin, you are editing the first vendor.`
-            : "Manage menus, categories, items and pricing."
+            ? t("superadminNote", { name: vendorName ?? "" })
+            : t("pageSubtitle")
         }
       />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          label="Total items"
+          label={t("items")}
           value={String(totalItems)}
           icon={<UtensilsCrossed size={18} />}
         />
         <StatCard
-          label="Available"
+          label={t("available")}
           value={String(availableItems)}
           icon={<CheckCircle2 size={18} />}
           hint={
@@ -124,22 +128,19 @@ export default async function MenuPage() {
           }
         />
         <StatCard
-          label="Categories"
+          label={t("categories")}
           value={String(categoryCount)}
           icon={<LayoutGrid size={18} />}
         />
         <StatCard
-          label="Menus"
+          label={t("menus")}
           value={String(menus.length)}
           icon={<BookOpen size={18} />}
         />
       </div>
 
       {menus.length === 0 ? (
-        <EmptyRow>
-          This vendor has no menus yet. Create a menu to start adding categories
-          and items.
-        </EmptyRow>
+        <EmptyRow>{t("noItems")}</EmptyRow>
       ) : (
         <MenuManager menus={menus} vendorId={vendorId} />
       )}

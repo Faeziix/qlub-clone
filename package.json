@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check:i18n": "tsx scripts/check-i18n-keys.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:push": "prisma db push",

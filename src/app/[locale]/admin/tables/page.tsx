@@ -1,4 +1,5 @@
 import { LayoutGrid, Armchair, CheckCircle2, Users } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { requireSession } from "../actions";
 import { db } from "@/lib/db";
 import { PageHeader, StatCard, EmptyRow } from "@/components/admin/ui";
@@ -7,11 +8,9 @@ import { TablesGrid } from "@/components/admin/tables/TablesGrid";
 export const dynamic = "force-dynamic";
 
 export default async function TablesPage() {
+  const t = await getTranslations("admin.tables");
   const session = await requireSession();
 
-  // Resolve the vendor in scope. Scoped admins use their own vendor;
-  // superadmin (vendorId === null) falls back to the first vendor so the
-  // QR / customer URLs have a concrete slug & country to point at.
   const vendor = session.vendorId
     ? await db.vendor.findUnique({ where: { id: session.vendorId } })
     : await db.vendor.findFirst({ orderBy: { createdAt: "asc" } });
@@ -19,11 +18,8 @@ export default async function TablesPage() {
   if (!vendor) {
     return (
       <>
-        <PageHeader
-          title="Tables & QR codes"
-          subtitle="Manage dining tables and their pay-at-table QR codes."
-        />
-        <EmptyRow>No vendor found. Create a vendor before adding tables.</EmptyRow>
+        <PageHeader title={t("pageTitle")} subtitle={t("pageSubtitle")} />
+        <EmptyRow>{t("noVendor")}</EmptyRow>
       </>
     );
   }
@@ -50,35 +46,29 @@ export default async function TablesPage() {
 
   return (
     <>
-      <PageHeader
-        title="Tables & QR codes"
-        subtitle={`Scan-to-pay QR codes for ${vendor.name}.`}
-      />
+      <PageHeader title={t("pageTitle")} subtitle={t("pageSubtitle")} />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          label="Total tables"
+          label={t("total")}
           value={String(total)}
           icon={<LayoutGrid size={18} />}
-          hint="across all areas"
         />
         <StatCard
-          label="Occupied"
+          label={t("occupied_stat")}
           value={String(occupied)}
           icon={<Armchair size={18} />}
-          hint={total ? `${Math.round((occupied / total) * 100)}% in use` : "—"}
+          hint={total ? `${Math.round((occupied / total) * 100)}%` : "—"}
         />
         <StatCard
-          label="Available"
+          label={t("available_stat")}
           value={String(available)}
           icon={<CheckCircle2 size={18} />}
-          hint="ready to seat"
         />
         <StatCard
-          label="Total seats"
+          label={t("seats")}
           value={String(totalSeats)}
           icon={<Users size={18} />}
-          hint="combined capacity"
         />
       </div>
 

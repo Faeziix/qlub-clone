@@ -1,4 +1,5 @@
 import { Star, Utensils, ConciergeBell, Sparkles } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { db } from "@/lib/db";
 import { PageHeader, Card, StatCard } from "@/components/admin/ui";
@@ -14,6 +15,7 @@ function avg(values: number[]): number {
 }
 
 export default async function ReviewsPage() {
+  const t = await getTranslations("admin.reviews");
   const session = await requireSession();
 
   const reviews = await db.review.findMany({
@@ -52,10 +54,7 @@ export default async function ReviewsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Reviews"
-        subtitle="Guest feedback and satisfaction across visits."
-      />
+      <PageHeader title={t("pageTitle")} subtitle={t("pageSubtitle")} />
 
       <div className="grid gap-5 lg:grid-cols-3">
         <Card className="flex flex-col items-center justify-center gap-2 text-center">
@@ -64,12 +63,12 @@ export default async function ReviewsPage() {
           </div>
           <StarRating value={Math.round(overallAvg)} readOnly size={22} />
           <p className="text-sm text-muted">
-            {total} {total === 1 ? "review" : "reviews"}
+            {total} {t("totalReviews")}
           </p>
         </Card>
 
         <Card className="lg:col-span-2">
-          <h3 className="mb-3 text-sm font-bold">Rating distribution</h3>
+          <h3 className="mb-3 text-sm font-bold">{t("filter")}</h3>
           <div className="space-y-2">
             {distribution.map(({ star, count, pct }) => (
               <div key={star} className="flex items-center gap-3">
@@ -97,19 +96,19 @@ export default async function ReviewsPage() {
 
       <div className="mt-5 grid gap-5 sm:grid-cols-3">
         <StatCard
-          label="Food"
+          label={t("foodRating")}
           value={foodVals.length ? avg(foodVals).toFixed(1) : "—"}
           icon={<Utensils size={18} />}
           hint={`${foodVals.length} rated`}
         />
         <StatCard
-          label="Service"
+          label={t("serviceRating")}
           value={serviceVals.length ? avg(serviceVals).toFixed(1) : "—"}
           icon={<ConciergeBell size={18} />}
           hint={`${serviceVals.length} rated`}
         />
         <StatCard
-          label="Ambience"
+          label={t("ambienceRating")}
           value={ambienceVals.length ? avg(ambienceVals).toFixed(1) : "—"}
           icon={<Sparkles size={18} />}
           hint={`${ambienceVals.length} rated`}

@@ -132,9 +132,43 @@ These support the facilitator sub-merchant onboarding flow (PRD user story #26).
 1. `0001_baseline_postgres` — full schema including all changes above, applied via `prisma migrate resolve --applied` to the existing Neon instance.
 2. `0002_order_number_backfill` — `UPDATE "Vendor" SET "vendorOrderSeq" = MAX(numeric_order_number)` — deterministic and idempotent.
 
+## Runtime read/write conventions for native JSONB columns
+
+With `Json` columns in Prisma on Postgres, the Prisma client deserialises JSONB
+on read and serialises on write automatically. Callers **must not**:
+
+- Call `JSON.parse(value as string)` on a column returned by Prisma — doing so
+  calls `JSON.parse` on an already-parsed array/object, which throws and causes
+  silent fallback to wrong defaults (e.g. the AED-era tip presets `[10,15,20]`
+  instead of `[5,10,15]`).
+- Call `JSON.stringify(value)` before passing to a Prisma write — doing so
+  stores a JSON string literal inside JSONB (e.g. `"[5,10,15]"`) rather than
+  the array.
+
+The correct pattern for reads:
+
+```ts
+const tipPresets = Array.isArray(vendor.tipPresets)
+  ? (vendor.tipPresets as number[])
+  : [5, 10, 15];
+```
+
+The correct pattern for writes:
+
+```ts
+await db.vendor.update({ data: { tipPresets } }); // pass the array directly
+```
+
+## @default(cuid()) on id fields
+
+`AuditLog`, `CategoryTranslation`, `MenuItemTranslation`, and
+`ModifierGroupTranslation` all use `@id @default(cuid())`. This is a Prisma
+client-side default (no Postgres `DEFAULT` expression in the migration SQL).
+Omitting it would require callers to supply an explicit `id` on every insert.
+
 ## References
 
-- Issue #8 — implementation
+- Issue #8 — implementation (round 2 review fixes)
 - PRD issue #1, §5 (Data model), user stories #14, #18, #23, #26, #30
 - ADR-0007 — Review per-Payment
 - ADR-0002 — Integer-rial money model

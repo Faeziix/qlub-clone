@@ -344,6 +344,35 @@ describe("Sub-merchant fields on Vendor", () => {
 });
 
 // ---------------------------------------------------------------------------
+// @default(cuid()) on models whose id has no DB-generated default
+// ---------------------------------------------------------------------------
+describe("@default(cuid()) on all id fields", () => {
+  it("AuditLog.id has @default(cuid())", () => {
+    const schema = readSchema();
+    const block = schema.match(/model AuditLog\s*\{[^}]+\}/)?.[0] ?? "";
+    expect(block).toMatch(/id\s+String\s+@id\s+@default\(cuid\(\)\)/);
+  });
+
+  it("CategoryTranslation.id has @default(cuid())", () => {
+    const schema = readSchema();
+    const block = schema.match(/model CategoryTranslation\s*\{[^}]+\}/)?.[0] ?? "";
+    expect(block).toMatch(/id\s+String\s+@id\s+@default\(cuid\(\)\)/);
+  });
+
+  it("MenuItemTranslation.id has @default(cuid())", () => {
+    const schema = readSchema();
+    const block = schema.match(/model MenuItemTranslation\s*\{[^}]+\}/)?.[0] ?? "";
+    expect(block).toMatch(/id\s+String\s+@id\s+@default\(cuid\(\)\)/);
+  });
+
+  it("ModifierGroupTranslation.id has @default(cuid())", () => {
+    const schema = readSchema();
+    const block = schema.match(/model ModifierGroupTranslation\s*\{[^}]+\}/)?.[0] ?? "";
+    expect(block).toMatch(/id\s+String\s+@id\s+@default\(cuid\(\)\)/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Seed uses Iran defaults
 // ---------------------------------------------------------------------------
 describe("Seed file uses Iran defaults", () => {
@@ -361,5 +390,35 @@ describe("Seed file uses Iran defaults", () => {
 
   it("seed creates vendors with Asia/Tehran timezone", () => {
     expect(readSeed()).toContain('"Asia/Tehran"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Seed data is Iran-scale rial (not AED-scale)
+// ---------------------------------------------------------------------------
+describe("Seed prices are Iran-scale rial", () => {
+  it("seed uses R = 10_000 multiplier constant", () => {
+    expect(readSeed()).toContain("const R = 10_000");
+  });
+
+  it("seed applies R multiplier to item prices", () => {
+    expect(readSeed()).toMatch(/price: \d+ \* R,/);
+  });
+
+  it("seed applies R multiplier to priceDelta values", () => {
+    expect(readSeed()).toMatch(/priceDelta: \d+ \* R/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Seed orderNumber format matches runtime generator (Q-000001 style)
+// ---------------------------------------------------------------------------
+describe("Seed orderNumber format", () => {
+  it("seed uses zero-padded 6-digit format Q-000001", () => {
+    expect(readSeed()).toContain('padStart(6, "0")');
+  });
+
+  it("seed does NOT use the old Q-10240 non-padded format", () => {
+    expect(readSeed()).not.toContain("Q-10240");
   });
 });

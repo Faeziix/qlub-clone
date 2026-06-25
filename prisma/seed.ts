@@ -45,6 +45,8 @@ interface SeedMenu {
   categories: SeedCategory[];
 }
 
+const R = 10_000;
+
 const hotBeverage = {
   name: "Choose your hot beverage",
   required: true,
@@ -55,7 +57,7 @@ const hotBeverage = {
     { name: "Cappuccino" },
     { name: "Café Latte" },
     { name: "English Breakfast Tea" },
-    { name: "Hot Chocolate", priceDelta: 4 },
+    { name: "Hot Chocolate", priceDelta: 4 * R },
   ],
 };
 const viennoiserie = {
@@ -67,7 +69,7 @@ const viennoiserie = {
     { name: "Butter Croissant", isDefault: true },
     { name: "Pain au Chocolat" },
     { name: "Pain aux Raisins" },
-    { name: "Almond Croissant", priceDelta: 5 },
+    { name: "Almond Croissant", priceDelta: 5 * R },
   ],
 };
 const eggStyle = {
@@ -87,11 +89,11 @@ const extras = {
   minSelect: 0,
   maxSelect: 5,
   options: [
-    { name: "Smoked Salmon", priceDelta: 18 },
-    { name: "Avocado", priceDelta: 12 },
-    { name: "Turkey Bacon", priceDelta: 10 },
-    { name: "Extra Egg", priceDelta: 6 },
-    { name: "Sautéed Mushrooms", priceDelta: 8 },
+    { name: "Smoked Salmon", priceDelta: 18 * R },
+    { name: "Avocado", priceDelta: 12 * R },
+    { name: "Turkey Bacon", priceDelta: 10 * R },
+    { name: "Extra Egg", priceDelta: 6 * R },
+    { name: "Sautéed Mushrooms", priceDelta: 8 * R },
   ],
 };
 
@@ -107,7 +109,7 @@ const paulMenus: SeedMenu[] = [
             name: "Parisien",
             description:
               "1 hot beverage + 1 viennoiserie of your choice, ½ flûte à l'ancienne, butter & jam.",
-            price: 62,
+            price: 62 * R,
             tags: ["popular"],
             modifierGroups: [hotBeverage, viennoiserie],
           },
@@ -115,14 +117,14 @@ const paulMenus: SeedMenu[] = [
             name: "Continental",
             description:
               "1 hot beverage + 1 fresh orange juice + 1 viennoiserie of your choice + ½ flûte à l'ancienne, butter & jam.",
-            price: 72,
+            price: 72 * R,
             modifierGroups: [hotBeverage, viennoiserie],
           },
           {
             name: "Complete",
             description:
               "1 hot beverage + 1 fresh orange juice + 1 viennoiserie + ½ flûte à l'ancienne + 2 eggs any style, butter & jam.",
-            price: 88,
+            price: 88 * R,
             tags: ["chef-special"],
             modifierGroups: [hotBeverage, viennoiserie, eggStyle],
           },
@@ -135,7 +137,7 @@ const paulMenus: SeedMenu[] = [
             name: "Eggs Benedict Salmon",
             description:
               "Two poached eggs, smoked salmon, hollandaise sauce on a toasted muffin with hash brown.",
-            price: 58,
+            price: 58 * R,
             imageUrl: `${CDN}/372608/mo9oxuh0998qeolnyln_Eggs%20Benedict%20Salmon.jpg`,
             tags: ["popular"],
             calories: 540,
@@ -145,7 +147,7 @@ const paulMenus: SeedMenu[] = [
             name: "Eggs Benedict Turkey Ham",
             description:
               "Two poached eggs, turkey ham, hollandaise sauce on a toasted muffin with hash brown.",
-            price: 52,
+            price: 52 * R,
             tags: ["halal"],
             modifierGroups: [extras],
           },
@@ -153,7 +155,7 @@ const paulMenus: SeedMenu[] = [
             name: "Three Egg Omelette",
             description:
               "Fluffy three-egg omelette with your choice of fillings, served with mixed greens.",
-            price: 46,
+            price: 46 * R,
             modifierGroups: [
               {
                 name: "Choose fillings",
@@ -164,7 +166,7 @@ const paulMenus: SeedMenu[] = [
                   { name: "Mushroom" },
                   { name: "Tomato" },
                   { name: "Spinach" },
-                  { name: "Turkey Ham", priceDelta: 6 },
+                  { name: "Turkey Ham", priceDelta: 6 * R },
                 ],
               },
             ],
@@ -173,7 +175,7 @@ const paulMenus: SeedMenu[] = [
             name: "Shakshuka",
             description:
               "Baked eggs in spiced tomato & pepper sauce, served with flûte à l'ancienne.",
-            price: 48,
+            price: 48 * R,
             tags: ["vegetarian", "spicy"],
           },
         ],
@@ -185,7 +187,7 @@ const paulMenus: SeedMenu[] = [
             name: "Avocado Toast",
             description:
               "Smashed avocado, poached egg, cherry tomatoes, dukkah on multigrain sourdough.",
-            price: 44,
+            price: 44 * R,
             tags: ["vegetarian", "popular"],
             imageUrl: UNS("photo-1588137378633-dea1336ce1e2"),
             modifierGroups: [extras],
@@ -194,12 +196,12 @@ const paulMenus: SeedMenu[] = [
             name: "Croque Monsieur",
             description:
               "Toasted brioche, turkey ham, béchamel & gruyère cheese gratiné.",
-            price: 42,
+            price: 42 * R,
           },
           {
             name: "Croque Madame",
             description: "Croque Monsieur topped with a sunny-side-up egg.",
-            price: 46,
+            price: 46 * R,
           },
         ],
       },
@@ -210,7 +212,7 @@ const paulMenus: SeedMenu[] = [
             name: "Pain Perdu",
             description:
               "Brioche French toast, caramelised, with fresh berries & vanilla ice cream.",
-            price: 45,
+            price: 45 * R,
             imageUrl: `${CDN}/377374/moh4c5mq8gc97jlt4p_Pain%20Perdu.jpg`,
             tags: ["popular", "vegetarian"],
             calories: 620,
@@ -219,7 +221,7 @@ const paulMenus: SeedMenu[] = [
             name: "Açaí Bowl",
             description:
               "Açaí blend topped with granola, banana, strawberries & honey.",
-            price: 48,
+            price: 48 * R,
             tags: ["vegan"],
             imageUrl: UNS("photo-1590301157890-4810ed352733"),
           },
@@ -238,14 +240,14 @@ const paulMenus: SeedMenu[] = [
             name: "Smashed Avocado & Eggs",
             description:
               "Sourdough, smashed avocado, two poached eggs, feta & chilli flakes.",
-            price: 49,
+            price: 49 * R,
             tags: ["vegetarian"],
           },
           {
             name: "Salmon & Scrambled Eggs",
             description:
               "Creamy scrambled eggs, smoked salmon, chives on toasted sourdough.",
-            price: 56,
+            price: 56 * R,
             tags: ["popular"],
           },
         ],
@@ -257,20 +259,20 @@ const paulMenus: SeedMenu[] = [
             name: "French Onion Soup",
             description:
               "Slow-cooked onions, beef broth, gruyère crouton gratiné.",
-            price: 38,
+            price: 38 * R,
             imageUrl: UNS("photo-1547592166-23ac45744acd"),
           },
           {
             name: "Burrata & Heirloom Tomato",
             description:
               "Creamy burrata, heirloom tomatoes, basil pesto & aged balsamic.",
-            price: 52,
+            price: 52 * R,
             tags: ["vegetarian", "chef-special"],
           },
           {
             name: "Soup of the Day",
             description: "Ask your server — served with warm bread.",
-            price: 32,
+            price: 32 * R,
             tags: ["vegetarian"],
           },
         ],
@@ -282,12 +284,12 @@ const paulMenus: SeedMenu[] = [
             name: "Le Parisien Baguette",
             description:
               "Flûte à l'ancienne, turkey ham, emmental, butter & cornichons.",
-            price: 42,
+            price: 42 * R,
           },
           {
             name: "Tuna Niçoise Baguette",
             description: "Tuna, egg, olives, tomato & lettuce on baguette.",
-            price: 44,
+            price: 44 * R,
           },
         ],
       },
@@ -298,7 +300,7 @@ const paulMenus: SeedMenu[] = [
             name: "Paul Club Sandwich",
             description:
               "Triple-decker with grilled chicken, turkey bacon, egg, tomato & fries.",
-            price: 58,
+            price: 58 * R,
             tags: ["popular"],
             imageUrl: UNS("photo-1528735602780-2552fd46c7af"),
             modifierGroups: [
@@ -310,7 +312,7 @@ const paulMenus: SeedMenu[] = [
                 options: [
                   { name: "French Fries", isDefault: true },
                   { name: "Mixed Salad" },
-                  { name: "Sweet Potato Fries", priceDelta: 6 },
+                  { name: "Sweet Potato Fries", priceDelta: 6 * R },
                 ],
               },
             ],
@@ -319,7 +321,7 @@ const paulMenus: SeedMenu[] = [
             name: "Wagyu Beef Burger",
             description:
               "Wagyu patty, cheddar, caramelised onion, brioche bun & fries.",
-            price: 72,
+            price: 72 * R,
             tags: ["chef-special"],
             modifierGroups: [
               {
@@ -327,9 +329,9 @@ const paulMenus: SeedMenu[] = [
                 minSelect: 0,
                 maxSelect: 3,
                 options: [
-                  { name: "Extra Cheese", priceDelta: 6 },
-                  { name: "Turkey Bacon", priceDelta: 10 },
-                  { name: "Fried Egg", priceDelta: 6 },
+                  { name: "Extra Cheese", priceDelta: 6 * R },
+                  { name: "Turkey Bacon", priceDelta: 10 * R },
+                  { name: "Fried Egg", priceDelta: 6 * R },
                 ],
               },
             ],
@@ -343,12 +345,12 @@ const paulMenus: SeedMenu[] = [
             name: "Niçoise Salad",
             description:
               "Seared tuna, green beans, egg, potato, olives & vinaigrette.",
-            price: 54,
+            price: 54 * R,
           },
           {
             name: "Quinoa & Avocado Salad",
             description: "Quinoa, avocado, pomegranate, almonds & lemon dressing.",
-            price: 48,
+            price: 48 * R,
             tags: ["vegan", "gluten-free"],
           },
         ],
@@ -359,13 +361,13 @@ const paulMenus: SeedMenu[] = [
           {
             name: "Truffle Mushroom Risotto",
             description: "Arborio rice, wild mushrooms, parmesan & truffle oil.",
-            price: 62,
+            price: 62 * R,
             tags: ["vegetarian", "chef-special"],
           },
           {
             name: "Penne Arrabbiata",
             description: "Penne in spicy tomato & garlic sauce, basil.",
-            price: 46,
+            price: 46 * R,
             tags: ["vegetarian", "spicy"],
           },
         ],
@@ -377,7 +379,7 @@ const paulMenus: SeedMenu[] = [
             name: "Entrecôte Steak Frites",
             description:
               "Grilled ribeye, café de Paris butter, golden fries & green salad.",
-            price: 96,
+            price: 96 * R,
             imageUrl: `${CDN}/372604/mo9oanvaspd80xtxea8_Entrecote%20Steak%20Frites.jpg`,
             tags: ["popular", "chef-special"],
             calories: 820,
@@ -398,7 +400,7 @@ const paulMenus: SeedMenu[] = [
           {
             name: "Coq au Vin",
             description: "Braised chicken, mushrooms, pearl onions in red wine jus.",
-            price: 68,
+            price: 68 * R,
           },
         ],
       },
@@ -408,13 +410,13 @@ const paulMenus: SeedMenu[] = [
           {
             name: "Grilled Salmon Fillet",
             description: "Salmon, sautéed vegetables, lemon butter sauce.",
-            price: 78,
+            price: 78 * R,
             tags: ["gluten-free"],
           },
           {
             name: "Roasted Chicken Supreme",
             description: "Free-range chicken, mashed potato, mushroom sauce.",
-            price: 64,
+            price: 64 * R,
           },
         ],
       },
@@ -430,25 +432,25 @@ const paulMenus: SeedMenu[] = [
           {
             name: "Tarte au Citron",
             description: "Classic lemon tart with torched meringue.",
-            price: 36,
+            price: 36 * R,
             tags: ["vegetarian"],
           },
           {
             name: "Mille-Feuille",
             description: "Layered puff pastry, vanilla crème pâtissière.",
-            price: 38,
+            price: 38 * R,
             tags: ["popular", "vegetarian"],
           },
           {
             name: "Éclair au Chocolat",
             description: "Choux pastry, chocolate cream, chocolate glaze.",
-            price: 28,
+            price: 28 * R,
             tags: ["vegetarian"],
           },
           {
             name: "Crème Brûlée",
             description: "Vanilla custard with caramelised sugar crust.",
-            price: 34,
+            price: 34 * R,
             tags: ["vegetarian", "gluten-free"],
           },
         ],
@@ -459,14 +461,14 @@ const paulMenus: SeedMenu[] = [
           {
             name: "Fondant au Chocolat",
             description: "Warm molten chocolate cake, vanilla ice cream.",
-            price: 42,
+            price: 42 * R,
             tags: ["popular", "vegetarian"],
             imageUrl: UNS("photo-1606313564200-e75d5e30476c"),
           },
           {
             name: "Macarons (Box of 6)",
             description: "Assorted French macarons.",
-            price: 48,
+            price: 48 * R,
             tags: ["vegetarian"],
           },
         ],
@@ -483,7 +485,7 @@ const paulMenus: SeedMenu[] = [
           {
             name: "Caramel Cappuccino",
             description: "Espresso, steamed milk, caramel drizzle.",
-            price: 26,
+            price: 26 * R,
             imageUrl: `${CDN}/372603/mo9o4yg5di61ylc1zne_Caramel%20Cappuccino.jpg`,
             tags: ["popular"],
             modifierGroups: [
@@ -495,8 +497,8 @@ const paulMenus: SeedMenu[] = [
                 options: [
                   { name: "Full Cream", isDefault: true },
                   { name: "Skimmed" },
-                  { name: "Oat Milk", priceDelta: 4 },
-                  { name: "Almond Milk", priceDelta: 4 },
+                  { name: "Oat Milk", priceDelta: 4 * R },
+                  { name: "Almond Milk", priceDelta: 4 * R },
                 ],
               },
               {
@@ -506,7 +508,7 @@ const paulMenus: SeedMenu[] = [
                 maxSelect: 1,
                 options: [
                   { name: "Regular", isDefault: true },
-                  { name: "Large", priceDelta: 5 },
+                  { name: "Large", priceDelta: 5 * R },
                 ],
               },
             ],
@@ -522,14 +524,14 @@ const paulMenus: SeedMenu[] = [
           {
             name: "Fresh Orange Juice",
             description: "Freshly squeezed.",
-            price: 28,
+            price: 28 * R,
             tags: ["vegan"],
           },
           { name: "Iced Latte", description: "Espresso over ice & milk.", price: 26 },
           {
             name: "Lemonade Mint",
             description: "Fresh lemon, mint & soda.",
-            price: 24,
+            price: 24 * R,
             tags: ["vegan"],
           },
           { name: "Still / Sparkling Water", price: 12 },
@@ -548,14 +550,14 @@ const paulMenus: SeedMenu[] = [
             name: "Le Petit Box",
             description:
               "Assorted mini sandwiches, viennoiseries & macarons. Serves 2-3.",
-            price: 145,
+            price: 145 * R,
             tags: ["popular"],
           },
           {
             name: "Le Grand Box",
             description:
               "Sandwiches, quiches, salads, pastries & juices. Serves 4-6.",
-            price: 280,
+            price: 280 * R,
             tags: ["chef-special"],
           },
         ],
@@ -725,7 +727,7 @@ async function seedOrders(
       data: {
         vendorId,
         tableId: tables[o % tables.length].id,
-        orderNumber: `Q-${String(10240 + offset + o)}`,
+        orderNumber: `Q-${String(offset + o + 1).padStart(6, "0")}`,
         type: o % 2 === 0 ? "dinein" : "qsr",
         status: paid ? "paid" : openStatuses[o % 3],
         guestName: names[o % names.length],
@@ -780,6 +782,11 @@ async function seedOrders(
       }
     }
   }
+
+  await db.vendor.update({
+    where: { id: vendorId },
+    data: { vendorOrderSeq: offset + 24 },
+  });
 }
 
 async function main() {

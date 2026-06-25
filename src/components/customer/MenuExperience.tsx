@@ -6,7 +6,7 @@ import { Search, Globe, ChevronLeft, ShoppingBag } from "lucide-react";
 import type { VendorWithMenus, ItemWithModifiers } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
 import { makeT, dirFor } from "@/lib/i18n";
-import { cn, formatAmount, parseJSON } from "@/lib/utils";
+import { cn, formatAmount } from "@/lib/utils";
 import { DietBadge } from "@/components/ui/Badge";
 import { ItemSheet } from "./ItemSheet";
 import { CartSheet } from "./CartSheet";
@@ -353,7 +353,7 @@ function ItemRow({
   currency: string;
   onClick: () => void;
 }) {
-  const tags = parseJSON<string[]>(item.tags, []);
+  const tags = Array.isArray(item.tags) ? item.tags : [];
   return (
     <button
       onClick={onClick}

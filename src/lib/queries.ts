@@ -1,6 +1,5 @@
 import "server-only";
 import { db } from "./db";
-import { parseJSON } from "./utils";
 import { bigintToNumber } from "./money";
 
 /** Full vendor + menu tree for the customer app. */
@@ -34,17 +33,20 @@ export async function getVendorBySlug(slug: string) {
   if (!vendor) return null;
   return {
     ...vendor,
-    supportedLangs: parseJSON<string[]>(vendor.supportedLangs as string | null, ["en"]),
-    tipPresets: parseJSON<number[]>(vendor.tipPresets as string | null, [10, 15, 20]),
+    supportedLangs: Array.isArray(vendor.supportedLangs)
+      ? (vendor.supportedLangs as string[])
+      : ["fa", "en"],
+    tipPresets: Array.isArray(vendor.tipPresets)
+      ? (vendor.tipPresets as number[])
+      : [5, 10, 15],
     menus: vendor.menus.map((menu) => ({
       ...menu,
-      availability: menu.availability as string | null,
       categories: menu.categories.map((cat) => ({
         ...cat,
         items: cat.items.map((item) => ({
           ...item,
           price: bigintToNumber(item.price),
-          tags: item.tags as string,
+          tags: Array.isArray(item.tags) ? (item.tags as string[]) : [],
           modifierGroups: item.modifierGroups.map((group) => ({
             ...group,
             options: group.options.map((opt) => ({
@@ -109,7 +111,7 @@ export async function getOrder(orderId: string) {
       ...item,
       unitPrice: bigintToNumber(item.unitPrice),
       lineTotal: bigintToNumber(item.lineTotal),
-      modifiers: item.modifiers as string,
+      modifiers: Array.isArray(item.modifiers) ? item.modifiers : [],
     })),
     payments: order.payments.map((payment) => ({
       ...payment,
@@ -119,8 +121,12 @@ export async function getOrder(orderId: string) {
     })),
     vendor: {
       ...order.vendor,
-      supportedLangs: order.vendor.supportedLangs as string | null,
-      tipPresets: order.vendor.tipPresets as string | null,
+      supportedLangs: Array.isArray(order.vendor.supportedLangs)
+        ? (order.vendor.supportedLangs as string[])
+        : ["fa", "en"],
+      tipPresets: Array.isArray(order.vendor.tipPresets)
+        ? (order.vendor.tipPresets as number[])
+        : [5, 10, 15],
     },
   };
 }

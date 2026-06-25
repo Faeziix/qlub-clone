@@ -67,10 +67,10 @@ export async function createOrderFromCart(input: {
           name: l.name,
           unitPrice: l.unitPrice,
           quantity: l.quantity,
-          modifiers: JSON.stringify(l.modifiers.map((m) => ({
+          modifiers: l.modifiers.map((m) => ({
             ...m,
             priceDelta: m.priceDelta.toString(),
-          }))),
+          })) as unknown as import("@prisma/client").Prisma.InputJsonValue,
           notes: l.notes,
           lineTotal: lineTotal(l),
         })),

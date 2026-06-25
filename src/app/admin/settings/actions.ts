@@ -71,7 +71,7 @@ export async function updateVendorSettings(
         taxPct: clampPct(data.taxPct),
         taxInclusive: Boolean(data.taxInclusive),
         tippingEnabled: Boolean(data.tippingEnabled),
-        tipPresets: JSON.stringify(tipPresets),
+        tipPresets,
       },
     });
   } catch {

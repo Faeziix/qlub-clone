@@ -255,7 +255,7 @@ model StaffUser {
 }
 
 model AuditLog {
-  id        String    @id
+  id        String    @id @default(cuid())
   actorId   String
   vendorId  String?
   action    String
@@ -274,7 +274,7 @@ model AuditLog {
 }
 
 model CategoryTranslation {
-  id         String   @id
+  id         String   @id @default(cuid())
   categoryId String
   locale     String
   name       String
@@ -285,7 +285,7 @@ model CategoryTranslation {
 }
 
 model MenuItemTranslation {
-  id          String   @id
+  id          String   @id @default(cuid())
   menuItemId  String
   locale      String
   name        String
@@ -297,7 +297,7 @@ model MenuItemTranslation {
 }
 
 model ModifierGroupTranslation {
-  id              String        @id
+  id              String        @id @default(cuid())
   modifierGroupId String
   locale          String
   name            String

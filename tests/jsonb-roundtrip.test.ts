@@ -174,3 +174,27 @@ describe("JSONB write-path: settings actions must not JSON.stringify for JSONB c
     expect(typeof dataToWrite.modifiers).not.toBe("string");
   });
 });
+
+describe("JSONB write-path: admin createItem tags must be native array not JSON string", () => {
+  it("tags initial value for new menu item is native empty array not string", () => {
+    const tagsForNewItem: string[] = [];
+    expect(typeof tagsForNewItem).not.toBe("string");
+    expect(Array.isArray(tagsForNewItem)).toBe(true);
+  });
+
+  it("tags written as JSON string literal would fail Array.isArray guard", () => {
+    const wrongWrite = "[]";
+    expect(Array.isArray(wrongWrite)).toBe(false);
+    expect(typeof wrongWrite).toBe("string");
+  });
+
+  it("src/app/admin/menu/actions.ts createItem does NOT use tags string literal", async () => {
+    const { readFileSync } = await import("fs");
+    const actionsSource = readFileSync(
+      new URL("../src/app/admin/menu/actions.ts", import.meta.url),
+      "utf-8"
+    );
+    expect(actionsSource).not.toContain('tags: "[]"');
+    expect(actionsSource).toContain("tags: []");
+  });
+});

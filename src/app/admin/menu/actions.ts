@@ -110,7 +110,7 @@ export async function createItem(
       price: priceRial,
       sortOrder: (last?.sortOrder ?? 0) + 1,
       available: true,
-      tags: "[]",
+      tags: [],
     },
   });
   revalidatePath("/admin/menu");

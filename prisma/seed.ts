@@ -634,7 +634,7 @@ async function seedVendor(opts: {
             categoryId: createdCat.id,
             name: it.name,
             description: it.description,
-            price: it.price,
+            price: BigInt(it.price),
             imageUrl: it.imageUrl,
             tags: JSON.stringify(it.tags ?? []),
             calories: it.calories,
@@ -650,7 +650,7 @@ async function seedVendor(opts: {
                     options: {
                       create: g.options.map((o, oi) => ({
                         name: o.name,
-                        priceDelta: o.priceDelta ?? 0,
+                        priceDelta: BigInt(o.priceDelta ?? 0),
                         isDefault: o.isDefault ?? false,
                         sortOrder: oi,
                       })),
@@ -697,7 +697,7 @@ async function seedOrders(
   offset = 0
 ) {
   const names = ["Sara", "Omar", "Layla", "James", "Fatima", "Noah", "Aisha", "Liam"];
-  const methods = ["card", "apple_pay", "google_pay", "tabby"];
+  const methods = ["ipg", "cash"] as const;
   const now = Date.now();
 
   for (let o = 0; o < 24; o++) {
@@ -712,18 +712,19 @@ async function seedOrders(
       return {
         itemId: p.id,
         name: p.name,
-        unitPrice: p.price,
+        unitPrice: BigInt(p.price),
         quantity: qty,
-        lineTotal: line,
+        lineTotal: BigInt(line),
       };
     });
-    const serviceCharge = Math.round(subtotal * 0.07 * 100) / 100;
-    const tax = Math.round((subtotal + serviceCharge) * 0.05 * 100) / 100;
-    const tip = o % 3 === 0 ? Math.round(subtotal * 0.1 * 100) / 100 : 0;
-    const total = Math.round((subtotal + serviceCharge + tip) * 100) / 100;
+    const serviceCharge = Math.round(subtotal * 0.07);
+    const tax = Math.round((subtotal + serviceCharge) * 0.05);
+    const tip = o % 3 === 0 ? Math.round(subtotal * 0.1) : 0;
+    const total = subtotal + serviceCharge + tip;
     const daysAgo = Math.floor(o / 3);
     const createdAt = new Date(now - daysAgo * 86400000 - o * 1800000);
     const paid = o > 4; // a few still open
+    const openStatuses = ["placed", "preparing", "ready"] as const;
 
     const order = await db.order.create({
       data: {
@@ -731,33 +732,34 @@ async function seedOrders(
         tableId: tables[o % tables.length].id,
         orderNumber: `Q-${String(10240 + offset + o)}`,
         type: o % 2 === 0 ? "dinein" : "qsr",
-        status: paid ? "paid" : ["placed", "preparing", "ready"][o % 3],
+        status: paid ? "paid" : openStatuses[o % 3],
         guestName: names[o % names.length],
-        currency: "AED",
-        subtotal,
-        serviceCharge,
-        tax,
-        tipAmount: tip,
-        total,
-        amountPaid: paid ? total : 0,
+        currency: "IRR",
+        subtotal: BigInt(subtotal),
+        serviceCharge: BigInt(serviceCharge),
+        tax: BigInt(tax),
+        tipAmount: BigInt(tip),
+        total: BigInt(total),
+        amountPaid: paid ? BigInt(total) : BigInt(0),
         createdAt,
         items: { create: orderItems },
       },
     });
 
     if (paid) {
-      await db.payment.create({
+      const paymentRef = `pay_${order.orderNumber}_${o}`;
+      const payment = await db.payment.create({
         data: {
           vendorId,
           orderId: order.id,
-          amount: subtotal + serviceCharge,
-          tipAmount: tip,
-          total,
+          amount: BigInt(subtotal + serviceCharge),
+          tipAmount: BigInt(tip),
+          total: BigInt(total),
           method: methods[o % methods.length],
           status: "succeeded",
           splitType: "full",
           payerName: names[o % names.length],
-          reference: `pay_${order.orderNumber}_${o}`,
+          reference: paymentRef,
           createdAt,
         },
       });
@@ -765,7 +767,7 @@ async function seedOrders(
         await db.review.create({
           data: {
             vendorId,
-            orderId: order.id,
+            paymentId: payment.id,
             rating: 4 + (o % 2),
             foodRating: 4 + (o % 2),
             serviceRating: 5 - (o % 2),
@@ -828,7 +830,7 @@ async function main() {
 
   // Staff users — each gets a unique cryptographically-random password,
   // printed once so the operator can sign in. No shared/static credential.
-  const demoStaff = [
+  const demoStaff: { email: string; name: string; role: "superadmin" | "owner" | "manager" | "staff"; vendorId: string | null }[] = [
     { email: "admin@qlub.io", name: "Platform Admin", role: "superadmin", vendorId: null },
     { email: "owner@paul.ae", name: "Pierre Dubois", role: "owner", vendorId: paul.vendor.id },
     { email: "manager@paul.ae", name: "Yara Haddad", role: "manager", vendorId: paul.vendor.id },
@@ -839,7 +841,13 @@ async function main() {
   for (const staff of demoStaff) {
     const password = randomStaffPassword();
     await db.staffUser.create({
-      data: { ...staff, passwordHash: await bcrypt.hash(password, 10) },
+      data: {
+        email: staff.email,
+        name: staff.name,
+        role: staff.role,
+        vendorId: staff.vendorId,
+        passwordHash: await bcrypt.hash(password, 10),
+      },
     });
     generatedCredentials.push({ email: staff.email, password });
   }

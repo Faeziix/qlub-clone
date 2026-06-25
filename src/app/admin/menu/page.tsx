@@ -68,7 +68,7 @@ export default async function MenuPage() {
     id: m.id,
     name: m.name,
     active: m.active,
-    availability: m.availability,
+    availability: m.availability as string | null,
     categories: m.categories.map((c) => ({
       id: c.id,
       name: c.name,
@@ -76,11 +76,11 @@ export default async function MenuPage() {
         id: it.id,
         name: it.name,
         description: it.description ?? "",
-        price: it.price,
+        price: Number(it.price),
         imageUrl: it.imageUrl,
         available: it.available,
         calories: it.calories,
-        tags: it.tags,
+        tags: it.tags as string,
         modifierGroupCount: it.modifierGroups.length,
         modifierOptionCount: it.modifierGroups.reduce(
           (s, g) => s + g.options.length,

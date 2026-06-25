@@ -3,6 +3,7 @@ import { db } from "./db";
 import { computeBill } from "./pricing";
 import { round2 } from "./utils";
 import { nanoid } from "nanoid";
+import { Prisma } from "@prisma/client";
 import type { CartLine, PaymentMethod, SplitType } from "./types";
 
 export async function createOrderFromCart(input: {
@@ -43,21 +44,21 @@ export async function createOrderFromCart(input: {
       guestPhone: input.guestPhone,
       notes: input.notes,
       currency: vendor.currency,
-      subtotal: bill.subtotal,
-      serviceCharge: bill.serviceCharge,
-      tax: bill.tax,
-      total: bill.total,
+      subtotal: BigInt(Math.round(bill.subtotal)),
+      serviceCharge: BigInt(Math.round(bill.serviceCharge)),
+      tax: BigInt(Math.round(bill.tax)),
+      total: BigInt(Math.round(bill.total)),
       items: {
         create: input.lines.map((l) => {
           const modSum = l.modifiers.reduce((s, m) => s + m.priceDelta, 0);
           return {
             itemId: l.itemId,
             name: l.name,
-            unitPrice: l.unitPrice,
+            unitPrice: BigInt(Math.round(l.unitPrice)),
             quantity: l.quantity,
             modifiers: JSON.stringify(l.modifiers),
             notes: l.notes,
-            lineTotal: round2((l.unitPrice + modSum) * l.quantity),
+            lineTotal: BigInt(Math.round(round2((l.unitPrice + modSum) * l.quantity))),
           };
         }),
       },
@@ -80,7 +81,7 @@ export async function recordPayment(input: {
   tipAmount?: number;
   method: PaymentMethod;
   splitType?: SplitType;
-  splitMeta?: unknown;
+  splitMeta?: Record<string, unknown> | null;
   payerName?: string;
   payerEmail?: string;
 }) {
@@ -97,28 +98,35 @@ export async function recordPayment(input: {
     data: {
       vendorId: order.vendorId,
       orderId: order.id,
-      amount: round2(input.amount),
-      tipAmount: tip,
-      total,
+      amount: BigInt(Math.round(input.amount)),
+      tipAmount: BigInt(Math.round(tip)),
+      total: BigInt(Math.round(total)),
       currency: order.currency,
       method: input.method,
       status: "succeeded",
       splitType: input.splitType ?? "full",
-      splitMeta: input.splitMeta ? JSON.stringify(input.splitMeta) : null,
+      splitMeta: input.splitMeta
+        ? (input.splitMeta as Prisma.InputJsonValue)
+        : Prisma.DbNull,
       payerName: input.payerName,
       payerEmail: input.payerEmail,
       reference: `pay_${nanoid(16)}`,
     },
   });
 
-  const amountPaid = round2(order.amountPaid + input.amount);
-  const fullyPaid = amountPaid >= order.total - 0.01;
+  const prevAmountPaid = Number(order.amountPaid);
+  const prevTipAmount = Number(order.tipAmount);
+  const prevTotal = Number(order.total);
+
+  const amountPaid = round2(prevAmountPaid + input.amount);
+  const fullyPaid = amountPaid >= prevTotal - 0.01;
+
   await db.order.update({
     where: { id: order.id },
     data: {
-      amountPaid,
-      tipAmount: round2(order.tipAmount + tip),
-      total: round2(order.total + tip),
+      amountPaid: BigInt(Math.round(amountPaid)),
+      tipAmount: BigInt(Math.round(round2(prevTipAmount + tip))),
+      total: BigInt(Math.round(round2(prevTotal + tip))),
       status: fullyPaid ? "paid" : order.status,
     },
   });
@@ -135,7 +143,7 @@ export async function recordPayment(input: {
 
 export async function createReview(input: {
   vendorSlug: string;
-  orderId?: string;
+  paymentId: string;
   rating: number;
   foodRating?: number;
   serviceRating?: number;
@@ -151,7 +159,7 @@ export async function createReview(input: {
   return db.review.create({
     data: {
       vendorId: vendor.id,
-      orderId: input.orderId,
+      paymentId: input.paymentId,
       rating: input.rating,
       foodRating: input.foodRating,
       serviceRating: input.serviceRating,

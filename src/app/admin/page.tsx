@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 const DAY_MS = 86400000;
 const REVENUE_WINDOW_DAYS = 14;
 
-type DashboardPayment = { createdAt: Date; total: number };
+type DashboardPayment = { createdAt: Date; total: bigint | number };
 
 function buildRevenueSeries(payments: DashboardPayment[]) {
   const series: { day: string; revenue: number; orders: number }[] = [];
@@ -32,7 +32,7 @@ function buildRevenueSeries(payments: DashboardPayment[]) {
     );
     series.push({
       day: label,
-      revenue: Math.round(dayPayments.reduce((s, p) => s + p.total, 0) * 100) / 100,
+      revenue: Math.round(dayPayments.reduce((s, p) => s + Number(p.total), 0) * 100) / 100,
       orders: dayPayments.length,
     });
   }
@@ -155,7 +155,7 @@ export default async function DashboardPage() {
                       <StatusPill status={o.status} />
                     </td>
                     <td className="py-2.5 text-right font-semibold tabular-nums">
-                      {formatMoney(o.total, currency)}
+                      {formatMoney(Number(o.total), currency)}
                     </td>
                     <td className="py-2.5 text-right text-xs text-muted">
                       {timeAgo(o.createdAt)}

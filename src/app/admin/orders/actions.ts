@@ -39,7 +39,7 @@ export async function updateOrderStatus(orderId: string, status: string) {
 
   await db.order.update({
     where: { id: orderId },
-    data: { status, updatedAt: new Date() },
+    data: { status: status as OrderStatus, updatedAt: new Date() },
   });
 
   revalidatePath("/admin/orders");

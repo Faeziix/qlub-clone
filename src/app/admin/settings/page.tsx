@@ -41,8 +41,8 @@ export default async function SettingsPage() {
     );
   }
 
-  const tipPresets = parseJSON<number[]>(vendor.tipPresets, [10, 15, 20]);
-  const supportedLangs = parseJSON<string[]>(vendor.supportedLangs, ["en", "ar"]);
+  const tipPresets = parseJSON<number[]>(vendor.tipPresets as string | null, [10, 15, 20]);
+  const supportedLangs = parseJSON<string[]>(vendor.supportedLangs as string | null, ["en", "ar"]);
 
   const initial = {
     name: vendor.name ?? "",

@@ -38,7 +38,7 @@ export default async function OrdersPage() {
 
   const paidToday = todays.filter((o) => o.status === "paid");
   const todaysRevenue = round2(
-    paidToday.reduce((sum, o) => sum + o.total, 0)
+    paidToday.reduce((sum, o) => sum + Number(o.total), 0)
   );
 
   // Avg prep time: served/paid orders -> minutes between created & updated.
@@ -68,30 +68,30 @@ export default async function OrdersPage() {
     guestPhone: o.guestPhone,
     notes: o.notes,
     currency: o.currency,
-    subtotal: o.subtotal,
-    serviceCharge: o.serviceCharge,
-    tax: o.tax,
-    discount: o.discount,
-    tipAmount: o.tipAmount,
-    total: o.total,
-    amountPaid: o.amountPaid,
+    subtotal: Number(o.subtotal),
+    serviceCharge: Number(o.serviceCharge),
+    tax: Number(o.tax),
+    discount: Number(o.discount),
+    tipAmount: Number(o.tipAmount),
+    total: Number(o.total),
+    amountPaid: Number(o.amountPaid),
     createdAt: o.createdAt.toISOString(),
     tableLabel: o.table?.label ?? null,
     tableCode: o.table?.code ?? null,
     items: o.items.map((it) => ({
       id: it.id,
       name: it.name,
-      unitPrice: it.unitPrice,
+      unitPrice: Number(it.unitPrice),
       quantity: it.quantity,
-      modifiers: it.modifiers,
+      modifiers: it.modifiers as string | null,
       notes: it.notes,
-      lineTotal: it.lineTotal,
+      lineTotal: Number(it.lineTotal),
     })),
     payments: o.payments.map((p) => ({
       id: p.id,
-      amount: p.amount,
-      tipAmount: p.tipAmount,
-      total: p.total,
+      amount: Number(p.amount),
+      tipAmount: Number(p.tipAmount),
+      total: Number(p.total),
       method: p.method,
       status: p.status,
       payerName: p.payerName,

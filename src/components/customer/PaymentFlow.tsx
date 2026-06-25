@@ -11,7 +11,7 @@ import {
   Sparkles,
   PartyPopper,
 } from "lucide-react";
-import type { PaymentMethod, SplitType } from "@/lib/types";
+import type { SplitType } from "@/lib/types";
 import { makeT, dirFor } from "@/lib/i18n";
 import { cn, formatAmount, round2 } from "@/lib/utils";
 import { evenSplit, tipFromPct } from "@/lib/pricing";
@@ -37,12 +37,11 @@ interface OrderData {
   items: OrderItem[];
 }
 
-const METHODS: { id: PaymentMethod; label: string; emoji: string }[] = [
-  { id: "apple_pay", label: "Apple Pay", emoji: "" },
-  { id: "google_pay", label: "Google Pay", emoji: "🅖" },
-  { id: "card", label: "Credit / Debit Card", emoji: "💳" },
-  { id: "tabby", label: "Tabby — Pay in 4", emoji: "🟢" },
-  { id: "benefit", label: "Benefit Pay", emoji: "🔵" },
+type UiPaymentMethod = "ipg" | "cash";
+
+const METHODS: { id: UiPaymentMethod; label: string; emoji: string }[] = [
+  { id: "ipg", label: "Online Payment (IPG)", emoji: "💳" },
+  { id: "cash", label: "Cash", emoji: "💵" },
 ];
 
 type Step = "pay" | "success" | "review" | "done";
@@ -88,7 +87,8 @@ export function PaymentFlow({
   const [customAmount, setCustomAmount] = React.useState("");
   const [tipPct, setTipPct] = React.useState<number | "custom" | null>(null);
   const [customTip, setCustomTip] = React.useState("");
-  const [method, setMethod] = React.useState<PaymentMethod>("apple_pay");
+  const [method, setMethod] = React.useState<UiPaymentMethod>("ipg");
+  const [paymentId, setPaymentId] = React.useState<string | null>(null);
   const [processing, setProcessing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -143,6 +143,7 @@ export function PaymentFlow({
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error ?? "Payment failed");
+      if (data.payment?.id) setPaymentId(data.payment.id);
       setStep("success");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Payment failed");
@@ -190,7 +191,7 @@ export function PaymentFlow({
         t={t}
         dir={dir}
         vendorSlug={vendorSlug}
-        orderId={order.id}
+        paymentId={paymentId}
         onDone={() => setStep("done")}
       />
     );
@@ -440,7 +441,7 @@ export function PaymentFlow({
                   method === m.id ? "border-brand bg-brand-soft" : "border-line"
                 )}
               >
-                <span className="text-xl">{m.id === "apple_pay" ? "" : m.emoji}</span>
+                <span className="text-xl">{m.emoji}</span>
                 <span className="flex-1 font-semibold">{m.label}</span>
                 <span
                   className={cn(
@@ -492,13 +493,13 @@ function ReviewScreen({
   t,
   dir,
   vendorSlug,
-  orderId,
+  paymentId,
   onDone,
 }: {
   t: (k: string) => string;
   dir: string;
   vendorSlug: string;
-  orderId: string;
+  paymentId: string | null;
   onDone: () => void;
 }) {
   const [rating, setRating] = React.useState(0);
@@ -517,7 +518,7 @@ function ReviewScreen({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           vendorSlug,
-          orderId,
+          paymentId,
           rating: rating || 5,
           foodRating: food || undefined,
           serviceRating: service || undefined,

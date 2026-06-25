@@ -2,6 +2,10 @@ import "server-only";
 import { db } from "./db";
 import { parseJSON } from "./utils";
 
+function bigintToNumber(value: bigint): number {
+  return Number(value);
+}
+
 /** Full vendor + menu tree for the customer app. */
 export async function getVendorBySlug(slug: string) {
   const vendor = await db.vendor.findUnique({
@@ -33,8 +37,27 @@ export async function getVendorBySlug(slug: string) {
   if (!vendor) return null;
   return {
     ...vendor,
-    supportedLangs: parseJSON<string[]>(vendor.supportedLangs, ["en"]),
-    tipPresets: parseJSON<number[]>(vendor.tipPresets, [10, 15, 20]),
+    supportedLangs: parseJSON<string[]>(vendor.supportedLangs as string | null, ["en"]),
+    tipPresets: parseJSON<number[]>(vendor.tipPresets as string | null, [10, 15, 20]),
+    menus: vendor.menus.map((menu) => ({
+      ...menu,
+      availability: menu.availability as string | null,
+      categories: menu.categories.map((cat) => ({
+        ...cat,
+        items: cat.items.map((item) => ({
+          ...item,
+          price: bigintToNumber(item.price),
+          tags: item.tags as string,
+          modifierGroups: item.modifierGroups.map((group) => ({
+            ...group,
+            options: group.options.map((opt) => ({
+              ...opt,
+              priceDelta: bigintToNumber(opt.priceDelta),
+            })),
+          })),
+        })),
+      })),
+    })),
   };
 }
 
@@ -46,7 +69,7 @@ export type ItemWithModifiers =
   MenuWithCategories["categories"][number]["items"][number];
 
 export async function getItem(itemId: string) {
-  return db.menuItem.findUnique({
+  const item = await db.menuItem.findUnique({
     where: { id: itemId },
     include: {
       modifierGroups: {
@@ -55,13 +78,54 @@ export async function getItem(itemId: string) {
       },
     },
   });
+  if (!item) return null;
+  return {
+    ...item,
+    price: bigintToNumber(item.price),
+    tags: item.tags as string,
+    modifierGroups: item.modifierGroups.map((group) => ({
+      ...group,
+      options: group.options.map((opt) => ({
+        ...opt,
+        priceDelta: bigintToNumber(opt.priceDelta),
+      })),
+    })),
+  };
 }
 
 export async function getOrder(orderId: string) {
-  return db.order.findUnique({
+  const order = await db.order.findUnique({
     where: { id: orderId },
     include: { items: true, payments: true, table: true, vendor: true },
   });
+  if (!order) return null;
+  return {
+    ...order,
+    subtotal: bigintToNumber(order.subtotal),
+    serviceCharge: bigintToNumber(order.serviceCharge),
+    tax: bigintToNumber(order.tax),
+    discount: bigintToNumber(order.discount),
+    tipAmount: bigintToNumber(order.tipAmount),
+    total: bigintToNumber(order.total),
+    amountPaid: bigintToNumber(order.amountPaid),
+    items: order.items.map((item) => ({
+      ...item,
+      unitPrice: bigintToNumber(item.unitPrice),
+      lineTotal: bigintToNumber(item.lineTotal),
+      modifiers: item.modifiers as string,
+    })),
+    payments: order.payments.map((payment) => ({
+      ...payment,
+      amount: bigintToNumber(payment.amount),
+      tipAmount: bigintToNumber(payment.tipAmount),
+      total: bigintToNumber(payment.total),
+    })),
+    vendor: {
+      ...order.vendor,
+      supportedLangs: order.vendor.supportedLangs as string | null,
+      tipPresets: order.vendor.tipPresets as string | null,
+    },
+  };
 }
 
 /** Admin: dashboard metrics for a vendor (or all, for superadmin). */
@@ -82,8 +146,8 @@ export async function getDashboardStats(vendorId: string | null) {
     db.diningTable.count({ where }),
   ]);
 
-  const revenue = payments.reduce((s, p) => s + p.total, 0);
-  const tips = payments.reduce((s, p) => s + p.tipAmount, 0);
+  const revenue = payments.reduce((s, p) => s + bigintToNumber(p.total), 0);
+  const tips = payments.reduce((s, p) => s + bigintToNumber(p.tipAmount), 0);
   const avgOrder = orders.length ? revenue / payments.length || 0 : 0;
   const avgRating = reviews.length
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length

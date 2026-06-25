@@ -6,7 +6,7 @@ const schema = z.object({
   orderId: z.string(),
   amount: z.number().nonnegative(),
   tipAmount: z.number().nonnegative().optional(),
-  method: z.enum(["card", "apple_pay", "google_pay", "tabby", "benefit", "cash"]),
+  method: z.enum(["ipg", "cash"]),
   splitType: z.enum(["full", "even", "items", "custom"]).optional(),
   splitMeta: z.any().optional(),
   payerName: z.string().optional(),

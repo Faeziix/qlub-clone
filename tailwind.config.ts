@@ -18,9 +18,15 @@ const config: Config = {
         ink: "hsl(var(--ink))",
         muted: "hsl(var(--muted))",
         line: "hsl(var(--line))",
-        success: "hsl(var(--success))",
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          soft: "hsl(var(--success-soft))",
+        },
         danger: "hsl(var(--danger))",
-        warning: "hsl(var(--warning))",
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          soft: "hsl(var(--warning-soft))",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],

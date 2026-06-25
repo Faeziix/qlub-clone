@@ -16,6 +16,7 @@ import { makeT, dirFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { evenSplit, tipFromPct } from "@/lib/pricing";
 import { formatRialAsToman, parseRialFromInput } from "@/lib/money";
+import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/Button";
 import { StarRating } from "@/components/ui/StarRating";
 
@@ -90,6 +91,7 @@ export function PaymentFlow({
   const [processing, setProcessing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [completedPaymentId, setCompletedPaymentId] = React.useState<string | null>(null);
+  const idempotencyKey = React.useRef(nanoid(32));
 
   // ── compute the base amount this guest pays (before tip) ──
   const baseAmount = React.useMemo(() => {
@@ -146,6 +148,7 @@ export function PaymentFlow({
               : split === "items"
                 ? { items: selectedItems }
                 : undefined,
+          idempotencyKey: idempotencyKey.current,
         }),
       });
       const data = await res.json();

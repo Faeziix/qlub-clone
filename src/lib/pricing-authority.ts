@@ -27,18 +27,22 @@ export interface CartLineInput {
 export interface DbItemPrice {
   itemId: string;
   price: bigint;
+  name?: string;
 }
 
 export interface DbModifierPrice {
   optionId: string;
   priceDelta: bigint;
+  name?: string;
 }
 
 export interface PriceChangeNotice {
   itemId: string;
+  itemName?: string;
   cartPrice: bigint;
   currentPrice: bigint;
   optionId?: string;
+  optionName?: string;
 }
 
 export interface PaymentLeg {
@@ -60,27 +64,30 @@ export function detectPriceChanges(
   dbItemPrices: DbItemPrice[],
   dbModifierPrices: DbModifierPrice[]
 ): PriceChangeNotice[] {
-  const itemMap = new Map(dbItemPrices.map((p) => [p.itemId, p.price]));
-  const modMap = new Map(dbModifierPrices.map((m) => [m.optionId, m.priceDelta]));
+  const itemMap = new Map(dbItemPrices.map((p) => [p.itemId, p]));
+  const modMap = new Map(dbModifierPrices.map((m) => [m.optionId, m]));
   const changes: PriceChangeNotice[] = [];
 
   for (const line of cartLines) {
-    const dbPrice = itemMap.get(line.itemId);
-    if (dbPrice !== undefined && dbPrice !== line.unitPrice) {
+    const dbItem = itemMap.get(line.itemId);
+    if (dbItem !== undefined && dbItem.price !== line.unitPrice) {
       changes.push({
         itemId: line.itemId,
+        itemName: dbItem.name,
         cartPrice: line.unitPrice,
-        currentPrice: dbPrice,
+        currentPrice: dbItem.price,
       });
     }
     for (const mod of line.modifiers) {
-      const dbDelta = modMap.get(mod.optionId);
-      if (dbDelta !== undefined && dbDelta !== mod.priceDelta) {
+      const dbMod = modMap.get(mod.optionId);
+      if (dbMod !== undefined && dbMod.priceDelta !== mod.priceDelta) {
         changes.push({
           itemId: line.itemId,
+          itemName: dbItem?.name,
           optionId: mod.optionId,
+          optionName: dbMod.name,
           cartPrice: mod.priceDelta,
-          currentPrice: dbDelta,
+          currentPrice: dbMod.priceDelta,
         });
       }
     }
@@ -126,26 +133,30 @@ export function computeServerBill(
 // ─── The honored-price invariant ──────────────────────────────────────────────
 
 /**
- * Asserts that the sum of all non-tip payment legs reconciles to the
- * OrderItem snapshot total (the pre-computed Order.total, which captures
- * subtotal + service charge + tax at the time of order creation).
+ * The honored-price reconciliation invariant (P0, PRD §12.1).
  *
- * Tips are tracked separately on each Payment (Payment.tipAmount) and are
- * NOT included in the reconciliation total per the PRD §5.3 tip-tracking rule.
+ * Validates that the cumulative sum of non-tip payment legs does NOT exceed
+ * the OrderItem snapshot total (Order.total — subtotal + service charge + tax
+ * snapshotted at order creation).
  *
- * This is the P0 invariant from PRD §12.1 — every payment recording path
- * must satisfy this before marking an order paid.
+ * Tips are tracked separately (Payment.tipAmount) and excluded here per PRD §5.3.
  *
- * Overpayment (paidTotal > snapshotTotal) is valid: the excess triggers a
- * refund-unwind path, not a rejection (PRD §6.6).
+ * What this invariant guards against:
+ *   - Overpayment: paidTotal > snapshotTotal → invalid, triggers refund-unwind.
+ *   - A single partial leg (paidTotal < snapshotTotal) is VALID — it means the
+ *     order is not yet fully settled, not that the leg is corrupt. Use
+ *     isFullyPaid() from money.ts to check whether an order is closed.
+ *
+ * This decoupling is essential for split-bill: the first leg of a 3-way split
+ * pays ~1/3 of the snapshot and must NOT be rejected.
  */
 export function validatePaymentLegsAgainstSnapshot(
   snapshotTotal: bigint,
   paymentLegs: PaymentLeg[]
 ): InvariantResult {
   const paidTotal = paymentLegs.reduce((sum, leg) => sum + leg.amount, 0n);
-  const valid = paidTotal >= snapshotTotal;
-  const discrepancy = valid ? 0n : snapshotTotal - paidTotal;
+  const valid = paidTotal <= snapshotTotal;
+  const discrepancy = valid ? 0n : paidTotal - snapshotTotal;
   return { valid, snapshotTotal, paidTotal, discrepancy };
 }
 

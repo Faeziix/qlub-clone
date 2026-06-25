@@ -212,7 +212,7 @@ function PriceChangedNotice({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-10 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-warning-soft text-warning">
         <AlertTriangle size={32} />
       </div>
       <div>
@@ -226,7 +226,9 @@ function PriceChangedNotice({
         {changes.map((ch, i) => (
           <div key={i} className="flex items-center justify-between gap-2">
             <span className="text-muted text-xs">
-              {ch.optionId ? `گزینه ${ch.optionId}` : `آیتم ${ch.itemId}`}
+              {ch.optionId
+                ? ch.optionName ?? `گزینه ${ch.optionId}`
+                : ch.itemName ?? `آیتم ${ch.itemId}`}
             </span>
             <span className="text-danger line-through">
               {formatRialAsToman(BigInt(String(ch.cartPrice)))} تومان

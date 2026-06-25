@@ -19,8 +19,10 @@
   --brand-soft: 40 45% 92%;
 
   --success: 142 60% 38%;
+  --success-soft: 142 50% 92%;
   --danger: 0 72% 51%;
   --warning: 35 92% 50%;
+  --warning-soft: 35 85% 93%;
 }
 
 /* ---- Customer themes (?theme=) ---- */

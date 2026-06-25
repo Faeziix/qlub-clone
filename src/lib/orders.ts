@@ -49,8 +49,11 @@ export async function createOrderFromCart(input: {
     }),
     optionIds.length
       ? db.modifierOption.findMany({
-          where: { id: { in: optionIds } },
-          select: { id: true, priceDelta: true },
+          where: {
+            id: { in: optionIds },
+            group: { item: { vendorId: vendor.id } },
+          },
+          select: { id: true, priceDelta: true, name: true },
         })
       : Promise.resolve([]),
   ]);
@@ -60,10 +63,15 @@ export async function createOrderFromCart(input: {
     throw new Error(`Items no longer available: ${unavailable.join(", ")}`);
   }
 
-  const dbItemPrices = dbItems.map((i) => ({ itemId: i.id, price: i.price }));
+  const dbItemPrices = dbItems.map((i) => ({
+    itemId: i.id,
+    price: i.price,
+    name: i.name,
+  }));
   const dbModPrices = dbOptions.map((o) => ({
     optionId: o.id,
     priceDelta: o.priceDelta,
+    name: o.name,
   }));
 
   const priceChanges = detectPriceChanges(input.lines, dbItemPrices, dbModPrices);
@@ -145,6 +153,18 @@ export async function createOrderFromCart(input: {
   return { order, priceChanges };
 }
 
+/**
+ * Initiates a payment leg and reserves it with a TTL before any gateway redirect.
+ * This is the correct entry point for split-bill flows — it acquires a
+ * row-level lock on the order, checks the remaining balance against already-
+ * succeeded and still-active reserved legs, then creates a pending Payment
+ * with an expiry. The client should confirm via recordPayment after the
+ * gateway callback.
+ *
+ * FOR UPDATE is issued via $queryRaw to prevent concurrent requests from both
+ * reading the same payments set and both passing the remaining check (the
+ * cross-gateway double-settlement scenario).
+ */
 export async function initiatePayment(input: {
   orderId: string;
   amount: bigint;
@@ -166,6 +186,8 @@ export async function initiatePayment(input: {
   const tip = input.tipAmount ?? 0n;
 
   const payment = await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
+
     const order = await tx.order.findUniqueOrThrow({
       where: { id: input.orderId },
       include: { items: true, payments: true },
@@ -183,9 +205,10 @@ export async function initiatePayment(input: {
     const reserved = reservedLegs.reduce((s, p) => s + p.amount, 0n);
     const committedOrReserved = alreadyPaid + reserved;
 
-    const remaining = order.total > committedOrReserved
-      ? order.total - committedOrReserved
-      : 0n;
+    const remaining =
+      order.total > committedOrReserved
+        ? order.total - committedOrReserved
+        : 0n;
 
     if (input.amount > remaining) {
       throw new Error(
@@ -193,19 +216,23 @@ export async function initiatePayment(input: {
       );
     }
 
+    const allActiveLegs = [
+      ...succeededLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
+      ...reservedLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
+      { amount: input.amount, tipAmount: tip },
+    ];
+
     const invariantCheck = validatePaymentLegsAgainstSnapshot(
       order.total,
-      [
-        ...succeededLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
-        ...reservedLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
-        { amount: input.amount, tipAmount: tip },
-      ]
+      allActiveLegs
     );
 
-    if (!invariantCheck.valid && input.method !== "cash") {
+    if (!invariantCheck.valid) {
       throw new Error(
-        `Payment legs do not reconcile to order snapshot. ` +
-          `Discrepancy: ${invariantCheck.discrepancy} rial`
+        `Payment legs exceed order snapshot. ` +
+          `Snapshot total: ${invariantCheck.snapshotTotal}, ` +
+          `would-be paid total: ${invariantCheck.paidTotal}, ` +
+          `overpayment: ${invariantCheck.discrepancy} rial`
       );
     }
 
@@ -235,6 +262,17 @@ export async function initiatePayment(input: {
   return { payment, deduplicated: false };
 }
 
+/**
+ * Records a confirmed (succeeded) payment leg.
+ *
+ * Acquires a row-level lock (FOR UPDATE) on the order inside the transaction
+ * to prevent concurrent settlement races. Validates that the new leg does
+ * not cause the cumulative succeeded total to exceed the order snapshot.
+ *
+ * For split-bill flows the invariant allows partial legs: a single leg
+ * paying 1/3 of the total is valid. Only overpayment (cumulative > snapshot)
+ * is rejected. Use isFullyPaid to determine order closure.
+ */
 export async function recordPayment(input: {
   orderId: string;
   amount: bigint;
@@ -266,6 +304,8 @@ export async function recordPayment(input: {
   const tip = input.tipAmount ?? 0n;
 
   const result = await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
+
     const order = await tx.order.findUniqueOrThrow({
       where: { id: input.orderId },
       include: { items: true, payments: true },
@@ -273,6 +313,15 @@ export async function recordPayment(input: {
 
     const succeededLegs = order.payments.filter((p) => p.status === "succeeded");
     const alreadyPaid = succeededLegs.reduce((s, p) => s + p.amount, 0n);
+
+    const remaining =
+      order.total > alreadyPaid ? order.total - alreadyPaid : 0n;
+
+    if (input.amount > remaining) {
+      throw new Error(
+        `Payment amount ${input.amount} exceeds remaining balance ${remaining}`
+      );
+    }
 
     const allLegs = [
       ...succeededLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
@@ -283,10 +332,10 @@ export async function recordPayment(input: {
 
     if (!invariantCheck.valid) {
       throw new Error(
-        `Payment legs do not reconcile to order snapshot. ` +
+        `Payment legs exceed order snapshot. ` +
           `Snapshot total: ${invariantCheck.snapshotTotal}, ` +
-          `paid total: ${invariantCheck.paidTotal}, ` +
-          `discrepancy: ${invariantCheck.discrepancy} rial`
+          `cumulative paid: ${invariantCheck.paidTotal}, ` +
+          `overpayment: ${invariantCheck.discrepancy} rial`
       );
     }
 

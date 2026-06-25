@@ -64,7 +64,7 @@ export default function HomePage() {
           </Link>
         </div>
         <p className="mt-4 text-xs text-muted">
-          Demo restaurant: Paul — UAE · Admin: owner@paul.ae / password123
+          Demo restaurant: Paul — UAE
         </p>
       </section>
 

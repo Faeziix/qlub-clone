@@ -76,7 +76,7 @@ export default async function MenuPage() {
         id: it.id,
         name: it.name,
         description: it.description ?? "",
-        price: it.price,
+        price: String(it.price),
         imageUrl: it.imageUrl,
         available: it.available,
         calories: it.calories,

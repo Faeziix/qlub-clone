@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import type { PaymentMethod, SplitType } from "@/lib/types";
 import { makeT, dirFor } from "@/lib/i18n";
-import { cn, formatAmount, round2 } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { evenSplit, tipFromPct } from "@/lib/pricing";
+import { formatRialAsToman } from "@/lib/money";
 import { Button } from "@/components/ui/Button";
 import { StarRating } from "@/components/ui/StarRating";
 
@@ -22,17 +23,17 @@ interface OrderItem {
   id: string;
   name: string;
   quantity: number;
-  lineTotal: number;
+  lineTotal: string;
   modifiers: { optionName: string }[];
 }
 interface OrderData {
   id: string;
   orderNumber: string;
-  subtotal: number;
-  serviceCharge: number;
-  tax: number;
-  total: number;
-  amountPaid: number;
+  subtotal: string;
+  serviceCharge: string;
+  tax: string;
+  total: string;
+  amountPaid: string;
   tableLabel: string | null;
   items: OrderItem[];
 }
@@ -78,7 +79,7 @@ export function PaymentFlow({
     root.setAttribute("dir", dir);
   }, [theme, dir]);
 
-  const remaining = round2(order.total - order.amountPaid);
+  const remaining = BigInt(order.total) - BigInt(order.amountPaid);
 
   const [step, setStep] = React.useState<Step>("pay");
   const [split, setSplit] = React.useState<SplitType>("full");
@@ -94,29 +95,39 @@ export function PaymentFlow({
 
   // ── compute the base amount this guest pays (before tip) ──
   const baseAmount = React.useMemo(() => {
-    if (split === "even") return evenSplit(remaining, parts)[partIndex] ?? 0;
+    if (split === "even") return evenSplit(remaining, parts)[partIndex] ?? 0n;
     if (split === "items") {
       const sum = order.items
         .filter((i) => selectedItems.includes(i.id))
-        .reduce((s, i) => s + i.lineTotal, 0);
-      // approximate service/tax share proportionally
-      const ratio = order.subtotal ? sum / order.subtotal : 0;
-      return round2(sum + (order.serviceCharge + order.tax) * ratio);
+        .reduce((s, i) => s + BigInt(i.lineTotal), 0n);
+      const subtotalBig = BigInt(order.subtotal);
+      const serviceChargeBig = BigInt(order.serviceCharge);
+      const taxBig = BigInt(order.tax);
+      const extra = subtotalBig > 0n
+        ? (sum * (serviceChargeBig + taxBig)) / subtotalBig
+        : 0n;
+      return sum + extra;
     }
-    if (split === "custom") return round2(Number(customAmount) || 0);
+    if (split === "custom") {
+      const parsed = customAmount ? BigInt(customAmount.replace(/,/g, "")) : 0n;
+      return parsed;
+    }
     return remaining;
   }, [split, parts, partIndex, selectedItems, customAmount, remaining, order]);
 
   const tip = React.useMemo(() => {
-    if (!tippingEnabled || tipPct == null) return 0;
-    if (tipPct === "custom") return round2(Number(customTip) || 0);
+    if (!tippingEnabled || tipPct == null) return 0n;
+    if (tipPct === "custom") {
+      const parsed = customTip ? BigInt(customTip.replace(/,/g, "")) : 0n;
+      return parsed;
+    }
     return tipFromPct(baseAmount, tipPct);
   }, [tipPct, customTip, baseAmount, tippingEnabled]);
 
-  const payTotal = round2(baseAmount + tip);
+  const payTotal = baseAmount + tip;
 
   async function pay() {
-    if (baseAmount <= 0) {
+    if (baseAmount <= 0n) {
       setError("Enter an amount to pay.");
       return;
     }
@@ -161,7 +172,7 @@ export function PaymentFlow({
           </div>
           <h1 className="mt-5 text-2xl font-extrabold">{t("paymentSuccess")}</h1>
           <p className="mt-1 text-muted">
-            {currency} {formatAmount(payTotal)} · {vendorName}
+            {currency} {formatRialAsToman(payTotal)} · {vendorName}
           </p>
           <p className="mt-1 text-sm text-muted">
             {t("receipt")} #{order.orderNumber}
@@ -257,27 +268,27 @@ export function PaymentFlow({
                     )}
                   </span>
                   <span className="font-semibold">
-                    {formatAmount(i.lineTotal)}
+                    {formatRialAsToman(BigInt(i.lineTotal))}
                   </span>
                 </div>
               ))}
             </div>
             <div className="mt-3 border-t border-line pt-3 text-sm">
               <SummaryRow label={t("subtotal")} v={order.subtotal} c={currency} />
-              {order.serviceCharge > 0 && (
+              {BigInt(order.serviceCharge) > 0n && (
                 <SummaryRow
                   label={t("serviceCharge")}
                   v={order.serviceCharge}
                   c={currency}
                 />
               )}
-              {order.tax > 0 && (
+              {BigInt(order.tax) > 0n && (
                 <SummaryRow label={t("tax")} v={order.tax} c={currency} />
               )}
               <div className="mt-2 flex items-center justify-between border-t border-line pt-2 text-base font-extrabold">
                 <span>{t("total")}</span>
                 <span>
-                  {currency} {formatAmount(order.total)}
+                  {currency} {formatRialAsToman(BigInt(order.total))}
                 </span>
               </div>
             </div>
@@ -363,7 +374,7 @@ export function PaymentFlow({
                       {i.quantity}× {i.name}
                     </span>
                     <span className="font-semibold">
-                      {formatAmount(i.lineTotal)}
+                      {formatRialAsToman(BigInt(i.lineTotal))}
                     </span>
                   </button>
                 );
@@ -400,7 +411,7 @@ export function PaymentFlow({
                   active={tipPct === p}
                   onClick={() => setTipPct(p)}
                   label={`${p}%`}
-                  sub={`${formatAmount(tipFromPct(baseAmount, p))}`}
+                  sub={`${formatRialAsToman(tipFromPct(baseAmount, p))}`}
                 />
               ))}
             </div>
@@ -468,11 +479,11 @@ export function PaymentFlow({
             <span className="text-muted">You pay</span>
             <span className="text-right">
               <span className="text-lg font-extrabold">
-                {currency} {formatAmount(payTotal)}
+                {currency} {formatRialAsToman(payTotal)}
               </span>
               {tip > 0 && (
                 <span className="block text-xs text-muted">
-                  incl. {formatAmount(tip)} tip
+                  incl. {formatRialAsToman(tip)} tip
                 </span>
               )}
             </span>
@@ -480,7 +491,7 @@ export function PaymentFlow({
           <Button fullWidth size="lg" loading={processing} onClick={pay}>
             {processing
               ? "Processing…"
-              : `${t("payNow")} · ${currency} ${formatAmount(payTotal)}`}
+              : `${t("payNow")} · ${currency} ${formatRialAsToman(payTotal)}`}
           </Button>
         </div>
       </div>
@@ -677,14 +688,14 @@ function SummaryRow({
   c,
 }: {
   label: string;
-  v: number;
+  v: string;
   c: string;
 }) {
   return (
     <div className="flex items-center justify-between text-muted">
       <span>{label}</span>
       <span className="font-semibold text-ink">
-        {c} {formatAmount(v)}
+        {c} {v}
       </span>
     </div>
   );

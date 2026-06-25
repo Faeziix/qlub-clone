@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createOrderFromCart } from "@/lib/orders";
 
+const bigintFromJson = z
+  .union([z.number(), z.string()])
+  .transform((v) => BigInt(typeof v === "string" ? v : Math.round(v)));
+
 const schema = z.object({
   vendorSlug: z.string(),
   tableCode: z.string().nullable().optional(),
@@ -15,7 +19,7 @@ const schema = z.object({
         lineId: z.string(),
         itemId: z.string(),
         name: z.string(),
-        unitPrice: z.number(),
+        unitPrice: bigintFromJson,
         quantity: z.number().int().positive(),
         notes: z.string().optional(),
         imageUrl: z.string().nullable().optional(),
@@ -25,7 +29,7 @@ const schema = z.object({
             groupName: z.string(),
             optionId: z.string(),
             optionName: z.string(),
-            priceDelta: z.number(),
+            priceDelta: bigintFromJson,
           })
         ),
       })

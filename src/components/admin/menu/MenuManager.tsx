@@ -16,7 +16,8 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { DietBadge } from "@/components/ui/Badge";
 import { EmptyRow } from "@/components/admin/ui";
-import { cn, formatMoney, parseJSON, round2 } from "@/lib/utils";
+import { cn, parseJSON } from "@/lib/utils";
+import { formatRialAsToman } from "@/lib/money";
 import {
   toggleItemAvailability,
   updateItemPrice,
@@ -31,7 +32,7 @@ export interface MenuItemNode {
   id: string;
   name: string;
   description: string;
-  price: number;
+  price: string;
   imageUrl: string | null;
   available: boolean;
   calories: number | null;
@@ -206,23 +207,24 @@ function ItemRow({
 
   // inline price editing
   const [editingPrice, setEditingPrice] = React.useState(false);
-  const [priceDraft, setPriceDraft] = React.useState(item.price.toString());
+  const [priceDraft, setPriceDraft] = React.useState(item.price);
 
   React.useEffect(() => {
-    setPriceDraft(item.price.toString());
+    setPriceDraft(item.price);
   }, [item.price]);
 
   const [confirmDelete, setConfirmDelete] = React.useState(false);
 
   function commitPrice() {
-    const parsed = round2(parseFloat(priceDraft));
-    if (!Number.isFinite(parsed) || parsed < 0) {
-      setPriceDraft(item.price.toString());
+    const num = parseFloat(priceDraft);
+    if (!Number.isFinite(num) || num < 0) {
+      setPriceDraft(item.price);
       setEditingPrice(false);
       return;
     }
+    const parsed = Math.round(num);
     setEditingPrice(false);
-    if (parsed === item.price) return;
+    if (String(parsed) === item.price) return;
     startTransition(async () => {
       await updateItemPrice(item.id, parsed);
     });
@@ -309,7 +311,7 @@ function ItemRow({
               onKeyDown={(e) => {
                 if (e.key === "Enter") commitPrice();
                 if (e.key === "Escape") {
-                  setPriceDraft(item.price.toString());
+                  setPriceDraft(item.price);
                   setEditingPrice(false);
                 }
               }}
@@ -323,7 +325,7 @@ function ItemRow({
             className="rounded-lg px-2 py-1 text-sm font-bold tabular-nums hover:bg-surface-2"
             title="Edit price"
           >
-            {formatMoney(item.price)}
+            {formatRialAsToman(BigInt(item.price))}
           </button>
         )}
       </div>
@@ -432,7 +434,7 @@ function EditItemSheet({
     if (item) {
       setName(item.name);
       setDescription(item.description);
-      setPrice(item.price.toString());
+      setPrice(item.price);
       setAvailable(item.available);
       setError(null);
     }
@@ -445,8 +447,8 @@ function EditItemSheet({
       setError("Name is required.");
       return;
     }
-    const parsed = round2(parseFloat(price));
-    const safePrice = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    const num = parseFloat(price);
+    const safePrice = Number.isFinite(num) && num >= 0 ? Math.round(num) : 0;
     setError(null);
     startTransition(async () => {
       await updateItem(item.id, {
@@ -557,8 +559,8 @@ function CreateItemSheet({
       setError("Name is required.");
       return;
     }
-    const parsed = round2(parseFloat(price));
-    const safePrice = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+    const num = parseFloat(price);
+    const safePrice = Number.isFinite(num) && num >= 0 ? Math.round(num) : 0;
     setError(null);
     startTransition(async () => {
       await createItem(category.id, vendorId, {

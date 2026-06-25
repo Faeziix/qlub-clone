@@ -17,3 +17,4 @@ consequences of a significant choice.
 - [0001 — Repo safety hardening](./adr/0001-repo-safety-hardening.md)
 - [0002 — Tables-actions IDOR fix](./adr/0002-tables-actions-idor-fix.md)
 - [0003 — Tooling standardisation](./adr/0003-tooling-standardisation.md)
+- [0004 — Integer-rial money model](./adr/0004-integer-rial-money-model.md)

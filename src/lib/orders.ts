@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "./db";
 import { computeBill } from "./pricing";
-import { round2 } from "./utils";
+import { isFullyPaid } from "./money";
 import { nanoid } from "nanoid";
 import type { CartLine, PaymentMethod, SplitType } from "./types";
 
@@ -49,7 +49,7 @@ export async function createOrderFromCart(input: {
       total: bill.total,
       items: {
         create: input.lines.map((l) => {
-          const modSum = l.modifiers.reduce((s, m) => s + m.priceDelta, 0);
+          const modifierSum = l.modifiers.reduce((s, m) => s + m.priceDelta, 0n);
           return {
             itemId: l.itemId,
             name: l.name,
@@ -57,7 +57,7 @@ export async function createOrderFromCart(input: {
             quantity: l.quantity,
             modifiers: JSON.stringify(l.modifiers),
             notes: l.notes,
-            lineTotal: round2((l.unitPrice + modSum) * l.quantity),
+            lineTotal: (l.unitPrice + modifierSum) * BigInt(l.quantity),
           };
         }),
       },
@@ -76,8 +76,8 @@ export async function createOrderFromCart(input: {
 
 export async function recordPayment(input: {
   orderId: string;
-  amount: number;
-  tipAmount?: number;
+  amount: bigint;
+  tipAmount?: bigint;
   method: PaymentMethod;
   splitType?: SplitType;
   splitMeta?: unknown;
@@ -90,14 +90,14 @@ export async function recordPayment(input: {
   });
   if (!order) throw new Error("Order not found");
 
-  const tip = round2(input.tipAmount ?? 0);
-  const total = round2(input.amount + tip);
+  const tip = input.tipAmount ?? 0n;
+  const total = input.amount + tip;
 
   const payment = await db.payment.create({
     data: {
       vendorId: order.vendorId,
       orderId: order.id,
-      amount: round2(input.amount),
+      amount: input.amount,
       tipAmount: tip,
       total,
       currency: order.currency,
@@ -111,14 +111,14 @@ export async function recordPayment(input: {
     },
   });
 
-  const amountPaid = round2(order.amountPaid + input.amount);
-  const fullyPaid = amountPaid >= order.total - 0.01;
+  const amountPaid = order.amountPaid + input.amount;
+  const fullyPaid = isFullyPaid(amountPaid, order.total);
   await db.order.update({
     where: { id: order.id },
     data: {
       amountPaid,
-      tipAmount: round2(order.tipAmount + tip),
-      total: round2(order.total + tip),
+      tipAmount: order.tipAmount + tip,
+      total: order.total + tip,
       status: fullyPaid ? "paid" : order.status,
     },
   });

@@ -30,8 +30,8 @@ model Vendor {
   timezone        String   @default("Asia/Dubai")
 
   // Billing config
-  serviceChargePct Float   @default(0)
-  taxPct           Float   @default(0)   // VAT
+  serviceChargePct Float   @default(0)   // percentage (not money — stays Float)
+  taxPct           Float   @default(0)   // percentage (not money — stays Float)
   taxInclusive     Boolean @default(true)
   tippingEnabled   Boolean @default(true)
   tipPresets       String  @default("[10,15,20]") // JSON array of %
@@ -87,7 +87,7 @@ model MenuItem {
   categoryId  String
   name        String
   description String?
-  price       Float
+  price       BigInt
   imageUrl    String?
   sortOrder   Int     @default(0)
   available   Boolean @default(true)
@@ -122,7 +122,7 @@ model ModifierOption {
   id         String  @id @default(cuid())
   groupId    String
   name       String
-  priceDelta Float   @default(0)
+  priceDelta BigInt  @default(0)
   isDefault  Boolean @default(false)
   sortOrder  Int     @default(0)
 
@@ -167,13 +167,13 @@ model Order {
   notes      String?
 
   currency       String @default("AED")
-  subtotal       Float  @default(0)
-  serviceCharge  Float  @default(0)
-  tax            Float  @default(0)
-  discount       Float  @default(0)
-  tipAmount      Float  @default(0)
-  total          Float  @default(0)
-  amountPaid     Float  @default(0)
+  subtotal       BigInt @default(0)
+  serviceCharge  BigInt @default(0)
+  tax            BigInt @default(0)
+  discount       BigInt @default(0)
+  tipAmount      BigInt @default(0)
+  total          BigInt @default(0)
+  amountPaid     BigInt @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -193,12 +193,12 @@ model OrderItem {
   orderId   String
   itemId    String?
   name      String
-  unitPrice Float
+  unitPrice BigInt
   quantity  Int    @default(1)
   // selected modifiers JSON: [{groupName,optionName,priceDelta}]
   modifiers String @default("[]")
   notes     String?
-  lineTotal Float
+  lineTotal BigInt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -209,9 +209,9 @@ model Payment {
   id          String  @id @default(cuid())
   vendorId    String
   orderId     String
-  amount      Float // portion of bill paid
-  tipAmount   Float   @default(0)
-  total       Float
+  amount      BigInt  // portion of bill paid (integer rial)
+  tipAmount   BigInt  @default(0)
+  total       BigInt
   currency    String  @default("AED")
   method      String  @default("card") // card | apple_pay | google_pay | tabby | benefit | cash
   status      String  @default("succeeded") // pending | succeeded | failed | refunded

@@ -82,9 +82,9 @@ export async function getDashboardStats(vendorId: string | null) {
     db.diningTable.count({ where }),
   ]);
 
-  const revenue = payments.reduce((s, p) => s + p.total, 0);
-  const tips = payments.reduce((s, p) => s + p.tipAmount, 0);
-  const avgOrder = orders.length ? revenue / payments.length || 0 : 0;
+  const revenue = payments.reduce((s, p) => s + p.total, 0n);
+  const tips = payments.reduce((s, p) => s + p.tipAmount, 0n);
+  const avgOrder = orders.length && payments.length ? revenue / BigInt(payments.length) : 0n;
   const avgRating = reviews.length
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
     : 0;

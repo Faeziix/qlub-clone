@@ -6,7 +6,8 @@ import type { ItemWithModifiers } from "@/lib/queries";
 import type { SelectedModifier } from "@/lib/types";
 import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
-import { cn, formatAmount, parseJSON, round2 } from "@/lib/utils";
+import { cn, parseJSON } from "@/lib/utils";
+import { formatRialAsToman } from "@/lib/money";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -74,8 +75,8 @@ export function ItemSheet({
   );
 
   const unitWithMods =
-    item.price + chosenModifiers.reduce((s, m) => s + m.priceDelta, 0);
-  const lineTotalValue = round2(unitWithMods * qty);
+    item.price + chosenModifiers.reduce((s, m) => s + m.priceDelta, 0n);
+  const lineTotalValue = unitWithMods * BigInt(qty);
 
   const missingRequired = item.modifierGroups.some(
     (g) => g.required && (selected[g.id]?.length ?? 0) < Math.max(1, g.minSelect)
@@ -113,7 +114,7 @@ export function ItemSheet({
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-2xl font-extrabold">{item.name}</h2>
               <span className="shrink-0 pt-1 font-bold text-brand">
-                {currency} {formatAmount(item.price)}
+                {currency} {formatRialAsToman(item.price)}
               </span>
             </div>
             {tags.length > 0 && (
@@ -182,7 +183,7 @@ export function ItemSheet({
                           </span>
                           {o.priceDelta > 0 && (
                             <span className="text-sm font-semibold text-muted">
-                              +{formatAmount(o.priceDelta)}
+                              +{formatRialAsToman(o.priceDelta)}
                             </span>
                           )}
                         </button>
@@ -217,7 +218,7 @@ export function ItemSheet({
               disabled={missingRequired}
               onClick={add}
             >
-              {t("addToOrder")} · {currency} {formatAmount(lineTotalValue)}
+              {t("addToOrder")} · {currency} {formatRialAsToman(lineTotalValue)}
             </Button>
           </div>
           {missingRequired && (

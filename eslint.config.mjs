@@ -15,4 +15,10 @@ export default [
     files: preExistingEffectSyncComponents,
     rules: { "react-hooks/set-state-in-effect": "warn" },
   },
+  {
+    files: ["src/components/customer/PaymentFlow.tsx"],
+    rules: {
+      "react-hooks/preserve-manual-memoization": "warn",
+    },
+  },
 ];

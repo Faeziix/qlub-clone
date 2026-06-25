@@ -11,14 +11,15 @@ import { getDashboardStats } from "@/lib/queries";
 import { db } from "@/lib/db";
 import { PageHeader, StatCard, Card, StatusPill } from "@/components/admin/ui";
 import { RevenueChart } from "@/components/admin/RevenueChart";
-import { formatMoney, timeAgo } from "@/lib/utils";
+import { timeAgo } from "@/lib/utils";
+import { formatRialAsToman } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
 const DAY_MS = 86400000;
 const REVENUE_WINDOW_DAYS = 14;
 
-type DashboardPayment = { createdAt: Date; total: number };
+type DashboardPayment = { createdAt: Date; total: bigint };
 
 function buildRevenueSeries(payments: DashboardPayment[]) {
   const series: { day: string; revenue: number; orders: number }[] = [];
@@ -32,7 +33,7 @@ function buildRevenueSeries(payments: DashboardPayment[]) {
     );
     series.push({
       day: label,
-      revenue: Math.round(dayPayments.reduce((s, p) => s + p.total, 0) * 100) / 100,
+      revenue: Number(dayPayments.reduce((s, p) => s + p.total, 0n)),
       orders: dayPayments.length,
     });
   }
@@ -81,7 +82,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
           label="Revenue"
-          value={formatMoney(stats.revenue, currency)}
+          value={formatRialAsToman(stats.revenue)}
           icon={<DollarSign size={18} />}
           delta={{ value: "+12.4%", positive: true }}
           hint="vs last month"
@@ -95,13 +96,13 @@ export default async function DashboardPage() {
         />
         <StatCard
           label="Avg. order"
-          value={formatMoney(stats.avgOrder || 0, currency)}
+          value={formatRialAsToman(stats.avgOrder)}
           icon={<TrendingUp size={18} />}
           hint="per paid bill"
         />
         <StatCard
           label="Tips collected"
-          value={formatMoney(stats.tips, currency)}
+          value={formatRialAsToman(stats.tips)}
           icon={<Coins size={18} />}
           hint="staff tips"
         />
@@ -155,7 +156,7 @@ export default async function DashboardPage() {
                       <StatusPill status={o.status} />
                     </td>
                     <td className="py-2.5 text-right font-semibold tabular-nums">
-                      {formatMoney(o.total, currency)}
+                      {formatRialAsToman(o.total)}
                     </td>
                     <td className="py-2.5 text-right text-xs text-muted">
                       {timeAgo(o.createdAt)}

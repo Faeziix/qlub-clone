@@ -12,28 +12,28 @@ import {
 import { Card, StatusPill, EmptyRow } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { formatMoney, timeAgo, parseJSON, cn } from "@/lib/utils";
+import { timeAgo, parseJSON, cn } from "@/lib/utils";
 import { updateOrderStatus, cancelOrder } from "@/app/admin/orders/actions";
 
 // --- Types -------------------------------------------------------------------
 
-type OrderModifier = { name?: string; priceDelta?: number };
+type OrderModifier = { name?: string; priceDelta?: string };
 
 export interface BoardItem {
   id: string;
   name: string;
-  unitPrice: number;
+  unitPrice: string;
   quantity: number;
   modifiers: string | null;
   notes: string | null;
-  lineTotal: number;
+  lineTotal: string;
 }
 
 export interface BoardPayment {
   id: string;
-  amount: number;
-  tipAmount: number;
-  total: number;
+  amount: string;
+  tipAmount: string;
+  total: string;
   method: string;
   status: string;
   payerName: string | null;
@@ -50,13 +50,13 @@ export interface BoardOrder {
   guestPhone: string | null;
   notes: string | null;
   currency: string;
-  subtotal: number;
-  serviceCharge: number;
-  tax: number;
-  discount: number;
-  tipAmount: number;
-  total: number;
-  amountPaid: number;
+  subtotal: string;
+  serviceCharge: string;
+  tax: string;
+  discount: string;
+  tipAmount: string;
+  total: string;
+  amountPaid: string;
   createdAt: string;
   tableLabel: string | null;
   tableCode: string | null;
@@ -213,7 +213,7 @@ function OrderRow({
 
       <div className="flex items-center justify-between gap-3 sm:justify-end">
         <span className="text-base font-extrabold tabular-nums">
-          {formatMoney(order.total, order.currency)}
+          {order.currency} {order.total}
         </span>
         <div onClick={(e) => e.stopPropagation()}>
           <OrderActions order={order} />
@@ -297,7 +297,7 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                       {mods
                         .map((m) =>
                           m.priceDelta
-                            ? `${m.name} (+${m.priceDelta.toFixed(2)})`
+                            ? `${m.name} (+${m.priceDelta})`
                             : m.name
                         )
                         .filter(Boolean)
@@ -309,7 +309,7 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                   )}
                 </div>
                 <span className="shrink-0 text-sm font-semibold tabular-nums">
-                  {formatMoney(it.lineTotal, order.currency)}
+                  {order.currency} {it.lineTotal}
                 </span>
               </div>
             );
@@ -319,18 +319,18 @@ function OrderDetail({ order }: { order: BoardOrder }) {
 
       {/* Totals */}
       <div className="rounded-2xl border border-line p-4">
-        {totalRow("Subtotal", formatMoney(order.subtotal, order.currency))}
-        {order.discount > 0 &&
-          totalRow("Discount", `- ${formatMoney(order.discount, order.currency)}`)}
-        {order.serviceCharge > 0 &&
-          totalRow("Service charge", formatMoney(order.serviceCharge, order.currency))}
-        {order.tax > 0 && totalRow("Tax", formatMoney(order.tax, order.currency))}
-        {order.tipAmount > 0 &&
-          totalRow("Tip", formatMoney(order.tipAmount, order.currency))}
-        {totalRow("Total", formatMoney(order.total, order.currency), true)}
-        {order.amountPaid > 0 &&
-          order.amountPaid < order.total &&
-          totalRow("Paid", formatMoney(order.amountPaid, order.currency))}
+        {totalRow("Subtotal", `${order.currency} ${order.subtotal}`)}
+        {BigInt(order.discount) > 0n &&
+          totalRow("Discount", `- ${order.currency} ${order.discount}`)}
+        {BigInt(order.serviceCharge) > 0n &&
+          totalRow("Service charge", `${order.currency} ${order.serviceCharge}`)}
+        {BigInt(order.tax) > 0n && totalRow("Tax", `${order.currency} ${order.tax}`)}
+        {BigInt(order.tipAmount) > 0n &&
+          totalRow("Tip", `${order.currency} ${order.tipAmount}`)}
+        {totalRow("Total", `${order.currency} ${order.total}`, true)}
+        {BigInt(order.amountPaid) > 0n &&
+          BigInt(order.amountPaid) < BigInt(order.total) &&
+          totalRow("Paid", `${order.currency} ${order.amountPaid}`)}
       </div>
 
       {/* Payments */}
@@ -358,11 +358,11 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold tabular-nums">
-                    {formatMoney(p.total, order.currency)}
+                    {order.currency} {p.total}
                   </p>
-                  {p.tipAmount > 0 && (
+                  {BigInt(p.tipAmount) > 0n && (
                     <p className="text-xs text-muted">
-                      incl. {formatMoney(p.tipAmount, order.currency)} tip
+                      incl. {order.currency} {p.tipAmount} tip
                     </p>
                   )}
                 </div>

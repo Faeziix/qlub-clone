@@ -6,7 +6,8 @@ import { Search, Globe, ChevronLeft, ShoppingBag } from "lucide-react";
 import type { VendorWithMenus, ItemWithModifiers } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
 import { makeT, dirFor } from "@/lib/i18n";
-import { cn, formatAmount, parseJSON } from "@/lib/utils";
+import { cn, parseJSON } from "@/lib/utils";
+import { formatRialAsToman } from "@/lib/money";
 import { DietBadge } from "@/components/ui/Badge";
 import { ItemSheet } from "./ItemSheet";
 import { CartSheet } from "./CartSheet";
@@ -62,7 +63,7 @@ export function MenuExperience({
   }, [theme, dir]);
 
   const count = hydrated ? cart.count() : 0;
-  const subtotal = hydrated ? cart.subtotal() : 0;
+  const subtotal = hydrated ? cart.subtotal() : 0n;
 
   const menu = menus[activeMenu];
   const categories = menu?.categories ?? [];
@@ -304,7 +305,7 @@ export function MenuExperience({
                 {t("viewOrder")}
               </span>
               <span className="flex items-center gap-2 font-bold">
-                {vendor.currency} {formatAmount(subtotal)}
+                {vendor.currency} {formatRialAsToman(subtotal)}
                 <ShoppingBag size={18} />
               </span>
             </button>
@@ -372,7 +373,7 @@ function ItemRow({
           </p>
         )}
         <p className="mt-2 font-bold text-brand">
-          {currency} {formatAmount(item.price)}
+          {currency} {formatRialAsToman(item.price)}
         </p>
       </div>
       {item.imageUrl && (

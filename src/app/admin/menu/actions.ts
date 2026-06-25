@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/admin/actions";
-import { round2 } from "@/lib/utils";
+
 
 /** Ensure the current session is allowed to mutate the given vendor's data. */
 async function assertVendorAccess(vendorId: string) {
@@ -37,7 +37,7 @@ export async function updateItemPrice(itemId: string, price: number) {
   if (!item) throw new Error("Item not found.");
   await assertVendorAccess(item.vendorId);
 
-  const safePrice = Number.isFinite(price) ? Math.max(0, round2(price)) : 0;
+  const safePrice = Number.isFinite(price) && price > 0 ? BigInt(Math.round(price)) : 0n;
   await db.menuItem.update({
     where: { id: itemId },
     data: { price: safePrice },
@@ -63,9 +63,7 @@ export async function updateItem(
 
   const name = data.name.trim();
   if (!name) throw new Error("Name is required.");
-  const safePrice = Number.isFinite(data.price)
-    ? Math.max(0, round2(data.price))
-    : 0;
+  const safePrice = Number.isFinite(data.price) && data.price > 0 ? BigInt(Math.round(data.price)) : 0n;
 
   await db.menuItem.update({
     where: { id: itemId },
@@ -97,9 +95,7 @@ export async function createItem(
 
   const name = data.name.trim();
   if (!name) throw new Error("Name is required.");
-  const safePrice = Number.isFinite(data.price)
-    ? Math.max(0, round2(data.price))
-    : 0;
+  const safePrice = Number.isFinite(data.price) && data.price > 0 ? BigInt(Math.round(data.price)) : 0n;
 
   // place new item at the end of the category.
   const last = await db.menuItem.findFirst({

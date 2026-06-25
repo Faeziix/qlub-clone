@@ -1,5 +1,4 @@
 import type { CartLine, BillBreakdown } from "./types";
-import { round2 } from "./utils";
 
 export interface PricingConfig {
   serviceChargePct: number;
@@ -7,56 +6,56 @@ export interface PricingConfig {
   taxInclusive: boolean;
 }
 
-export function lineTotal(line: CartLine): number {
-  const modifiers = line.modifiers.reduce((s, m) => s + m.priceDelta, 0);
-  return round2((line.unitPrice + modifiers) * line.quantity);
+export function lineTotal(line: CartLine): bigint {
+  const modifierSum = line.modifiers.reduce((s, m) => s + m.priceDelta, 0n);
+  return (line.unitPrice + modifierSum) * BigInt(line.quantity);
 }
 
-export function cartSubtotal(lines: CartLine[]): number {
-  return round2(lines.reduce((s, l) => s + lineTotal(l), 0));
+export function cartSubtotal(lines: CartLine[]): bigint {
+  return lines.reduce((s, l) => s + lineTotal(l), 0n);
 }
 
-/**
- * Computes the full bill. When tax is inclusive (UAE VAT typically shown as
- * included), tax is reported for transparency but not added on top.
- */
+function applyPct(amount: bigint, pct: number): bigint {
+  return (amount * BigInt(Math.round(pct * 100))) / 10_000n;
+}
+
 export function computeBill(
   lines: CartLine[],
   config: PricingConfig,
-  opts: { tip?: number; discount?: number } = {}
+  opts: { tip?: bigint; discount?: bigint } = {}
 ): BillBreakdown {
   const subtotal = cartSubtotal(lines);
-  const discount = round2(opts.discount ?? 0);
-  const taxable = Math.max(0, subtotal - discount);
-  const serviceCharge = round2((taxable * config.serviceChargePct) / 100);
+  const discount = opts.discount ?? 0n;
+  const taxable = subtotal > discount ? subtotal - discount : 0n;
+  const serviceCharge = applyPct(taxable, config.serviceChargePct);
+  const tip = opts.tip ?? 0n;
 
-  let tax: number;
-  let total: number;
-  const tip = round2(opts.tip ?? 0);
+  let tax: bigint;
+  let total: bigint;
 
   if (config.taxInclusive) {
-    // tax already inside subtotal — surface the embedded portion
     const base = taxable + serviceCharge;
-    tax = round2(base - base / (1 + config.taxPct / 100));
-    total = round2(base + tip);
+    const divisor = BigInt(Math.round((1 + config.taxPct / 100) * 10_000));
+    tax = base - (base * 10_000n) / divisor;
+    total = base + tip;
   } else {
-    tax = round2(((taxable + serviceCharge) * config.taxPct) / 100);
-    total = round2(taxable + serviceCharge + tax + tip);
+    tax = applyPct(taxable + serviceCharge, config.taxPct);
+    total = taxable + serviceCharge + tax + tip;
   }
 
   return { subtotal, serviceCharge, tax, discount, tip, total };
 }
 
-/** Even split — returns per-person amount with remainder absorbed by first payer. */
-export function evenSplit(total: number, parts: number): number[] {
-  if (parts <= 1) return [round2(total)];
-  const base = Math.floor((total / parts) * 100) / 100;
-  const amounts = Array(parts).fill(base);
-  const remainder = round2(total - base * parts);
-  amounts[0] = round2(amounts[0] + remainder);
+export function evenSplit(total: bigint, parts: number): bigint[] {
+  if (parts <= 1) return [total];
+  const partsBig = BigInt(parts);
+  const base = total / partsBig;
+  const amounts = Array<bigint>(parts).fill(base);
+  const remainder = total - base * partsBig;
+  amounts[0] = amounts[0] + remainder;
   return amounts;
 }
 
-export function tipFromPct(base: number, pct: number): number {
-  return round2((base * pct) / 100);
+export function tipFromPct(base: bigint, pct: number): bigint {
+  return applyPct(base, pct);
 }

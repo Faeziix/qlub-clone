@@ -22,7 +22,7 @@ interface CartState {
   removeLine: (lineId: string) => void;
   clear: () => void;
   count: () => number;
-  subtotal: () => number;
+  subtotal: () => bigint;
 }
 
 export const useCart = create<CartState>()(
@@ -76,7 +76,7 @@ export const useCart = create<CartState>()(
       clear: () => set({ lines: [] }),
 
       count: () => get().lines.reduce((s, l) => s + l.quantity, 0),
-      subtotal: () => get().lines.reduce((s, l) => s + lineTotal(l), 0),
+      subtotal: () => get().lines.reduce((s, l) => s + lineTotal(l), 0n),
     }),
     {
       name: "qlub-cart",

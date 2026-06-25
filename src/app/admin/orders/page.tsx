@@ -7,7 +7,7 @@ import {
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/admin/actions";
 import { PageHeader, StatCard } from "@/components/admin/ui";
-import { formatMoney, round2 } from "@/lib/utils";
+import { formatRialAsToman } from "@/lib/money";
 import { OrdersBoard } from "@/components/admin/orders/OrdersBoard";
 
 export const dynamic = "force-dynamic";
@@ -37,9 +37,7 @@ export default async function OrdersPage() {
   const todaysCount = todays.length;
 
   const paidToday = todays.filter((o) => o.status === "paid");
-  const todaysRevenue = round2(
-    paidToday.reduce((sum, o) => sum + o.total, 0)
-  );
+  const todaysRevenue = paidToday.reduce((sum, o) => sum + o.total, 0n);
 
   // Avg prep time: served/paid orders -> minutes between created & updated.
   const completed = orders.filter(
@@ -68,30 +66,30 @@ export default async function OrdersPage() {
     guestPhone: o.guestPhone,
     notes: o.notes,
     currency: o.currency,
-    subtotal: o.subtotal,
-    serviceCharge: o.serviceCharge,
-    tax: o.tax,
-    discount: o.discount,
-    tipAmount: o.tipAmount,
-    total: o.total,
-    amountPaid: o.amountPaid,
+    subtotal: String(o.subtotal),
+    serviceCharge: String(o.serviceCharge),
+    tax: String(o.tax),
+    discount: String(o.discount),
+    tipAmount: String(o.tipAmount),
+    total: String(o.total),
+    amountPaid: String(o.amountPaid),
     createdAt: o.createdAt.toISOString(),
     tableLabel: o.table?.label ?? null,
     tableCode: o.table?.code ?? null,
     items: o.items.map((it) => ({
       id: it.id,
       name: it.name,
-      unitPrice: it.unitPrice,
+      unitPrice: String(it.unitPrice),
       quantity: it.quantity,
       modifiers: it.modifiers,
       notes: it.notes,
-      lineTotal: it.lineTotal,
+      lineTotal: String(it.lineTotal),
     })),
     payments: o.payments.map((p) => ({
       id: p.id,
-      amount: p.amount,
-      tipAmount: p.tipAmount,
-      total: p.total,
+      amount: String(p.amount),
+      tipAmount: String(p.tipAmount),
+      total: String(p.total),
       method: p.method,
       status: p.status,
       payerName: p.payerName,
@@ -121,7 +119,7 @@ export default async function OrdersPage() {
         />
         <StatCard
           label="Today's revenue"
-          value={formatMoney(todaysRevenue)}
+          value={formatRialAsToman(todaysRevenue)}
           icon={<Banknote size={18} />}
           hint={`${paidToday.length} paid`}
         />

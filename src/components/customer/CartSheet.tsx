@@ -6,8 +6,8 @@ import { Trash2, ShoppingBag } from "lucide-react";
 import type { VendorWithMenus } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
-import { formatAmount } from "@/lib/utils";
 import { computeBill, lineTotal } from "@/lib/pricing";
+import { formatRialAsToman } from "@/lib/money";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -117,7 +117,7 @@ export function CartSheet({
                       min={0}
                     />
                     <span className="font-bold">
-                      {vendor.currency} {formatAmount(lineTotal(l))}
+                      {vendor.currency} {formatRialAsToman(lineTotal(l))}
                     </span>
                   </div>
                 </div>
@@ -145,7 +145,7 @@ export function CartSheet({
               <div className="flex items-center justify-between text-base font-extrabold">
                 <span>{t("total")}</span>
                 <span>
-                  {vendor.currency} {formatAmount(bill.total)}
+                  {vendor.currency} {formatRialAsToman(bill.total)}
                 </span>
               </div>
             </div>
@@ -161,7 +161,7 @@ export function CartSheet({
               loading={placing}
               onClick={placeOrder}
             >
-              {t("placeOrder")} · {vendor.currency} {formatAmount(bill.total)}
+              {t("placeOrder")} · {vendor.currency} {formatRialAsToman(bill.total)}
             </Button>
           </div>
         </div>
@@ -176,14 +176,14 @@ function Row({
   c,
 }: {
   label: string;
-  value: number;
+  value: bigint;
   c: string;
 }) {
   return (
     <div className="flex items-center justify-between text-muted">
       <span>{label}</span>
       <span className="font-semibold text-ink">
-        {c} {formatAmount(value)}
+        {c} {formatRialAsToman(value)}
       </span>
     </div>
   );

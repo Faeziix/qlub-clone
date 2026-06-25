@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Currency formatting. AED uses 2 decimals; qlub shows e.g. "62.00". */
+/** Currency formatting — use formatRialAsToman from money.ts for IRR amounts. */
 export function formatMoney(
   amount: number,
   currency = "AED",
@@ -23,7 +23,7 @@ export function formatMoney(
   }
 }
 
-/** Compact money without symbol, e.g. "62.00" matching qlub item cards. */
+/** Compact money without symbol. For IRR use formatRialAsToman from money.ts. */
 export function formatAmount(amount: number): string {
   return amount.toFixed(2);
 }
@@ -41,10 +41,6 @@ export function classNames(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
 }
 
-/** Round to 2dp avoiding float drift. */
-export function round2(n: number): number {
-  return Math.round((n + Number.EPSILON) * 100) / 100;
-}
 
 export function pluralize(n: number, singular: string, plural?: string) {
   return n === 1 ? singular : plural ?? `${singular}s`;

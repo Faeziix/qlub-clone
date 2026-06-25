@@ -16,7 +16,7 @@ export interface SelectedModifier {
   groupName: string;
   optionId: string;
   optionName: string;
-  priceDelta: number;
+  priceDelta: bigint;
 }
 
 export interface CartLine {
@@ -25,19 +25,19 @@ export interface CartLine {
   itemId: string;
   name: string;
   imageUrl?: string | null;
-  unitPrice: number; // base price
+  unitPrice: bigint;
   quantity: number;
   modifiers: SelectedModifier[];
   notes?: string;
 }
 
 export interface BillBreakdown {
-  subtotal: number;
-  serviceCharge: number;
-  tax: number;
-  discount: number;
-  tip: number;
-  total: number;
+  subtotal: bigint;
+  serviceCharge: bigint;
+  tax: bigint;
+  discount: bigint;
+  tip: bigint;
+  total: bigint;
 }
 
 export type OrderStatus =

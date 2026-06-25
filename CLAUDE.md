@@ -46,6 +46,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ `pnpm` in README/scripts despite `bun.lockb` → ✅ bun everywhere, no exceptions.
 - ❌ No `.nvmrc` or `engines` field → ✅ Both required for Node version pinning.
 - ❌ Incomplete `.env.example` missing `DIRECT_URL` → ✅ Document every required env var with comments.
+- ❌ `Float` money columns with `round2` and epsilon comparisons → ✅ `BigInt` integer rial only; conversions only via `money.ts`; exact `isFullyPaid` comparison.
+- ❌ `bigint` cannot be JSON-serialized → ✅ Serialize to `String(bigintValue)` at the server/client boundary; convert back with `BigInt(str)` at point of use. Never pass raw `bigint` props to client components.
+- ❌ Explicit type parameters on `React.useMemo<bigint>()` block React Compiler → ✅ Let TypeScript infer from the return type; remove explicit type parameter.
 
 ## Dependencies & Tooling
 
@@ -57,12 +60,14 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `zustand@^5.0.14` — Cart state
 - `jose@^5.10.0` — JWT signing/verification
 - `zod@^3.25.76` — Input validation on all server actions/routes
+- `fast-check@^4.8.0` + `@fast-check/vitest@^0.4.1` — Property-based testing for money round-trip invariants
 
 ## Component Registry
 
 - `src/lib/env.ts` — `requireAuthSecret`, `assertServerEnv`, `isDemoSeedingEnabled`
 - `src/lib/auth.ts` — JWT session management
-- `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip)
+- `src/lib/money.ts` — ALL money conversions: `MONETARY_UNIT`, `rialToToman`, `tomanToRial`, `rialToGatewayUnit`, `gatewayUnitToRial`, `formatRialAsToman`, `parseRialFromInput`, `isFullyPaid`
+- `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip) — all `bigint` arithmetic
 - `src/lib/orders.ts` — Order/payment/review service layer
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
 
@@ -73,10 +78,11 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 ## Current State
 
-**Done (M1 issues):**
+**Done (M1 + M2 issues):**
 - #2 — Repo safety hardening (secrets, backdoors, hardened seed)
 - #3 — Tables actions IDOR fix (auth + vendor scoping)
 - #4 — Tooling standardisation (bun, Node pin, CI, env example)
+- #7 — Integer-rial money model (money.ts deep module + property tests)
 
 **In progress / next:**
-- M1 remaining issues per milestone branch `feat/m1-foundation-safety`
+- M2 remaining issues on branch `feat/m2-data-money-core`

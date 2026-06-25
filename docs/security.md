@@ -30,6 +30,20 @@ This is a real-money product. Treat every secret and credential accordingly.
   `SEED_DEMO` in production.
 - Table QR passcodes are cryptographically random (`crypto.randomInt`).
 
+## Tenant isolation — table mutations
+
+All table mutations (`createTable`, `updateTableStatus`, `deleteTable`) require a
+valid admin session and verify that the target table belongs to the caller's
+vendor. Superadmins (`vendorId null`) may touch any vendor. A scoped admin
+attempting to mutate another vendor's table receives `Forbidden: table belongs to
+another vendor.` and no database read or write occurs for the target.
+
+This closes the IDOR identified in PRD §3.2 / user story 31. See
+`docs/adr/0002-tables-actions-idor-fix.md` for the full decision record.
+
+`tests/tables-actions-idor.test.ts` enforces this invariant: unauthenticated
+calls, cross-vendor writes, and authorised own-vendor writes are all tested.
+
 ## Regression guard
 
 `tests/repo-safety.test.ts` fails if a committed `.env`, the `mint-token`

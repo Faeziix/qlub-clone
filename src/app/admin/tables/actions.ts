@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { requireSession } from "@/app/admin/actions";
 
 const STATUSES = ["available", "occupied", "bill-requested"] as const;
 type TableStatus = (typeof STATUSES)[number];
@@ -10,10 +11,48 @@ function randomPasscode(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
+/**
+ * Guards a table mutation by vendorId. Superadmins (vendorId null) may touch
+ * any vendor; scoped admins may only touch their own.
+ *
+ * Separated from the DB lookup so it can be used for both createTable (where
+ * the vendorId is a parameter) and update/delete (where it is resolved from
+ * the table record).
+ */
+function assertVendorOwnership(
+  sessionVendorId: string | null,
+  targetVendorId: string
+) {
+  if (sessionVendorId && sessionVendorId !== targetVendorId) {
+    throw new Error("Forbidden: table belongs to another vendor.");
+  }
+}
+
+/**
+ * Validates session, then fetches the table and verifies the caller owns its
+ * vendor. Returns the table record.
+ *
+ * Session is checked before any DB read so unauthenticated callers are
+ * redirected immediately without leaking table-existence information.
+ */
+async function requireOwnedTable(tableId: string) {
+  const session = await requireSession();
+  const table = await db.diningTable.findUnique({
+    where: { id: tableId },
+    select: { id: true, vendorId: true },
+  });
+  if (!table) throw new Error("Table not found.");
+  assertVendorOwnership(session.vendorId, table.vendorId);
+  return table;
+}
+
 export async function createTable(
   vendorId: string,
   input: { code: string; label: string; seats: number; area: string }
 ) {
+  const session = await requireSession();
+  assertVendorOwnership(session.vendorId, vendorId);
+
   const code = input.code.trim();
   const label = input.label.trim();
   if (!vendorId) throw new Error("Missing vendor.");
@@ -42,6 +81,7 @@ export async function updateTableStatus(tableId: string, status: string) {
   if (!STATUSES.includes(status as TableStatus)) {
     throw new Error("Invalid status.");
   }
+  await requireOwnedTable(tableId);
   await db.diningTable.update({
     where: { id: tableId },
     data: { status },
@@ -50,6 +90,7 @@ export async function updateTableStatus(tableId: string, status: string) {
 }
 
 export async function deleteTable(tableId: string) {
+  await requireOwnedTable(tableId);
   await db.diningTable.delete({ where: { id: tableId } });
   revalidatePath("/admin/tables");
 }

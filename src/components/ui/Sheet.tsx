@@ -61,7 +61,7 @@ function Sheet({
             aria-describedby={description ? undefined : "sheet-no-desc"}
           >
             <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
-              <div className="absolute start-1/2 -translate-x-1/2 top-2 h-1.5 w-10 rounded-full bg-line" />
+              <div className="absolute inset-x-0 mx-auto top-2 h-1.5 w-10 rounded-full bg-line" />
               {title ? (
                 <Dialog.Title className="text-lg font-bold pt-2">
                   {title}

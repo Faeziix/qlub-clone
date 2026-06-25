@@ -168,6 +168,21 @@ All layout uses CSS logical properties — no physical directional CSS.
 
 Portal elements (Sheet, dialogs) receive an explicit `dir` prop because they render outside the `[dir]` attribute chain.
 
+### RTL translate for off-canvas elements
+
+Tailwind provides no logical-property equivalent for `translate-x`. For off-canvas drawers anchored to `start-0`, use the `rtl:` variant to flip the translate direction:
+
+```tsx
+// closed: slides off the inline-start edge in both LTR and RTL
+open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full"
+```
+
+LTR: closed = `translateX(-100%)` → slides off left (inline-start = left). RTL: closed = `translateX(+100%)` → slides off right (inline-start = right).
+
+### Drag-handle pill centering
+
+Center the drag-handle pill with `inset-x-0 mx-auto` (logical, works in both directions). Do NOT use `start-1/2 -translate-x-1/2` — `start-1/2` resolves to `inset-inline-start: 50%` which in RTL becomes `right: 50%`, combined with the physical `-translate-x-1/2` the pill is off-center in RTL.
+
 ## Spacing Scale
 
 CSS variables `--space-1` through `--space-12` defined in `:root`. Prefer Tailwind's spacing utilities which reference these indirectly.

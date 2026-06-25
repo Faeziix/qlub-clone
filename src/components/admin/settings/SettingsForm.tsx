@@ -441,13 +441,13 @@ export function SettingsForm({
       {/* Sticky save bar */}
       <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-2xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur">
         {error && (
-          <span className="mr-auto flex items-center gap-1.5 text-sm font-medium text-danger">
+          <span className="me-auto flex items-center gap-1.5 text-sm font-medium text-danger">
             <AlertCircle className="h-4 w-4" />
             {error}
           </span>
         )}
         {saved && !error && (
-          <span className="mr-auto flex items-center gap-1.5 text-sm font-medium text-success">
+          <span className="me-auto flex items-center gap-1.5 text-sm font-medium text-success">
             <Check className="h-4 w-4" />
             Settings saved
           </span>

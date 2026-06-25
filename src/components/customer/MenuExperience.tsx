@@ -14,17 +14,14 @@ import { LanguageSheet } from "./LanguageSheet";
 
 export function MenuExperience({
   vendor,
-  initialTheme,
   initialLang,
   tableCode,
 }: {
   vendor: VendorWithMenus;
-  initialTheme: string;
   initialLang: string;
   tableCode: string | null;
 }) {
   const [lang, setLang] = React.useState(initialLang);
-  const [theme] = React.useState(initialTheme);
   const t = makeT(lang);
   const dir = dirFor(lang);
 
@@ -46,18 +43,6 @@ export function MenuExperience({
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  React.useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove(
-      "theme-darkgold",
-      "theme-classic",
-      "theme-emerald",
-      "theme-rose",
-      "theme-midnight"
-    );
-    root.classList.add(`theme-${theme}`);
-  }, [theme]);
 
   const count = hydrated ? cart.count() : 0;
   const subtotal = hydrated ? cart.subtotal() : 0;
@@ -106,7 +91,7 @@ export function MenuExperience({
             </div>
             <div className="relative -mt-12 rounded-t-3xl bg-surface px-5 pb-6 pt-14 text-center shadow-float">
               {vendor.logoUrl && (
-                <div className="absolute left-1/2 -top-12 h-24 w-24 -translate-x-1/2 overflow-hidden rounded-2xl border-4 border-surface bg-surface shadow-card">
+                <div className="absolute inset-x-0 -top-12 mx-auto h-24 w-24 overflow-hidden rounded-2xl border-4 border-surface bg-surface shadow-card">
                   <Image
                     src={vendor.logoUrl}
                     alt=""

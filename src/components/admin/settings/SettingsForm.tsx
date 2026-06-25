@@ -297,7 +297,7 @@ export function SettingsForm({
                     {t.label}
                   </span>
                   {active && (
-                    <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-brand-fg">
+                    <span className="absolute end-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-brand-fg">
                       <Check className="h-3 w-3" />
                     </span>
                   )}

@@ -91,7 +91,7 @@ export function MenuManager({ menus, vendorId }: MenuManagerProps) {
                   <button
                     onClick={() => setActiveMenuId(m.id)}
                     className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors",
+                      "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-start text-sm font-semibold transition-colors",
                       isActive
                         ? "bg-brand text-brand-fg"
                         : "text-ink hover:bg-surface-2"
@@ -297,7 +297,7 @@ function ItemRow({
       </div>
 
       {/* Price (inline editable) */}
-      <div className="w-28 shrink-0 text-right">
+      <div className="w-28 shrink-0 text-end">
         {editingPrice ? (
           <div className="flex items-center justify-end gap-1">
             <input
@@ -315,7 +315,7 @@ function ItemRow({
                 }
               }}
               onBlur={commitPrice}
-              className="w-20 rounded-lg border border-line bg-surface px-2 py-1 text-right text-sm font-semibold tabular-nums outline-none focus:border-brand"
+              className="w-20 rounded-lg border border-line bg-surface px-2 py-1 text-end text-sm font-semibold tabular-nums outline-none focus:border-brand"
             />
           </div>
         ) : (

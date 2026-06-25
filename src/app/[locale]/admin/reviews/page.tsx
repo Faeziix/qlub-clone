@@ -86,7 +86,7 @@ export default async function ReviewsPage() {
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <span className="w-10 shrink-0 text-right text-xs font-semibold tabular-nums text-muted">
+                <span className="w-10 shrink-0 text-end text-xs font-semibold tabular-nums text-muted">
                   {count}
                 </span>
               </div>

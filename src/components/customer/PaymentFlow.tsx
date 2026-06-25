@@ -49,7 +49,6 @@ type Step = "pay" | "success" | "review" | "done";
 
 export function PaymentFlow({
   lang,
-  theme,
   vendorSlug,
   vendorName,
   country,
@@ -59,7 +58,6 @@ export function PaymentFlow({
   order,
 }: {
   lang: string;
-  theme: string;
   vendorSlug: string;
   vendorName: string;
   country: string;
@@ -71,10 +69,6 @@ export function PaymentFlow({
   const t = makeT(lang);
   const dir = dirFor(lang);
   const router = useRouter();
-
-  React.useEffect(() => {
-    document.documentElement.classList.add(`theme-${theme}`);
-  }, [theme]);
 
   const remainingRial = BigInt(order.total) - BigInt(order.amountPaid);
 
@@ -344,7 +338,7 @@ export function PaymentFlow({
                       )
                     }
                     className={cn(
-                      "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm",
+                      "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-start text-sm",
                       checked ? "border-brand bg-brand-soft" : "border-line"
                     )}
                   >
@@ -433,7 +427,7 @@ export function PaymentFlow({
                 key={m.id}
                 onClick={() => setMethod(m.id)}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left",
+                  "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-start",
                   method === m.id ? "border-brand bg-brand-soft" : "border-line"
                 )}
               >
@@ -462,7 +456,7 @@ export function PaymentFlow({
           )}
           <div className="mb-2 flex items-center justify-between text-sm">
             <span className="text-muted">You pay</span>
-            <span className="text-right">
+            <span className="text-end">
               <span className="text-lg font-extrabold">
                 {currency} {formatAmount(payTotalRial)}
               </span>

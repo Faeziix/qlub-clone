@@ -42,7 +42,7 @@ export default async function AdminLayout({
           vendor?.name ?? (session.role === "superadmin" ? "All restaurants" : "—")
         }
       />
-      <main className="lg:pl-72">
+      <main className="lg:ps-72">
         <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8 lg:py-8">
           {children}
         </div>

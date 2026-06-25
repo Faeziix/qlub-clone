@@ -168,7 +168,7 @@ function OrderRow({
     <button
       type="button"
       onClick={() => onOpen(order)}
-      className="group flex w-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-left shadow-card transition-colors hover:border-brand/40 hover:bg-surface-2/40 sm:flex-row sm:items-center"
+      className="group flex w-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-start shadow-card transition-colors hover:border-brand/40 hover:bg-surface-2/40 sm:flex-row sm:items-center"
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <span
@@ -356,7 +356,7 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                     {p.reference ? ` • ${p.reference}` : ""}
                   </p>
                 </div>
-                <div className="shrink-0 text-right">
+                <div className="shrink-0 text-end">
                   <p className="text-sm font-semibold tabular-nums">
                     {formatMoney(p.total)}
                   </p>

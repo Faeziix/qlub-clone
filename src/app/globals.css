@@ -5,7 +5,7 @@
 :root {
   /* ---- Font ---- */
   --font-sans: system-ui, sans-serif;
-  --font-display: system-ui, sans-serif;
+  --font-display: var(--font-sans);
 
   /* ---- Surface tokens ---- */
   --bg: 0 0% 97%;

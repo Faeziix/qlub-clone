@@ -144,12 +144,12 @@ export default async function DashboardPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase text-muted">
+                <tr className="text-start text-xs uppercase text-muted">
                   <th className="pb-2 font-semibold">Order</th>
                   <th className="pb-2 font-semibold">Guest</th>
                   <th className="pb-2 font-semibold">Status</th>
-                  <th className="pb-2 text-right font-semibold">Total</th>
-                  <th className="pb-2 text-right font-semibold">Time</th>
+                  <th className="pb-2 text-end font-semibold">Total</th>
+                  <th className="pb-2 text-end font-semibold">Time</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,10 +160,10 @@ export default async function DashboardPage() {
                     <td className="py-2.5">
                       <StatusPill status={o.status} />
                     </td>
-                    <td className="py-2.5 text-right font-semibold tabular-nums">
+                    <td className="py-2.5 text-end font-semibold tabular-nums">
                       {formatMoney(o.total)}
                     </td>
-                    <td className="py-2.5 text-right text-xs text-muted">
+                    <td className="py-2.5 text-end text-xs text-muted">
                       {timeAgo(o.createdAt)}
                     </td>
                   </tr>

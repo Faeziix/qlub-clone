@@ -14,7 +14,7 @@ Self-hosted via `next/font/local` from `public/fonts/`. Variable font (wght 100�
 
 **Font variables:**
 - `--font-sans` — Vazirmatn variable, resolved by `next/font/local`, applied on `<html className={vazirmatn.variable}`
-- `--font-display` — points to `var(--font-sans)` as its first entry in Tailwind
+- `--font-display` — set to `var(--font-sans)` in `globals.css :root`, so both font families resolve to Vazirmatn
 
 **Persian type scale (set in `globals.css` on `[dir="rtl"], :lang(fa)`):**
 - `line-height: 1.85` — Persian script needs more line height than Latin
@@ -85,7 +85,7 @@ Applied via `TenantThemeProvider` component with `theme={{ preset: "darkgold" }}
 </TenantThemeProvider>
 ```
 
-The server sets the theme and direction before rendering — no client-side DOM mutation needed.
+The server sets the theme before rendering by wrapping the page in `TenantThemeProvider` at the server-component level. The `preset` class is rendered into the HTML string on first paint — no client-side DOM mutation needed.
 
 ## Primitives
 

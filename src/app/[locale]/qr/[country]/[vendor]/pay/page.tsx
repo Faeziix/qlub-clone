@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { getOrder, getVendorBySlug } from "@/lib/queries";
 import { PaymentFlow } from "@/components/customer/PaymentFlow";
+import { TenantThemeProvider } from "@/components/ui/TenantThemeProvider";
+import { THEME_PRESETS, type ThemePreset } from "@/lib/design-tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -31,27 +33,32 @@ export default async function PayPage({
       : [],
   }));
 
+  const preset = THEME_PRESETS.includes(vendor.theme as ThemePreset)
+    ? (vendor.theme as ThemePreset)
+    : undefined;
+
   return (
-    <PaymentFlow
-      lang={locale}
-      theme={vendor.theme}
-      vendorSlug={vendor.slug}
-      vendorName={vendor.name}
-      country={country}
-      currency={order.currency}
-      tippingEnabled={vendor.tippingEnabled}
-      tipPresets={vendor.tipPresets}
-      order={{
-        id: order.id,
-        orderNumber: order.orderNumber,
-        subtotal: order.subtotal,
-        serviceCharge: order.serviceCharge,
-        tax: order.tax,
-        total: order.total,
-        amountPaid: order.amountPaid,
-        tableLabel: order.table?.label ?? null,
-        items,
-      }}
-    />
+    <TenantThemeProvider theme={{ preset }}>
+      <PaymentFlow
+        lang={locale}
+        vendorSlug={vendor.slug}
+        vendorName={vendor.name}
+        country={country}
+        currency={order.currency}
+        tippingEnabled={vendor.tippingEnabled}
+        tipPresets={vendor.tipPresets}
+        order={{
+          id: order.id,
+          orderNumber: order.orderNumber,
+          subtotal: order.subtotal,
+          serviceCharge: order.serviceCharge,
+          tax: order.tax,
+          total: order.total,
+          amountPaid: order.amountPaid,
+          tableLabel: order.table?.label ?? null,
+          items,
+        }}
+      />
+    </TenantThemeProvider>
   );
 }

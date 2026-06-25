@@ -30,7 +30,7 @@ The woff2 files are copied from `node_modules/@fontsource-variable/vazirmatn/fil
 - `vazirmatn-arabic-wght-normal.woff2` — covers Persian/Arabic script (U+0600–U+06FF)
 - `vazirmatn-latin-wght-normal.woff2` — covers ASCII/Latin fallback
 
-`next/font/local` is configured with `variable: "--font-sans"` and `display: "swap"`, and applied as `className={vazirmatn.variable}` on `<html>`. The Tailwind `font-sans` and `font-display` both resolve to `var(--font-sans)` as their first entry, ensuring the variable font is used throughout.
+`next/font/local` is configured with `variable: "--font-sans"` and `display: "swap"`, and applied as `className={vazirmatn.variable}` on `<html>`. In `globals.css :root`, `--font-display` is set to `var(--font-sans)`, ensuring both `font-sans` and `font-display` Tailwind utilities resolve to Vazirmatn.
 
 ### 2. CVA (class-variance-authority) + Radix UI for primitives
 
@@ -93,7 +93,7 @@ Per-restaurant theming works at two levels:
 
 The preset list and the `buildTenantInlineVars` function live in `src/lib/design-tokens.ts` (a non-JSX module) so they are testable in the node vitest environment without JSX parsing.
 
-The direction (`dir`) and theme preset are server-set (the server renders the `<html dir>` and the tenant wrapper `data-tenant-theme` attribute), eliminating imperative `document.documentElement` mutations and ensuring correct first-paint behavior.
+The direction (`dir`) is server-set on `<html dir>` via `next-intl`. The theme preset is server-set by wrapping the vendor page (`qr/.../page.tsx`) and pay page (`qr/.../pay/page.tsx`) in `<TenantThemeProvider>` at the server-component level, rendering the `data-tenant-theme` attribute and preset class in the initial HTML. The client components `MenuExperience` and `PaymentFlow` no longer carry an `initialTheme` prop or `useEffect` DOM mutations.
 
 ### 6. Persian type scale
 
@@ -117,6 +117,6 @@ In `globals.css`:
 - All interactive primitives (Sheet) have focus trap, Esc, return-focus, and correct aria attributes.
 - Layout is RTL-correct by default without direction-specific overrides.
 - Payment CTAs use `--cta` (red/positive) not `--danger` (error/warning), matching Iranian UX conventions.
-- Per-restaurant theming is server-driven and does not require client-side DOM mutation.
+- Per-restaurant theming is server-driven: `TenantThemeProvider` is rendered on the server at the page level, setting `data-tenant-theme` and the preset class in the initial HTML without client-side DOM mutation.
 - `@fontsource-variable/vazirmatn` must be kept as a devDependency and the woff2 files re-copied on update.
 - `@radix-ui/react-dialog` and `class-variance-authority` are production dependencies.

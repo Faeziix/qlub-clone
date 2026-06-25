@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { getVendorBySlug } from "@/lib/queries";
 import { MenuExperience } from "@/components/customer/MenuExperience";
+import { TenantThemeProvider } from "@/components/ui/TenantThemeProvider";
 import { routing, type SupportedLocale } from "@/i18n/routing";
+import { THEME_PRESETS, type ThemePreset } from "@/lib/design-tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +25,18 @@ export default async function VendorMenuPage({
     ? (locale as SupportedLocale)
     : routing.defaultLocale;
 
+  const rawTheme = sp.theme ?? vendor.theme;
+  const preset = THEME_PRESETS.includes(rawTheme as ThemePreset)
+    ? (rawTheme as ThemePreset)
+    : undefined;
+
   return (
-    <MenuExperience
-      vendor={vendor}
-      initialTheme={sp.theme ?? vendor.theme}
-      initialLang={resolvedLocale}
-      tableCode={sp.table ?? null}
-    />
+    <TenantThemeProvider theme={{ preset }}>
+      <MenuExperience
+        vendor={vendor}
+        initialLang={resolvedLocale}
+        tableCode={sp.table ?? null}
+      />
+    </TenantThemeProvider>
   );
 }

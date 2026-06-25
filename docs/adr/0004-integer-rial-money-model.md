@@ -86,7 +86,7 @@ division and modulo — no floating-point rounding artifacts.
 ### 6. Property-based tests guard every conversion boundary
 
 `@fast-check/vitest` is added as a dev dependency. The test file
-`src/lib/__tests__/money.test.ts` (28 tests including 7 property-based) verifies:
+`src/lib/__tests__/money.test.ts` (32 tests including 8 property-based) verifies:
 
 - `rial → gateway → rial` round-trips with zero drift (property test).
 - `tomanToRial(rialToToman(rial))` loses at most 9 rial (truncation only, never
@@ -98,7 +98,30 @@ division and modulo — no floating-point rounding artifacts.
 - `isFullyPaid` is consistent with `paid >= total` (property test).
 - `parseRialFromInput(formatRialAsToman(rial))` round-trips for multiples of 10
   (property test).
-- Deterministic unit tests for concrete conversion examples.
+- `parseRialFromInput(tomanTyped)` always returns `tomanTyped * 10n` — regression
+  guard against the x10 undercharge bug (property test).
+- Deterministic unit tests for concrete conversion examples, including explicit
+  regression cases for the x10 undercharge.
+
+### 8. UI input parsing must go through `money.ts`
+
+All user-facing money input fields must parse their values through
+`parseRialFromInput` (not raw `BigInt(string)`). The distinction is:
+
+- `parseRialFromInput("50000")` → `500_000n` rial (user typed 50,000 toman)
+- `BigInt("50000")` → `50_000n` rial — a **10x undercharge**
+
+`PaymentFlow.tsx` custom amount and custom tip fields are routed through
+`parseRialFromInput`. The `inputMode` is `"numeric"` and the placeholder is `"0"`
+to match the toman-integer context of the adjacent display.
+
+### 9. Chart data passed across the server/client boundary must be toman
+
+`RevenueChart.tsx` receives revenue as a `number` (from the RSC boundary). The
+server-side `buildRevenueSeries` in `admin/page.tsx` converts BigInt rial to toman
+via `rialToToman` before `Number(...)` conversion. The chart tooltip formatter uses
+`toLocaleString("en-US")` for comma-separated toman display — not `.toFixed(2)`,
+which has no meaning for integer toman values.
 
 ### 7. JSON serialization at the server/client boundary
 
@@ -134,5 +157,5 @@ arithmetic.
 
 ## Testing
 
-`src/lib/__tests__/money.test.ts` — 28 tests (7 property-based, 21 unit).
-All 55 tests in the test suite pass.
+`src/lib/__tests__/money.test.ts` — 32 tests (8 property-based, 24 unit).
+All 58 tests in the test suite pass.

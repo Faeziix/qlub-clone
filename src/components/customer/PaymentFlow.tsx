@@ -15,7 +15,7 @@ import type { PaymentMethod, SplitType } from "@/lib/types";
 import { makeT, dirFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { evenSplit, tipFromPct } from "@/lib/pricing";
-import { formatRialAsToman } from "@/lib/money";
+import { formatRialAsToman, parseRialFromInput } from "@/lib/money";
 import { Button } from "@/components/ui/Button";
 import { StarRating } from "@/components/ui/StarRating";
 
@@ -109,8 +109,7 @@ export function PaymentFlow({
       return sum + extra;
     }
     if (split === "custom") {
-      const parsed = customAmount ? BigInt(customAmount.replace(/,/g, "")) : 0n;
-      return parsed;
+      return customAmount ? parseRialFromInput(customAmount) : 0n;
     }
     return remaining;
   }, [split, parts, partIndex, selectedItems, customAmount, remaining, order]);
@@ -118,8 +117,7 @@ export function PaymentFlow({
   const tip = React.useMemo(() => {
     if (!tippingEnabled || tipPct == null) return 0n;
     if (tipPct === "custom") {
-      const parsed = customTip ? BigInt(customTip.replace(/,/g, "")) : 0n;
-      return parsed;
+      return customTip ? parseRialFromInput(customTip) : 0n;
     }
     return tipFromPct(baseAmount, tipPct);
   }, [tipPct, customTip, baseAmount, tippingEnabled]);
@@ -386,10 +384,10 @@ export function PaymentFlow({
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-3">
               <span className="font-bold text-muted">{currency}</span>
               <input
-                inputMode="decimal"
+                inputMode="numeric"
                 value={customAmount}
                 onChange={(e) => setCustomAmount(e.target.value)}
-                placeholder="0.00"
+                placeholder="0"
                 className="w-full bg-transparent text-lg font-bold outline-none"
               />
             </div>
@@ -428,10 +426,10 @@ export function PaymentFlow({
               <div className="mt-2 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-3">
                 <span className="font-bold text-muted">{currency}</span>
                 <input
-                  inputMode="decimal"
+                  inputMode="numeric"
                   value={customTip}
                   onChange={(e) => setCustomTip(e.target.value)}
-                  placeholder="0.00"
+                  placeholder="0"
                   className="w-full bg-transparent text-lg font-bold outline-none"
                 />
               </div>

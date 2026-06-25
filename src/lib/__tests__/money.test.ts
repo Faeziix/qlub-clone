@@ -99,6 +99,18 @@ describe("parseRialFromInput", () => {
   it("returns 0n for empty string", () => {
     expect(parseRialFromInput("")).toBe(0n);
   });
+
+  it("produces exactly 10x the numeric input (toman→rial, no x10 undercharge)", () => {
+    // Regression: if user types 50000 (toman), we must store 500000n rial, not 50000n.
+    // The pre-fix bug was BigInt("50000") = 50000n rial, a 10x undercharge.
+    expect(parseRialFromInput("50000")).toBe(500_000n);
+    expect(parseRialFromInput("1")).toBe(10n);
+  });
+
+  it("parseRialFromInput result is always 10x the integer the user typed", () => {
+    const userTyped = 12345n;
+    expect(parseRialFromInput(String(userTyped))).toBe(userTyped * 10n);
+  });
 });
 
 // ─────────────────────────── isFullyPaid ──────────────────────────────────────
@@ -183,6 +195,14 @@ describe("property-based: no drift across boundaries", () => {
       const displayed = formatRialAsToman(rial);
       const reparsed = parseRialFromInput(displayed);
       return reparsed === rial;
+    }
+  );
+
+  test.prop([fc.bigInt({ min: 0n, max: 1_000_000_000n })])(
+    "parseRialFromInput always produces exactly 10x the integer the user typed (no x10 undercharge)",
+    (tomanTyped) => {
+      const result = parseRialFromInput(String(tomanTyped));
+      return result === tomanTyped * 10n;
     }
   );
 });

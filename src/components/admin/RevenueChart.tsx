@@ -41,7 +41,7 @@ export function RevenueChart({
             width={48}
           />
           <Tooltip
-            formatter={(v: number) => [`${currency} ${v.toFixed(2)}`, "Revenue"]}
+            formatter={(v: number) => [`${currency} ${v.toLocaleString("en-US")}`, "Revenue"]}
             contentStyle={{
               borderRadius: 12,
               border: "1px solid hsl(var(--line))",

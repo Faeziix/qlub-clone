@@ -12,7 +12,7 @@ import { db } from "@/lib/db";
 import { PageHeader, StatCard, Card, StatusPill } from "@/components/admin/ui";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { timeAgo } from "@/lib/utils";
-import { formatRialAsToman } from "@/lib/money";
+import { formatRialAsToman, rialToToman } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +33,7 @@ function buildRevenueSeries(payments: DashboardPayment[]) {
     );
     series.push({
       day: label,
-      revenue: Number(dayPayments.reduce((s, p) => s + p.total, 0n)),
+      revenue: Number(rialToToman(dayPayments.reduce((s, p) => s + p.total, 0n))),
       orders: dayPayments.length,
     });
   }

@@ -24,8 +24,8 @@ const { mockDb } = vi.hoisted(() => {
     $transaction: vi.fn(),
     $queryRaw: vi.fn(),
     vendor: { findUnique: vi.fn() },
-    menuItem: { findUnique: vi.fn() },
-    modifierOption: { findUnique: vi.fn() },
+    menuItem: { findMany: vi.fn() },
+    modifierOption: { findMany: vi.fn() },
     order: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -110,42 +110,82 @@ function makeStubOrder(overrides: Record<string, unknown> = {}) {
   };
 }
 
+type TxMock = {
+  $queryRaw: ReturnType<typeof vi.fn>;
+  menuItem: { findMany: ReturnType<typeof vi.fn> };
+  modifierOption: { findMany: ReturnType<typeof vi.fn> };
+  order: {
+    create: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
+  payment: {
+    create: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+  };
+  diningTable: { update: ReturnType<typeof vi.fn> };
+};
+
+function setupTx(overrides: { queryRawResults?: unknown[] } = {}) {
+  const queryRawResults = overrides.queryRawResults ?? [[{ seq: 1 }]];
+  let queryRawCallIdx = 0;
+
+  const tx: TxMock = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    $queryRaw: vi.fn((..._args: any[]) => {
+      const result = queryRawResults[queryRawCallIdx] ?? [];
+      queryRawCallIdx++;
+      return Promise.resolve(result);
+    }),
+    menuItem: { findMany: mockDb.menuItem.findMany },
+    modifierOption: { findMany: mockDb.modifierOption.findMany },
+    order: { create: mockDb.order.create, findUnique: mockDb.order.findUnique, update: mockDb.order.update },
+    payment: { create: mockDb.payment.create, findUnique: mockDb.payment.findUnique },
+    diningTable: { update: mockDb.diningTable.update },
+  };
+
+  mockDb.$transaction.mockImplementation(
+    async (fn: (t: TxMock) => Promise<unknown>) => fn(tx)
+  );
+
+  return { tx };
+}
+
 // ── 1. Server-authoritative pricing ───────────────────────────────────────────
 
 describe("Server-authoritative pricing — createOrderFromCart", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb.$queryRaw.mockResolvedValue([{ seq: 1 }]);
     mockDb.diningTable.findFirst.mockResolvedValue(null);
-
-    mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
-      fn(mockDb)
-    );
   });
 
   it("re-fetches item price from DB and ignores client-supplied unitPrice", async () => {
     const dbPrice = 200_000n;
-    const clientPrice = 50_000n; // tampered
+    const clientPrice = 50_000n;
 
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
     mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
-    mockDb.menuItem.findUnique.mockResolvedValue(makeItem("item1", dbPrice));
-    mockDb.order.create.mockImplementation(async (args: { data: { subtotal: bigint; items: { create: { unitPrice: bigint }[] } } }) => ({
-      id: ORDER_ID,
-      vendorId: VENDOR_ID,
-      orderNumber: "Q-000001",
-      currency: "IRR",
-      subtotal: args.data.subtotal,
-      serviceCharge: 0n,
-      tax: 0n,
-      discount: 0n,
-      tipAmount: 0n,
-      total: args.data.subtotal,
-      amountPaid: 0n,
-      tableId: null,
-      items: args.data.items.create,
-      vendor: stubVendor,
-      table: null,
-    }));
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", dbPrice)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
+    mockDb.order.create.mockImplementation(
+      async (args: { data: { subtotal: bigint; items: { create: { unitPrice: bigint }[] } } }) => ({
+        id: ORDER_ID,
+        vendorId: VENDOR_ID,
+        orderNumber: "Q-000001",
+        currency: "IRR",
+        subtotal: args.data.subtotal,
+        serviceCharge: 0n,
+        tax: 0n,
+        discount: 0n,
+        tipAmount: 0n,
+        total: args.data.subtotal,
+        amountPaid: 0n,
+        tableId: null,
+        items: args.data.items.create,
+        vendor: stubVendor,
+        table: null,
+      })
+    );
 
     const { order } = await createOrderFromCart({
       vendorSlug: "test-cafe",
@@ -161,7 +201,11 @@ describe("Server-authoritative pricing — createOrderFromCart", () => {
       ],
     });
 
-    const createdItem = (mockDb.order.create.mock.calls[0] as [{ data: { items: { create: { unitPrice: bigint }[] } } }])[0].data.items.create[0];
+    const createdItem = (
+      mockDb.order.create.mock.calls[0] as [
+        { data: { items: { create: { unitPrice: bigint }[] } } },
+      ]
+    )[0].data.items.create[0];
     expect(createdItem.unitPrice).toBe(dbPrice);
     expect(createdItem.unitPrice).not.toBe(clientPrice);
     expect(order.priceChanged).toBe(true);
@@ -169,28 +213,31 @@ describe("Server-authoritative pricing — createOrderFromCart", () => {
 
   it("re-fetches modifier priceDelta from DB and ignores client-supplied delta", async () => {
     const dbDelta = 20_000n;
-    const clientDelta = 0n; // tampered to zero
+    const clientDelta = 0n;
 
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
     mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
-    mockDb.menuItem.findUnique.mockResolvedValue(makeItem("item1", 100_000n));
-    mockDb.modifierOption.findUnique.mockResolvedValue(makeModifierOption("opt1", dbDelta));
-    mockDb.order.create.mockImplementation(async (args: { data: { subtotal: bigint; items: { create: { modifiers: { priceDelta: string }[] }[] } } }) => ({
-      id: ORDER_ID,
-      vendorId: VENDOR_ID,
-      orderNumber: "Q-000001",
-      currency: "IRR",
-      subtotal: args.data.subtotal,
-      serviceCharge: 0n,
-      tax: 0n,
-      discount: 0n,
-      tipAmount: 0n,
-      total: args.data.subtotal,
-      amountPaid: 0n,
-      tableId: null,
-      items: args.data.items.create,
-      vendor: stubVendor,
-      table: null,
-    }));
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", 100_000n)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([makeModifierOption("opt1", dbDelta)]);
+    mockDb.order.create.mockImplementation(
+      async (args: { data: { subtotal: bigint; items: { create: { modifiers: { priceDelta: string }[] }[] } } }) => ({
+        id: ORDER_ID,
+        vendorId: VENDOR_ID,
+        orderNumber: "Q-000001",
+        currency: "IRR",
+        subtotal: args.data.subtotal,
+        serviceCharge: 0n,
+        tax: 0n,
+        discount: 0n,
+        tipAmount: 0n,
+        total: args.data.subtotal,
+        amountPaid: 0n,
+        tableId: null,
+        items: args.data.items.create,
+        vendor: stubVendor,
+        table: null,
+      })
+    );
 
     await createOrderFromCart({
       vendorSlug: "test-cafe",
@@ -214,7 +261,11 @@ describe("Server-authoritative pricing — createOrderFromCart", () => {
       ],
     });
 
-    const createdItem = (mockDb.order.create.mock.calls[0] as [{ data: { items: { create: { modifiers: { priceDelta: string }[] }[] } } }])[0].data.items.create[0];
+    const createdItem = (
+      mockDb.order.create.mock.calls[0] as [
+        { data: { items: { create: { modifiers: { priceDelta: string }[] }[] } } },
+      ]
+    )[0].data.items.create[0];
     const storedDelta = BigInt(createdItem.modifiers[0].priceDelta);
     expect(storedDelta).toBe(dbDelta);
     expect(storedDelta).not.toBe(clientDelta);
@@ -222,8 +273,10 @@ describe("Server-authoritative pricing — createOrderFromCart", () => {
 
   it("sets priceChanged=false when all client prices match DB prices", async () => {
     const price = 150_000n;
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
     mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
-    mockDb.menuItem.findUnique.mockResolvedValue(makeItem("item1", price));
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", price)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
     mockDb.order.create.mockResolvedValue({
       id: ORDER_ID,
       vendorId: VENDOR_ID,
@@ -263,13 +316,15 @@ describe("Server-authoritative pricing — createOrderFromCart", () => {
     const dbPrice = 100_000n;
     const clientPrice = 1n;
 
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
     mockDb.vendor.findUnique.mockResolvedValue({
       ...stubVendor,
       serviceChargePct: 0,
       taxPct: 0,
       taxInclusive: true,
     });
-    mockDb.menuItem.findUnique.mockResolvedValue(makeItem("item1", dbPrice));
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", dbPrice)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
 
     let capturedSubtotal = 0n;
     mockDb.order.create.mockImplementation(async (args: { data: { subtotal: bigint } }) => {
@@ -310,6 +365,29 @@ describe("Server-authoritative pricing — createOrderFromCart", () => {
     expect(capturedSubtotal).toBe(dbPrice);
     expect(capturedSubtotal).not.toBe(clientPrice);
   });
+
+  it("throws when item is not found in DB for the vendor — never trusts client price", async () => {
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
+    mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
+    mockDb.menuItem.findMany.mockResolvedValue([]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
+
+    await expect(
+      createOrderFromCart({
+        vendorSlug: "test-cafe",
+        lines: [
+          {
+            lineId: "l1",
+            itemId: "unknown-item",
+            name: "item",
+            unitPrice: 100_000n,
+            quantity: 1,
+            modifiers: [],
+          },
+        ],
+      })
+    ).rejects.toThrow(/not found for vendor/i);
+  });
 });
 
 // ── 2. Price-changed-at-checkout notice ───────────────────────────────────────
@@ -317,16 +395,14 @@ describe("Server-authoritative pricing — createOrderFromCart", () => {
 describe("Price-changed-at-checkout notice", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb.$queryRaw.mockResolvedValue([{ seq: 1 }]);
     mockDb.diningTable.findFirst.mockResolvedValue(null);
-    mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
-      fn(mockDb)
-    );
   });
 
   it("returns priceChanged=true when item price differs between client and DB", async () => {
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
     mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
-    mockDb.menuItem.findUnique.mockResolvedValue(makeItem("item1", 300_000n));
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", 300_000n)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
     mockDb.order.create.mockResolvedValue({
       id: ORDER_ID,
       vendorId: VENDOR_ID,
@@ -364,8 +440,10 @@ describe("Price-changed-at-checkout notice", () => {
   });
 
   it("returns priceChanged=false when all prices match", async () => {
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
     mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
-    mockDb.menuItem.findUnique.mockResolvedValue(makeItem("item1", 200_000n));
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", 200_000n)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
     mockDb.order.create.mockResolvedValue({
       id: ORDER_ID,
       vendorId: VENDOR_ID,
@@ -404,19 +482,17 @@ describe("Price-changed-at-checkout notice", () => {
 
 // ── 3. Transactional writes with FOR UPDATE ───────────────────────────────────
 
-describe("Order/payment writes are transactional", () => {
+describe("Order/payment writes are transactional with FOR UPDATE", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
-      fn(mockDb)
-    );
-    mockDb.$queryRaw.mockResolvedValue([{ seq: 1 }]);
     mockDb.diningTable.findFirst.mockResolvedValue(null);
   });
 
-  it("createOrderFromCart executes inside a $transaction", async () => {
+  it("createOrderFromCart executes price resolution and order creation inside a $transaction", async () => {
+    const { tx } = setupTx({ queryRawResults: [[{ seq: 1 }]] });
     mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
-    mockDb.menuItem.findUnique.mockResolvedValue(makeItem("item1", 100_000n));
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", 100_000n)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
     mockDb.order.create.mockResolvedValue({
       ...makeStubOrder(),
       vendor: stubVendor,
@@ -438,11 +514,29 @@ describe("Order/payment writes are transactional", () => {
     });
 
     expect(mockDb.$transaction).toHaveBeenCalled();
+    expect(tx.$queryRaw).toHaveBeenCalled();
   });
 
-  it("recordPayment executes inside a $transaction", async () => {
+  it("recordPayment uses FOR UPDATE — $queryRaw is called inside $transaction", async () => {
     const stubOrder = makeStubOrder();
-    mockDb.order.findUnique.mockResolvedValue(stubOrder);
+    const { tx } = setupTx({
+      queryRawResults: [
+        [],
+        [
+          {
+            id: stubOrder.id,
+            vendorId: stubOrder.vendorId,
+            currency: stubOrder.currency,
+            total: stubOrder.total,
+            amountPaid: stubOrder.amountPaid,
+            tipAmount: stubOrder.tipAmount,
+            tableId: null,
+            status: stubOrder.status,
+          },
+        ],
+      ],
+    });
+
     mockDb.payment.create.mockResolvedValue({
       id: "p1",
       orderId: ORDER_ID,
@@ -454,24 +548,42 @@ describe("Order/payment writes are transactional", () => {
       method: "ipg",
       status: "succeeded",
       reference: "pay_test",
-      idempotencyKey: null,
+      idempotencyKey: "idem-rec-1",
       createdAt: new Date(),
     });
     mockDb.order.update.mockResolvedValue({ ...stubOrder, status: "paid", amountPaid: 239_800n });
-    mockDb.diningTable.update.mockResolvedValue({});
 
     await recordPayment({
       orderId: ORDER_ID,
       amount: 239_800n,
       method: "ipg",
+      idempotencyKey: "idem-rec-1",
     });
 
     expect(mockDb.$transaction).toHaveBeenCalled();
+    const rawCalls = (tx.$queryRaw as ReturnType<typeof vi.fn>).mock.calls;
+    const rawSqls = rawCalls.map((c) => (c[0] as TemplateStringsArray).join("?"));
+    expect(rawSqls.some((s) => s.includes("FOR UPDATE"))).toBe(true);
   });
 
-  it("initiatePaymentLeg reserves the leg atomically with FOR UPDATE", async () => {
+  it("initiatePaymentLeg uses FOR UPDATE — $queryRaw is called inside $transaction", async () => {
     const stubOrder = makeStubOrder();
-    mockDb.order.findUnique.mockResolvedValue(stubOrder);
+    const { tx } = setupTx({
+      queryRawResults: [
+        [],
+        [
+          {
+            id: stubOrder.id,
+            vendorId: stubOrder.vendorId,
+            currency: stubOrder.currency,
+            total: stubOrder.total,
+            amountPaid: stubOrder.amountPaid,
+            tableId: null,
+          },
+        ],
+        [],
+      ],
+    });
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     mockDb.payment.create.mockResolvedValue({
@@ -500,6 +612,9 @@ describe("Order/payment writes are transactional", () => {
     });
 
     expect(mockDb.$transaction).toHaveBeenCalled();
+    const rawCalls = (tx.$queryRaw as ReturnType<typeof vi.fn>).mock.calls;
+    const rawSqls = rawCalls.map((c) => (c[0] as TemplateStringsArray).join("?"));
+    expect(rawSqls.some((s) => s.includes("FOR UPDATE"))).toBe(true);
     expect(leg.status).toBe("pending");
     expect(leg.expiresAt).toBeInstanceOf(Date);
     expect(leg.expiresAt!.getTime()).toBeGreaterThan(Date.now());
@@ -511,12 +626,9 @@ describe("Order/payment writes are transactional", () => {
 describe("Idempotency keys — persisted and deduplicated", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
-      fn(mockDb)
-    );
   });
 
-  it("returns the existing payment when the same idempotency key is resubmitted", async () => {
+  it("recordPayment returns the existing payment when the same idempotency key is resubmitted", async () => {
     const existingPayment = {
       id: "p-existing",
       orderId: ORDER_ID,
@@ -532,8 +644,15 @@ describe("Idempotency keys — persisted and deduplicated", () => {
       expiresAt: null,
       createdAt: new Date(),
     };
+    const stubOrder = makeStubOrder({ amountPaid: 239_800n });
 
+    setupTx({
+      queryRawResults: [
+        [{ id: "p-existing" }],
+      ],
+    });
     mockDb.payment.findUnique.mockResolvedValue(existingPayment);
+    mockDb.order.findUnique.mockResolvedValue(stubOrder);
 
     const result = await recordPayment({
       orderId: ORDER_ID,
@@ -547,9 +666,61 @@ describe("Idempotency keys — persisted and deduplicated", () => {
     expect(mockDb.payment.create).not.toHaveBeenCalled();
   });
 
+  it("initiatePaymentLeg returns the existing leg when the same idempotency key is resubmitted", async () => {
+    const existingLeg = {
+      id: "p-leg-existing",
+      orderId: ORDER_ID,
+      vendorId: VENDOR_ID,
+      amount: 120_000n,
+      tipAmount: 0n,
+      total: 120_000n,
+      currency: "IRR",
+      method: "ipg",
+      status: "pending",
+      reference: "pay_leg_existing",
+      idempotencyKey: "idem-leg-abc",
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      createdAt: new Date(),
+    };
+
+    setupTx({
+      queryRawResults: [
+        [{ id: "p-leg-existing" }],
+      ],
+    });
+    mockDb.payment.findUnique.mockResolvedValue(existingLeg);
+
+    const result = await initiatePaymentLeg({
+      orderId: ORDER_ID,
+      amount: 120_000n,
+      tipAmount: 0n,
+      method: "ipg",
+      idempotencyKey: "idem-leg-abc",
+    });
+
+    expect(result.id).toBe("p-leg-existing");
+    expect(mockDb.payment.create).not.toHaveBeenCalled();
+  });
+
   it("creates a new payment when idempotency key has not been seen before", async () => {
-    mockDb.payment.findUnique.mockResolvedValue(null);
-    mockDb.order.findUnique.mockResolvedValue(makeStubOrder());
+    const stubOrder = makeStubOrder();
+    setupTx({
+      queryRawResults: [
+        [],
+        [
+          {
+            id: stubOrder.id,
+            vendorId: stubOrder.vendorId,
+            currency: stubOrder.currency,
+            total: stubOrder.total,
+            amountPaid: stubOrder.amountPaid,
+            tipAmount: stubOrder.tipAmount,
+            tableId: null,
+            status: stubOrder.status,
+          },
+        ],
+      ],
+    });
 
     const newPayment = {
       id: "p-new",
@@ -582,25 +753,43 @@ describe("Idempotency keys — persisted and deduplicated", () => {
   });
 
   it("stores idempotencyKey on the created payment", async () => {
-    mockDb.payment.findUnique.mockResolvedValue(null);
-    mockDb.order.findUnique.mockResolvedValue(makeStubOrder());
+    const stubOrder = makeStubOrder();
+    setupTx({
+      queryRawResults: [
+        [],
+        [
+          {
+            id: stubOrder.id,
+            vendorId: stubOrder.vendorId,
+            currency: stubOrder.currency,
+            total: stubOrder.total,
+            amountPaid: stubOrder.amountPaid,
+            tipAmount: stubOrder.tipAmount,
+            tableId: null,
+            status: stubOrder.status,
+          },
+        ],
+      ],
+    });
     mockDb.order.update.mockResolvedValue({ ...makeStubOrder(), amountPaid: 239_800n });
 
-    mockDb.payment.create.mockImplementation(async (args: { data: { idempotencyKey?: string } }) => ({
-      id: "p-stored",
-      orderId: ORDER_ID,
-      vendorId: VENDOR_ID,
-      amount: 239_800n,
-      tipAmount: 0n,
-      total: 239_800n,
-      currency: "IRR",
-      method: "ipg",
-      status: "succeeded",
-      reference: "pay_stored",
-      idempotencyKey: args.data.idempotencyKey,
-      expiresAt: null,
-      createdAt: new Date(),
-    }));
+    mockDb.payment.create.mockImplementation(
+      async (args: { data: { idempotencyKey?: string } }) => ({
+        id: "p-stored",
+        orderId: ORDER_ID,
+        vendorId: VENDOR_ID,
+        amount: 239_800n,
+        tipAmount: 0n,
+        total: 239_800n,
+        currency: "IRR",
+        method: "ipg",
+        status: "succeeded",
+        reference: "pay_stored",
+        idempotencyKey: args.data.idempotencyKey,
+        expiresAt: null,
+        createdAt: new Date(),
+      })
+    );
 
     const key = "stored-key-xyz";
     const result = await recordPayment({
@@ -614,31 +803,229 @@ describe("Idempotency keys — persisted and deduplicated", () => {
   });
 });
 
-// ── 5. Honored-price invariant ─────────────────────────────────────────────────
+// ── 5. Honored-price invariant — payment legs reconcile to OrderItem snapshot ─
 
 describe("Honored-price invariant — payment legs reconcile to OrderItem snapshot", () => {
-  it("payment amount equals order total (subtotal + serviceCharge + tax, no tip)", () => {
-    const subtotal = 500_000n;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDb.diningTable.findFirst.mockResolvedValue(null);
+  });
+
+  it("payment amount from initiatePaymentLeg equals order.total produced by createOrderFromCart", async () => {
+    const dbPrice = 200_000n;
+    const serviceChargePct = 10;
+    const taxPct = 9;
+    const taxInclusive = false;
+
+    const expectedBill = computeBill(
+      [{ lineId: "l1", itemId: "item1", name: "کباب", unitPrice: dbPrice, quantity: 1, modifiers: [] }],
+      { serviceChargePct, taxPct, taxInclusive }
+    );
+
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
+    mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", dbPrice)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
+
+    let snapshotTotal = 0n;
+    mockDb.order.create.mockImplementation(async (args: { data: { total: bigint } }) => {
+      snapshotTotal = args.data.total;
+      return {
+        id: ORDER_ID,
+        vendorId: VENDOR_ID,
+        orderNumber: "Q-000001",
+        currency: "IRR",
+        subtotal: expectedBill.subtotal,
+        serviceCharge: expectedBill.serviceCharge,
+        tax: expectedBill.tax,
+        discount: 0n,
+        tipAmount: 0n,
+        total: args.data.total,
+        amountPaid: 0n,
+        tableId: null,
+        items: [
+          {
+            itemId: "item1",
+            unitPrice: dbPrice,
+            quantity: 1,
+            modifiers: [],
+            lineTotal: dbPrice,
+          },
+        ],
+        vendor: stubVendor,
+        table: null,
+      };
+    });
+
+    await createOrderFromCart({
+      vendorSlug: "test-cafe",
+      lines: [{ lineId: "l1", itemId: "item1", name: "کباب", unitPrice: 50_000n, quantity: 1, modifiers: [] }],
+    });
+
+    expect(snapshotTotal).toBe(expectedBill.total);
+
+    setupTx({
+      queryRawResults: [
+        [],
+        [
+          {
+            id: ORDER_ID,
+            vendorId: VENDOR_ID,
+            currency: "IRR",
+            total: snapshotTotal,
+            amountPaid: 0n,
+            tableId: null,
+          },
+        ],
+        [],
+      ],
+    });
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    mockDb.payment.create.mockResolvedValue({
+      id: "p-leg",
+      orderId: ORDER_ID,
+      vendorId: VENDOR_ID,
+      amount: snapshotTotal,
+      tipAmount: 0n,
+      total: snapshotTotal,
+      currency: "IRR",
+      method: "ipg",
+      status: "pending",
+      reference: "pay_leg",
+      idempotencyKey: "idem-full",
+      expiresAt,
+      createdAt: new Date(),
+    });
+
+    const leg = await initiatePaymentLeg({
+      orderId: ORDER_ID,
+      amount: snapshotTotal,
+      tipAmount: 0n,
+      method: "ipg",
+      idempotencyKey: "idem-full",
+      splitType: "full",
+    });
+
+    expect(leg.amount).toBe(snapshotTotal);
+    expect(leg.amount).toBe(expectedBill.total);
+  });
+
+  it("even-split legs from createOrderFromCart snapshot sum to order.total with no rounding leak", async () => {
+    const { evenSplit } = await import("@/lib/pricing");
+    const dbPrice = 200_000n;
     const serviceChargePct = 10;
     const taxPct = 9;
     const taxInclusive = false;
 
     const bill = computeBill(
-      [
-        {
-          lineId: "l1",
-          itemId: "i1",
-          name: "item",
-          unitPrice: subtotal,
-          quantity: 1,
-          modifiers: [],
-        },
-      ],
+      [{ lineId: "l1", itemId: "item1", name: "کباب", unitPrice: dbPrice, quantity: 1, modifiers: [] }],
       { serviceChargePct, taxPct, taxInclusive }
     );
 
-    const paymentAmount = bill.subtotal + bill.serviceCharge + bill.tax;
-    expect(paymentAmount).toBe(bill.total);
+    setupTx({ queryRawResults: [[{ seq: 1 }]] });
+    mockDb.vendor.findUnique.mockResolvedValue(stubVendor);
+    mockDb.menuItem.findMany.mockResolvedValue([makeItem("item1", dbPrice)]);
+    mockDb.modifierOption.findMany.mockResolvedValue([]);
+    mockDb.order.create.mockResolvedValue({
+      ...makeStubOrder({ total: bill.total }),
+      vendor: stubVendor,
+      table: null,
+    });
+
+    const { order } = await createOrderFromCart({
+      vendorSlug: "test-cafe",
+      lines: [{ lineId: "l1", itemId: "item1", name: "کباب", unitPrice: dbPrice, quantity: 1, modifiers: [] }],
+    });
+
+    const parts = 3;
+    const legs = evenSplit(order.total, parts);
+    const legsSum = legs.reduce((s, l) => s + l, 0n);
+    expect(legsSum).toBe(order.total);
+    expect(legs).toHaveLength(parts);
+  });
+
+  it("recordPayment legs: sum of payment.amount values equals order.total (multi-payment reconciliation)", async () => {
+    const orderTotal = 239_800n;
+    const leg1Amount = orderTotal / 2n + (orderTotal % 2n);
+    const leg2Amount = orderTotal / 2n;
+
+    expect(leg1Amount + leg2Amount).toBe(orderTotal);
+
+    const makeOrderRow = (amountPaid: bigint) => ({
+      id: ORDER_ID,
+      vendorId: VENDOR_ID,
+      currency: "IRR",
+      total: orderTotal,
+      amountPaid,
+      tipAmount: 0n,
+      tableId: null,
+      status: "placed",
+    });
+
+    setupTx({
+      queryRawResults: [
+        [],
+        [makeOrderRow(0n)],
+      ],
+    });
+
+    mockDb.payment.create.mockResolvedValueOnce({
+      id: "p-leg1",
+      orderId: ORDER_ID,
+      vendorId: VENDOR_ID,
+      amount: leg1Amount,
+      tipAmount: 0n,
+      total: leg1Amount,
+      currency: "IRR",
+      method: "ipg",
+      status: "succeeded",
+      reference: "pay_1",
+      idempotencyKey: "idem-leg1",
+      createdAt: new Date(),
+    });
+    mockDb.order.update.mockResolvedValueOnce({ ...makeStubOrder(), amountPaid: leg1Amount });
+
+    const result1 = await recordPayment({
+      orderId: ORDER_ID,
+      amount: leg1Amount,
+      method: "ipg",
+      idempotencyKey: "idem-leg1",
+    });
+
+    setupTx({
+      queryRawResults: [
+        [],
+        [makeOrderRow(leg1Amount)],
+      ],
+    });
+
+    mockDb.payment.create.mockResolvedValueOnce({
+      id: "p-leg2",
+      orderId: ORDER_ID,
+      vendorId: VENDOR_ID,
+      amount: leg2Amount,
+      tipAmount: 0n,
+      total: leg2Amount,
+      currency: "IRR",
+      method: "ipg",
+      status: "succeeded",
+      reference: "pay_2",
+      idempotencyKey: "idem-leg2",
+      createdAt: new Date(),
+    });
+    mockDb.order.update.mockResolvedValueOnce({ ...makeStubOrder(), amountPaid: orderTotal, status: "paid" });
+
+    const result2 = await recordPayment({
+      orderId: ORDER_ID,
+      amount: leg2Amount,
+      method: "ipg",
+      idempotencyKey: "idem-leg2",
+    });
+
+    const paymentsSum = result1.payment.amount + result2.payment.amount;
+    expect(paymentsSum).toBe(orderTotal);
+    expect(result2.fullyPaid).toBe(true);
   });
 
   it("tip is tracked separately and does not inflate order.total", () => {
@@ -646,16 +1033,7 @@ describe("Honored-price invariant — payment legs reconcile to OrderItem snapsh
     const tipAmount = 20_000n;
 
     const bill = computeBill(
-      [
-        {
-          lineId: "l1",
-          itemId: "i1",
-          name: "item",
-          unitPrice: subtotal,
-          quantity: 1,
-          modifiers: [],
-        },
-      ],
+      [{ lineId: "l1", itemId: "i1", name: "item", unitPrice: subtotal, quantity: 1, modifiers: [] }],
       { serviceChargePct: 0, taxPct: 0, taxInclusive: true },
       { tip: 0n }
     );
@@ -668,16 +1046,9 @@ describe("Honored-price invariant — payment legs reconcile to OrderItem snapsh
     expect(orderTotal).not.toBe(paymentTotal);
   });
 
-  it("multi-item order: sum of OrderItem lineTotals equals order subtotal", () => {
+  it("multi-item order: sum of OrderItem lineTotals equals snapshotted order subtotal", () => {
     const lines = [
-      {
-        lineId: "l1",
-        itemId: "i1",
-        name: "کباب",
-        unitPrice: 150_000n,
-        quantity: 2,
-        modifiers: [],
-      },
+      { lineId: "l1", itemId: "i1", name: "کباب", unitPrice: 150_000n, quantity: 2, modifiers: [] as { priceDelta: bigint; groupId: string; groupName: string; optionId: string; optionName: string }[] },
       {
         lineId: "l2",
         itemId: "i2",
@@ -685,71 +1056,15 @@ describe("Honored-price invariant — payment legs reconcile to OrderItem snapsh
         unitPrice: 30_000n,
         quantity: 3,
         modifiers: [
-          {
-            groupId: "g1",
-            groupName: "اندازه",
-            optionId: "o1",
-            optionName: "بزرگ",
-            priceDelta: 5_000n,
-          },
+          { groupId: "g1", groupName: "اندازه", optionId: "o1", optionName: "بزرگ", priceDelta: 5_000n },
         ],
       },
     ];
 
-    const bill = computeBill(lines, {
-      serviceChargePct: 0,
-      taxPct: 0,
-      taxInclusive: true,
-    });
+    const bill = computeBill(lines, { serviceChargePct: 0, taxPct: 0, taxInclusive: true });
 
-    const expectedSubtotal =
-      150_000n * 2n + (30_000n + 5_000n) * 3n;
+    const expectedSubtotal = 150_000n * 2n + (30_000n + 5_000n) * 3n;
     expect(bill.subtotal).toBe(expectedSubtotal);
-  });
-
-  it("payment leg amount plus tip equals payment.total", () => {
-    const paymentAmount = 239_800n;
-    const tipAmount = 24_000n;
-    const expectedTotal = paymentAmount + tipAmount;
-    expect(expectedTotal).toBe(263_800n);
-  });
-
-  it("even-split: sum of all legs equals order total (no rounding leak)", async () => {
-    const { evenSplit } = await import("@/lib/pricing");
-    const total = 239_800n;
-    const parts = 3;
-    const legs = evenSplit(total, parts);
-
-    const sum = legs.reduce((s, l) => s + l, 0n);
-    expect(sum).toBe(total);
-    expect(legs).toHaveLength(parts);
-  });
-
-  it("invariant: payment legs sum reconciles to OrderItem snapshot total", () => {
-    const orderItems = [
-      { unitPrice: 150_000n, quantity: 2, modifiers: [] as { priceDelta: bigint }[] },
-      {
-        unitPrice: 30_000n,
-        quantity: 1,
-        modifiers: [{ priceDelta: 5_000n }],
-      },
-    ];
-
-    const snapshotSubtotal = orderItems.reduce((s, item) => {
-      const modTotal = item.modifiers.reduce((ms, m) => ms + m.priceDelta, 0n);
-      return s + (item.unitPrice + modTotal) * BigInt(item.quantity);
-    }, 0n);
-
-    const serviceChargePct = 10;
-    const serviceCharge = (snapshotSubtotal * BigInt(Math.round(serviceChargePct * 100))) / 10_000n;
-    const tax = 0n;
-    const snapshotTotal = snapshotSubtotal + serviceCharge + tax;
-
-    const paymentLeg1 = snapshotTotal / 2n + (snapshotTotal % 2n);
-    const paymentLeg2 = snapshotTotal / 2n;
-    const legsSum = paymentLeg1 + paymentLeg2;
-
-    expect(legsSum).toBe(snapshotTotal);
   });
 });
 
@@ -758,14 +1073,26 @@ describe("Honored-price invariant — payment legs reconcile to OrderItem snapsh
 describe("Split leg reservation with TTL", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb.$transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<unknown>) =>
-      fn(mockDb)
-    );
   });
 
   it("initiatePaymentLeg creates a pending payment with expiresAt in the future", async () => {
     const stubOrder = makeStubOrder();
-    mockDb.order.findUnique.mockResolvedValue(stubOrder);
+    setupTx({
+      queryRawResults: [
+        [],
+        [
+          {
+            id: stubOrder.id,
+            vendorId: stubOrder.vendorId,
+            currency: stubOrder.currency,
+            total: stubOrder.total,
+            amountPaid: stubOrder.amountPaid,
+            tableId: null,
+          },
+        ],
+        [],
+      ],
+    });
 
     const futureExpiry = new Date(Date.now() + 15 * 60 * 1000);
     mockDb.payment.create.mockResolvedValue({
@@ -798,12 +1125,23 @@ describe("Split leg reservation with TTL", () => {
     expect(leg.expiresAt!.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("initiatePaymentLeg rejects if remaining balance is insufficient for the requested amount", async () => {
-    const stubOrder = makeStubOrder({
-      total: 239_800n,
-      amountPaid: 239_800n,
+  it("initiatePaymentLeg rejects when order remaining balance is zero", async () => {
+    setupTx({
+      queryRawResults: [
+        [],
+        [
+          {
+            id: ORDER_ID,
+            vendorId: VENDOR_ID,
+            currency: "IRR",
+            total: 239_800n,
+            amountPaid: 239_800n,
+            tableId: null,
+          },
+        ],
+        [],
+      ],
     });
-    mockDb.order.findUnique.mockResolvedValue(stubOrder);
 
     await expect(
       initiatePaymentLeg({
@@ -812,6 +1150,36 @@ describe("Split leg reservation with TTL", () => {
         tipAmount: 0n,
         method: "ipg",
         idempotencyKey: "idem-excess",
+        splitType: "custom",
+      })
+    ).rejects.toThrow(/already fully paid|exceeds remaining/i);
+  });
+
+  it("initiatePaymentLeg accounts for already-reserved pending legs", async () => {
+    setupTx({
+      queryRawResults: [
+        [],
+        [
+          {
+            id: ORDER_ID,
+            vendorId: VENDOR_ID,
+            currency: "IRR",
+            total: 239_800n,
+            amountPaid: 0n,
+            tableId: null,
+          },
+        ],
+        [{ amount: 239_800n }],
+      ],
+    });
+
+    await expect(
+      initiatePaymentLeg({
+        orderId: ORDER_ID,
+        amount: 1n,
+        tipAmount: 0n,
+        method: "ipg",
+        idempotencyKey: "idem-over",
         splitType: "custom",
       })
     ).rejects.toThrow(/already fully paid|exceeds remaining/i);

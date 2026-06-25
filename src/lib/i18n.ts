@@ -14,7 +14,7 @@ export const LOCALES = [
 export type Locale = (typeof LOCALES)[number]["code"];
 
 export function dirFor(locale: string): "ltr" | "rtl" {
-  return locale === "ar" ? "rtl" : "ltr";
+  return locale === "ar" || locale === "fa" ? "rtl" : "ltr";
 }
 
 type Dict = Record<string, string>;
@@ -70,6 +70,71 @@ const en: Dict = {
   receipt: "Receipt",
   popular: "Popular",
   new: "New",
+  priceUpdated: "Prices have been updated",
+  priceUpdatedHint:
+    "Some item prices changed since you opened the menu. The new total is shown above. Please confirm to continue.",
+  confirmAndPay: "Confirm and pay",
+  goBack: "Go back",
+  orderFailed: "Failed to place order",
+};
+
+const fa: Dict = {
+  selectMenu: "انتخاب منو",
+  search: "جستجو",
+  addToOrder: "افزودن به سفارش",
+  add: "افزودن",
+  yourOrder: "سفارش شما",
+  viewOrder: "مشاهده سفارش",
+  cart: "سبد خرید",
+  empty: "سبد خرید شما خالی است",
+  emptyHint: "منو را مرور کنید و آیتم‌ها را اضافه کنید.",
+  browseMenu: "مرور منو",
+  subtotal: "جمع جزء",
+  serviceCharge: "هزینه خدمات",
+  tax: "مالیات",
+  tip: "انعام",
+  total: "مجموع",
+  checkout: "پرداخت",
+  placeOrder: "ثبت سفارش",
+  payNow: "پرداخت",
+  payBill: "پرداخت صورتحساب",
+  splitBill: "تقسیم صورتحساب",
+  splitEven: "تقسیم مساوی",
+  splitItems: "پرداخت آیتم‌های خود",
+  splitCustom: "پرداخت مبلغ دلخواه",
+  payFull: "پرداخت کامل",
+  addTip: "افزودن انعام",
+  noTip: "بدون انعام",
+  custom: "دلخواه",
+  paymentMethod: "روش پرداخت",
+  rateExperience: "تجربه خود را ارزیابی کنید",
+  food: "غذا",
+  service: "خدمات",
+  ambience: "فضا",
+  submitReview: "ارسال نظر",
+  thankYou: "ممنون!",
+  orderPlaced: "سفارش ثبت شد",
+  paymentSuccess: "پرداخت موفق",
+  required: "اجباری",
+  optional: "اختیاری",
+  chooseUpTo: "حداکثر انتخاب کنید",
+  special: "توضیحات ویژه",
+  qty: "تعداد",
+  changeLanguage: "تغییر زبان",
+  enterPasscode: "کد QR را وارد کنید",
+  apply: "اعمال",
+  termsPrefix: "با استفاده از qlub شما قوانین ما را می‌پذیرید",
+  terms: "شرایط و ضوابط",
+  table: "میز",
+  receipt: "رسید",
+  popular: "محبوب",
+  new: "جدید",
+  priceUpdated: "قیمت‌ها تغییر کرده است",
+  priceUpdatedHint:
+    "برخی قیمت‌ها از زمانی که منو را باز کردید تغییر کرده است. مجموع جدید در بالا نشان داده شده. لطفاً برای ادامه تأیید کنید.",
+  confirmAndPay: "تأیید و پرداخت",
+  goBack: "بازگشت",
+  orderFailed: "ثبت سفارش ناموفق بود",
 };
 
 const ar: Dict = {
@@ -123,9 +188,15 @@ const ar: Dict = {
   receipt: "الإيصال",
   popular: "الأكثر طلباً",
   new: "جديد",
+  priceUpdated: "تم تحديث الأسعار",
+  priceUpdatedHint:
+    "تغيرت أسعار بعض الأصناف منذ آخر مرة فتحت فيها القائمة. المجموع الجديد معروض أعلاه. يرجى التأكيد للمتابعة.",
+  confirmAndPay: "تأكيد والدفع",
+  goBack: "رجوع",
+  orderFailed: "فشل تأكيد الطلب",
 };
 
-const dicts: Record<string, Dict> = { en, ar };
+const dicts: Record<string, Dict> = { en, fa, ar };
 
 export function getDict(locale: string): Dict {
   return dicts[locale] ?? en;

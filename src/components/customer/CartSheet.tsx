@@ -2,13 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, ShoppingBag } from "lucide-react";
+import { Trash2, ShoppingBag, AlertTriangle } from "lucide-react";
 import type { VendorWithMenus } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
 import { formatAmount } from "@/lib/utils";
 import { computeBill, lineTotal } from "@/lib/pricing";
 import { bigintToJson } from "@/lib/money";
+import axios from "axios";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -32,12 +33,21 @@ export function CartSheet({
   const { lines, setQty, removeLine } = useCart();
   const [placing, setPlacing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [pendingOrderId, setPendingOrderId] = React.useState<string | null>(null);
+  const [showPriceChangedNotice, setShowPriceChangedNotice] = React.useState(false);
 
   const bill = computeBill(lines, {
     serviceChargePct: vendor.serviceChargePct,
     taxPct: vendor.taxPct,
     taxInclusive: vendor.taxInclusive,
   });
+
+  function navigateToPayment(orderId: string) {
+    onClose();
+    router.push(
+      `/qr/${vendor.country}/${vendor.slug}/pay?order=${orderId}&lang=${lang}`
+    );
+  }
 
   async function placeOrder() {
     setPlacing(true);
@@ -51,27 +61,62 @@ export function CartSheet({
           priceDelta: bigintToJson(m.priceDelta),
         })),
       }));
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
+      const { data } = await axios.post<{ ok: boolean; order: { id: string }; priceChanged: boolean; error?: string }>(
+        "/api/orders",
+        {
           vendorSlug: vendor.slug,
           tableCode,
           type: tableCode ? "dinein" : "qsr",
           lines: serializedLines,
-        }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error ?? "Failed to place order");
-      onClose();
-      router.push(
-        `/qr/${vendor.country}/${vendor.slug}/pay?order=${data.order.id}&lang=${lang}`
+        }
       );
+      if (!data.ok) throw new Error(data.error ?? t("orderFailed"));
+      if (data.priceChanged) {
+        setPendingOrderId(data.order.id);
+        setShowPriceChangedNotice(true);
+      } else {
+        navigateToPayment(data.order.id);
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : t("orderFailed"));
     } finally {
       setPlacing(false);
     }
+  }
+
+  if (showPriceChangedNotice && pendingOrderId) {
+    return (
+      <Sheet open={open} onClose={onClose} title={t("priceUpdated")} height="tall">
+        <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-10 text-center">
+          <div className="grid h-16 w-16 place-items-center rounded-full bg-warning/15 text-warning">
+            <AlertTriangle size={32} />
+          </div>
+          <div>
+            <h2 className="text-lg font-extrabold">{t("priceUpdated")}</h2>
+            <p className="mt-2 text-sm text-muted">{t("priceUpdatedHint")}</p>
+          </div>
+          <div className="w-full space-y-3">
+            <Button
+              fullWidth
+              size="lg"
+              onClick={() => navigateToPayment(pendingOrderId)}
+            >
+              {t("confirmAndPay")}
+            </Button>
+            <Button
+              fullWidth
+              variant="ghost"
+              onClick={() => {
+                setShowPriceChangedNotice(false);
+                setPendingOrderId(null);
+              }}
+            >
+              {t("goBack")}
+            </Button>
+          </div>
+        </div>
+      </Sheet>
+    );
   }
 
   return (

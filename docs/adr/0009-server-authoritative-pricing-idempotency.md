@@ -21,23 +21,33 @@ The original implementation of `createOrderFromCart` accepted `unitPrice` and `p
 
 ### 2. Honored-price rule
 
-If any price has changed between the client's cart view and order creation, `createOrderFromCart` returns `priceChanged: true`. The `/api/orders` route surfaces this flag. The caller is responsible for showing a "price updated" notice to the diner before redirecting to payment.
+If any price has changed between the client's cart view and order creation, `createOrderFromCart` returns `priceChanged: true`. The `/api/orders` route surfaces this flag. `CartSheet.tsx` consumes `priceChanged` from the response and gates the redirect: when `true` it renders an interstitial screen with the updated total, an `AlertTriangle` icon, and two buttons — "Confirm and pay" (proceeds to `/pay`) and "Go back" (clears the gate). No redirect occurs until the diner explicitly confirms.
 
 The payment then verifies against the server-side snapshot, never the client.
 
-### 3. `$transaction` wrapping
+### 3. `$transaction` + `SELECT … FOR UPDATE`
 
-`createOrderFromCart`, `recordPayment`, and `initiatePaymentLeg` all execute inside `db.$transaction`. The `vendorOrderSeq` increment inside `nextVendorOrderNumber` is now passed the transaction client so the entire order creation — including the sequence increment, `Order.create`, and `DiningTable.update` — is atomic.
+`createOrderFromCart`, `recordPayment`, and `initiatePaymentLeg` all execute inside `db.$transaction`. Price resolution (`resolveLinePricesInsideTx`) runs inside the same transaction, eliminating the TOCTOU gap between resolving prices and creating the order.
 
-`recordPayment` wraps the order read, payment create, and order update in a single transaction, preventing concurrent writes from creating duplicate payments or incorrect `amountPaid` totals.
+`recordPayment` and `initiatePaymentLeg` use `tx.$queryRaw\`SELECT … FOR UPDATE\`` on the `Order` row before computing remaining balance. This acquires a PostgreSQL row-level exclusive lock, preventing concurrent split payers from reading the same `amountPaid` / reserved balance and both passing the remaining-balance check.
 
-### 4. Split leg reservation (`initiatePaymentLeg`)
+### 4. Split leg reservation (`initiatePaymentLeg`) wired into the payment route
 
-A new exported function `initiatePaymentLeg` creates a `Payment` with `status: "pending"` and an `expiresAt` TTL (15 minutes) before the diner is redirected to the gateway. The function accounts for already-reserved pending legs when computing the remaining balance, preventing cross-gateway double-settlement.
+`initiatePaymentLeg` is now called by `POST /api/payments` for every payment request (replacing the previous direct call to `recordPayment`). This ensures every gateway redirect is preceded by a reservation. The function:
+- Locks the `Order` row with `FOR UPDATE`
+- Reads active pending legs with `status = 'pending' AND expiresAt > NOW()`
+- Subtracts the reserved balance from the remaining calculation
+- Creates the pending payment with a 15-minute `expiresAt` TTL
 
-### 5. Idempotency
+### 5. Idempotency — race-safe dedup inside transaction
 
-`recordPayment` and `initiatePaymentLeg` accept an optional `idempotencyKey`. Before writing, they query `payment.findUnique({ where: { idempotencyKey } })`. If a matching payment exists, it is returned immediately without a second write, and `idempotent: true` is set in the result. The `Payment.idempotencyKey` column is `@unique` in the schema (already established in M2 schema migration).
+`recordPayment` and `initiatePaymentLeg` dedup inside the transaction using `$queryRaw SELECT id FROM "Payment" WHERE idempotencyKey = $1`. This avoids the check-then-create race of separate `findUnique + create` calls; any concurrent request with the same key will block on the transaction rather than creating a duplicate row.
+
+`POST /api/payments` auto-generates a server-side `idempotencyKey` (`pay_<nanoid(21)>`) when none is supplied by the client, ensuring idempotency is always wired on the live path.
+
+### 6. Tenant-isolation + no client-trust fallback
+
+`resolveLinePricesInsideTx` issues a single `menuItem.findMany({ where: { id: { in: itemIds }, vendorId } })` and `modifierOption.findMany({ where: { id: { in: optionIds }, group: { item: { vendorId } } } })`. If any item or modifier option is not found for the vendor it throws immediately — there is no fallback to the client-supplied price. This prevents both cross-tenant item attachment and deleted-item client-price trust.
 
 ## Consequences
 

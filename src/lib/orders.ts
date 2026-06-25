@@ -2,15 +2,14 @@ import "server-only";
 import { db } from "./db";
 import { computeBill, lineTotal } from "./pricing";
 import { nanoid } from "nanoid";
-import { Prisma } from "@prisma/client";
+import { Prisma, OrderStatus } from "@prisma/client";
 import type { CartLine, PaymentMethod, SplitType } from "./types";
 
 const LEG_RESERVATION_TTL_MS = 15 * 60 * 1000;
 
-async function nextVendorOrderNumber(
-  tx: Parameters<Parameters<typeof db.$transaction>[0]>[0],
-  vendorId: string
-): Promise<string> {
+type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+async function nextVendorOrderNumber(tx: TxClient, vendorId: string): Promise<string> {
   const updated = await tx.$queryRaw<{ seq: number }[]>`
     UPDATE "Vendor"
     SET "vendorOrderSeq" = "vendorOrderSeq" + 1
@@ -27,30 +26,61 @@ type ResolvedLine = CartLine & {
   resolvedUnitPrice: bigint;
 };
 
-async function resolveLinePricesFromDb(lines: CartLine[]): Promise<ResolvedLine[]> {
-  return Promise.all(
-    lines.map(async (line) => {
-      const dbItem = await db.menuItem.findUnique({ where: { id: line.itemId } });
-      const resolvedUnitPrice = dbItem?.price ?? line.unitPrice;
+async function resolveLinePricesInsideTx(
+  tx: TxClient,
+  vendorId: string,
+  lines: CartLine[]
+): Promise<ResolvedLine[]> {
+  const itemIds = [...new Set(lines.map((l) => l.itemId))];
+  const modifierOptionIds = [
+    ...new Set(lines.flatMap((l) => l.modifiers.map((m) => m.optionId))),
+  ];
 
-      const resolvedModifiers = await Promise.all(
-        line.modifiers.map(async (mod) => {
-          const dbOpt = await db.modifierOption.findUnique({ where: { id: mod.optionId } });
-          return { ...mod, priceDelta: dbOpt?.priceDelta ?? mod.priceDelta };
+  const [dbItems, dbOptions] = await Promise.all([
+    tx.menuItem.findMany({
+      where: { id: { in: itemIds }, vendorId },
+      select: { id: true, price: true },
+    }),
+    modifierOptionIds.length
+      ? tx.modifierOption.findMany({
+          where: { id: { in: modifierOptionIds }, group: { item: { vendorId } } },
+          select: { id: true, priceDelta: true },
         })
-      );
+      : Promise.resolve([] as { id: string; priceDelta: bigint }[]),
+  ]);
 
-      return { ...line, unitPrice: resolvedUnitPrice, modifiers: resolvedModifiers, resolvedUnitPrice };
-    })
-  );
+  const itemPriceById = new Map(dbItems.map((i) => [i.id, i.price]));
+  const optionDeltaById = new Map(dbOptions.map((o) => [o.id, o.priceDelta]));
+
+  return lines.map((line) => {
+    const dbPrice = itemPriceById.get(line.itemId);
+    if (dbPrice === undefined) {
+      throw new Error(
+        `MenuItem ${line.itemId} not found for vendor ${vendorId} — cannot trust client price`
+      );
+    }
+    const resolvedUnitPrice = dbPrice;
+
+    const resolvedModifiers = line.modifiers.map((mod) => {
+      const dbDelta = optionDeltaById.get(mod.optionId);
+      if (dbDelta === undefined) {
+        throw new Error(
+          `ModifierOption ${mod.optionId} not found for vendor ${vendorId} — cannot trust client delta`
+        );
+      }
+      return { ...mod, priceDelta: dbDelta };
+    });
+
+    return { ...line, unitPrice: resolvedUnitPrice, modifiers: resolvedModifiers, resolvedUnitPrice };
+  });
 }
 
 function detectPriceChange(original: CartLine[], resolved: ResolvedLine[]): boolean {
-  return resolved.some((resolved, idx) => {
-    const original_ = original[idx];
-    if (resolved.resolvedUnitPrice !== original_.unitPrice) return true;
-    return resolved.modifiers.some((rmod, midx) => {
-      const omod = original_.modifiers[midx];
+  return resolved.some((resolvedLine, idx) => {
+    const originalLine = original[idx];
+    if (resolvedLine.resolvedUnitPrice !== originalLine.unitPrice) return true;
+    return resolvedLine.modifiers.some((rmod, midx) => {
+      const omod = originalLine.modifiers[midx];
       return omod && rmod.priceDelta !== omod.priceDelta;
     });
   });
@@ -71,15 +101,6 @@ export async function createOrderFromCart(input: {
   if (!vendor) throw new Error("Vendor not found");
   if (!input.lines.length) throw new Error("Cart is empty");
 
-  const resolvedLines = await resolveLinePricesFromDb(input.lines);
-  const priceChanged = detectPriceChange(input.lines, resolvedLines);
-
-  const bill = computeBill(resolvedLines, {
-    serviceChargePct: vendor.serviceChargePct,
-    taxPct: vendor.taxPct,
-    taxInclusive: vendor.taxInclusive,
-  });
-
   const table = input.tableCode
     ? await db.diningTable.findFirst({
         where: { vendorId: vendor.id, code: input.tableCode },
@@ -87,6 +108,15 @@ export async function createOrderFromCart(input: {
     : null;
 
   const order = await db.$transaction(async (tx) => {
+    const resolvedLines = await resolveLinePricesInsideTx(tx, vendor.id, input.lines);
+    const priceChanged = detectPriceChange(input.lines, resolvedLines);
+
+    const bill = computeBill(resolvedLines, {
+      serviceChargePct: vendor.serviceChargePct,
+      taxPct: vendor.taxPct,
+      taxInclusive: vendor.taxInclusive,
+    });
+
     const orderNumber = await nextVendorOrderNumber(tx, vendor.id);
 
     const created = await tx.order.create({
@@ -129,10 +159,10 @@ export async function createOrderFromCart(input: {
       });
     }
 
-    return created;
+    return { ...created, priceChanged };
   });
 
-  return { order: { ...order, priceChanged }, priceChanged };
+  return { order, priceChanged: order.priceChanged };
 }
 
 export async function initiatePaymentLeg(input: {
@@ -146,23 +176,44 @@ export async function initiatePaymentLeg(input: {
   payerName?: string;
   payerEmail?: string;
 }) {
-  const existing = await db.payment.findUnique({
-    where: { idempotencyKey: input.idempotencyKey },
-  });
-  if (existing) return existing;
-
   return db.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: input.orderId },
-      include: { payments: true },
-    });
-    if (!order) throw new Error("Order not found");
+    const existingRows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Payment"
+      WHERE "idempotencyKey" = ${input.idempotencyKey}
+      LIMIT 1
+    `;
+    if (existingRows.length > 0) {
+      const existing = await tx.payment.findUnique({ where: { id: existingRows[0].id } });
+      if (existing) return existing;
+    }
 
-    const reservedBalance = order.payments
-      .filter((p) => p.status === "pending" && p.expiresAt && p.expiresAt > new Date())
-      .reduce((s, p) => s + p.amount, 0n);
+    const orderRows = await tx.$queryRaw<
+      {
+        id: string;
+        "vendorId": string;
+        "currency": string;
+        "total": bigint;
+        "amountPaid": bigint;
+        "tableId": string | null;
+      }[]
+    >`
+      SELECT id, "vendorId", currency, total, "amountPaid", "tableId"
+      FROM "Order"
+      WHERE id = ${input.orderId}
+      FOR UPDATE
+    `;
+    if (!orderRows.length) throw new Error("Order not found");
+    const orderRow = orderRows[0];
 
-    const remaining = order.total - order.amountPaid - reservedBalance;
+    const pendingPayments = await tx.$queryRaw<{ amount: bigint }[]>`
+      SELECT amount FROM "Payment"
+      WHERE "orderId" = ${input.orderId}
+        AND status = 'pending'
+        AND "expiresAt" > NOW()
+    `;
+
+    const reservedBalance = pendingPayments.reduce((s, p) => s + p.amount, 0n);
+    const remaining = orderRow.total - orderRow.amountPaid - reservedBalance;
 
     if (remaining <= 0n) {
       throw new Error("Order is already fully paid or reserved");
@@ -175,12 +226,12 @@ export async function initiatePaymentLeg(input: {
 
     return tx.payment.create({
       data: {
-        vendorId: order.vendorId,
-        orderId: order.id,
+        vendorId: orderRow.vendorId,
+        orderId: orderRow.id,
         amount: input.amount,
         tipAmount: input.tipAmount,
         total: input.amount + input.tipAmount,
-        currency: order.currency,
+        currency: orderRow.currency,
         method: input.method,
         status: "pending",
         splitType: input.splitType ?? "full",
@@ -208,39 +259,58 @@ export async function recordPayment(input: {
   payerEmail?: string;
   idempotencyKey?: string;
 }) {
-  if (input.idempotencyKey) {
-    const existing = await db.payment.findUnique({
-      where: { idempotencyKey: input.idempotencyKey },
-    });
-    if (existing) {
-      const order = await db.order.findUnique({ where: { id: input.orderId } });
-      return {
-        payment: existing,
-        fullyPaid: order ? order.amountPaid >= order.total : false,
-        amountPaid: order?.amountPaid ?? 0n,
-        idempotent: true,
-      };
-    }
-  }
-
   const result = await db.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: { id: input.orderId },
-      include: { payments: true },
-    });
-    if (!order) throw new Error("Order not found");
+    if (input.idempotencyKey) {
+      const existingRows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "Payment"
+        WHERE "idempotencyKey" = ${input.idempotencyKey}
+        LIMIT 1
+      `;
+      if (existingRows.length > 0) {
+        const existing = await tx.payment.findUnique({ where: { id: existingRows[0].id } });
+        if (existing) {
+          const order = await tx.order.findUnique({ where: { id: input.orderId } });
+          return {
+            payment: existing,
+            fullyPaid: order ? order.amountPaid >= order.total : false,
+            amountPaid: order?.amountPaid ?? 0n,
+            idempotent: true,
+          };
+        }
+      }
+    }
+
+    const orderRows = await tx.$queryRaw<
+      {
+        id: string;
+        vendorId: string;
+        currency: string;
+        total: bigint;
+        amountPaid: bigint;
+        tipAmount: bigint;
+        tableId: string | null;
+        status: OrderStatus;
+      }[]
+    >`
+      SELECT id, "vendorId", currency, total, "amountPaid", "tipAmount", "tableId", status
+      FROM "Order"
+      WHERE id = ${input.orderId}
+      FOR UPDATE
+    `;
+    if (!orderRows.length) throw new Error("Order not found");
+    const orderRow = orderRows[0];
 
     const tip = input.tipAmount ?? 0n;
     const total = input.amount + tip;
 
     const payment = await tx.payment.create({
       data: {
-        vendorId: order.vendorId,
-        orderId: order.id,
+        vendorId: orderRow.vendorId,
+        orderId: orderRow.id,
         amount: input.amount,
         tipAmount: tip,
         total,
-        currency: order.currency,
+        currency: orderRow.currency,
         method: input.method,
         status: "succeeded",
         splitType: input.splitType ?? "full",
@@ -254,29 +324,29 @@ export async function recordPayment(input: {
       },
     });
 
-    const amountPaid = order.amountPaid + input.amount;
-    const fullyPaid = amountPaid >= order.total;
+    const amountPaid = orderRow.amountPaid + input.amount;
+    const fullyPaid = amountPaid >= orderRow.total;
 
     await tx.order.update({
-      where: { id: order.id },
+      where: { id: orderRow.id },
       data: {
         amountPaid,
-        tipAmount: order.tipAmount + tip,
-        status: fullyPaid ? "paid" : order.status,
+        tipAmount: orderRow.tipAmount + tip,
+        status: fullyPaid ? "paid" : orderRow.status,
       },
     });
 
-    if (fullyPaid && order.tableId) {
+    if (fullyPaid && orderRow.tableId) {
       await tx.diningTable.update({
-        where: { id: order.tableId },
+        where: { id: orderRow.tableId },
         data: { status: "available" },
       });
     }
 
-    return { payment, fullyPaid, amountPaid };
+    return { payment, fullyPaid, amountPaid, idempotent: false };
   });
 
-  return { ...result, idempotent: false };
+  return result;
 }
 
 export async function createReview(input: {

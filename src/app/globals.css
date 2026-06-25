@@ -3,10 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-display: "Inter", system-ui, sans-serif;
+  /* ---- Font ---- */
+  --font-sans: system-ui, sans-serif;
+  --font-display: system-ui, sans-serif;
 
-  /* Base light surface (customer app default) */
+  /* ---- Surface tokens ---- */
   --bg: 0 0% 97%;
   --surface: 0 0% 100%;
   --surface-2: 220 14% 96%;
@@ -14,16 +15,56 @@
   --muted: 220 9% 46%;
   --line: 220 13% 91%;
 
-  --brand: 38 52% 38%; /* darkgold default */
+  /* ---- Brand tokens (per-restaurant; overridden via inline style on tenant wrapper) ---- */
+  --brand: 38 52% 38%;
   --brand-fg: 40 30% 98%;
   --brand-soft: 40 45% 92%;
 
+  /* ---- CTA token (brand-red — red is positive/CTA in Iran, distinct from danger) ---- */
+  --cta: 4 86% 52%;
+  --cta-fg: 0 0% 100%;
+  --cta-soft: 4 86% 95%;
+
+  /* ---- Semantic tokens ---- */
   --success: 142 60% 38%;
   --danger: 0 72% 51%;
   --warning: 35 92% 50%;
+
+  /* ---- Spacing scale ---- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* ---- Z-index scale ---- */
+  --z-base: 0;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+
+  /* ---- Motion tokens ---- */
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 350ms;
+  --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+
+  /* ---- Radius scale ---- */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+  --radius-full: 9999px;
 }
 
-/* ---- Customer themes (?theme=) ---- */
+/* ---- Customer themes (applied to <html> or a tenant wrapper) ---- */
 .theme-darkgold {
   --brand: 38 54% 36%;
   --brand-fg: 40 33% 97%;
@@ -56,6 +97,13 @@
   --brand-soft: 222 24% 18%;
 }
 
+/* ---- Global reset & base styles ---- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 * {
   border-color: hsl(var(--line));
 }
@@ -69,11 +117,41 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-[dir="rtl"] {
-  text-align: right;
+/* ---- Persian / RTL typography ---- */
+[dir="rtl"],
+:lang(fa) {
+  line-height: 1.85;
+  hyphens: none;
+  letter-spacing: 0;
 }
 
-/* Hide scrollbars on horizontal category strips */
+[dir="ltr"] {
+  line-height: 1.5;
+}
+
+/* RTL focus order flows inline-end → inline-start */
+[dir="rtl"] :focus-visible {
+  outline-offset: 2px;
+}
+
+/* Tabular numbers for prices and totals */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Price / money display enforces tabular layout */
+[data-money] {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ---- Focus-visible ring (accessible, not default outline) ---- */
+:focus-visible {
+  outline: 2px solid hsl(var(--brand));
+  outline-offset: 2px;
+}
+
+/* ---- Hide scrollbars on horizontal strips ---- */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -82,6 +160,7 @@ body {
   scrollbar-width: none;
 }
 
+/* ---- Skeleton shimmer ---- */
 .skeleton {
   position: relative;
   overflow: hidden;
@@ -101,6 +180,50 @@ body {
   animation: shimmer 1.5s infinite;
 }
 
+/* ---- iOS safe-area bottom padding ---- */
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---- Keyframe animations ---- */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
 }

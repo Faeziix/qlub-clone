@@ -99,7 +99,7 @@ export function MenuExperience({
               )}
               <button
                 onClick={() => setLangOpen(true)}
-                className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-sm font-semibold shadow-card backdrop-blur"
+                className="absolute start-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-sm font-semibold shadow-card backdrop-blur"
               >
                 <Globe size={16} /> {lang.toUpperCase()}
               </button>
@@ -138,7 +138,7 @@ export function MenuExperience({
                     setActiveCat(0);
                     setEntered(true);
                   }}
-                  className="group overflow-hidden rounded-2xl bg-surface text-left shadow-card transition-transform active:scale-95"
+                  className="group overflow-hidden rounded-2xl bg-surface text-start shadow-card transition-transform active:scale-95"
                 >
                   <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-2">
                     {m.imageUrl && (
@@ -355,7 +355,7 @@ function ItemRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full gap-3 rounded-2xl bg-surface p-3 text-left shadow-card transition-transform active:scale-[0.98]"
+      className="flex w-full gap-3 rounded-2xl bg-surface p-3 text-start shadow-card transition-transform active:scale-[0.98]"
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">

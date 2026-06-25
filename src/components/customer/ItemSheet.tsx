@@ -161,7 +161,7 @@ export function ItemSheet({
                           key={o.id}
                           onClick={() => toggle(g, o.id)}
                           className={cn(
-                            "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors",
+                            "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-start transition-colors",
                             checked
                               ? "border-brand bg-brand-soft"
                               : "border-line bg-surface"

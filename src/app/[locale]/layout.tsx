@@ -1,13 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Vazirmatn } from "next/font/google";
+import localFont from "next/font/local";
 import { hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { routing, dirForLocale } from "@/i18n/routing";
 
-const vazirmatn = Vazirmatn({
-  subsets: ["arabic"],
+const vazirmatn = localFont({
+  src: [
+    {
+      path: "../../../public/fonts/vazirmatn-arabic-wght-normal.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+    {
+      path: "../../../public/fonts/vazirmatn-latin-wght-normal.woff2",
+      weight: "100 900",
+      style: "normal",
+    },
+  ],
   variable: "--font-sans",
   display: "swap",
+  preload: true,
+  fallback: ["system-ui", "sans-serif"],
 });
 
 export const metadata: Metadata = {
@@ -37,7 +50,7 @@ export default async function LocaleLayout({ children, params }: Props) {
   const dir = dirForLocale(locale);
 
   return (
-    <html lang={locale} dir={dir} className={vazirmatn.variable}>
+    <html lang={locale} dir={dir} className={`${vazirmatn.variable} font-sans`}>
       <body>{children}</body>
     </html>
   );

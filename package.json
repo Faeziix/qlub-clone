@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "Production-ready clone of qlub.io — QR pay-at-table + ordering app and restaurant management platform",
+  "engines": {
+    "node": ">=20",
+    "bun": ">=1.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",

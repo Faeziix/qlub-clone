@@ -4,10 +4,12 @@ A production-ready clone of [qlub.io](https://qlub.io): a contactless **scan →
 
 ## Stack
 
-- **Next.js 15** (App Router, React 19, Server Actions, Route Handlers)
+- **Next.js 16** (App Router, React 19, Server Actions, Route Handlers)
 - **TypeScript** (strict) · **Tailwind CSS** (themeable design tokens)
-- **Prisma** + **SQLite** (zero-config; switch `provider` to `postgresql` for prod)
+- **Prisma** + **SQLite** (zero-config dev; swap `provider` to `postgresql` for prod)
 - **Zustand** (cart) · **Recharts** (analytics) · **jose**/**bcryptjs** (admin auth)
+
+**Runtime requirements:** Node ≥ 20, [bun](https://bun.sh) ≥ 1.0 (bun is the only package manager used in this project).
 
 ## Quick start
 
@@ -69,6 +71,10 @@ prisma/{schema.prisma, seed.ts}    # data model + verified Paul-UAE seed
 Bill math (service charge, inclusive/exclusive VAT, even-split remainder
 handling) lives in `src/lib/pricing.ts`; order/payment/review services in
 `src/lib/orders.ts`.
+
+## CI
+
+Pull requests run typecheck and lint automatically. The `eslint.ignoreDuringBuilds` flag is not set — ESLint failures block the build and must be resolved. See `.github/workflows/ci.yml`.
 
 > Payments are simulated (no real gateway) — `recordPayment` writes a succeeded
 > transaction so the end-to-end flow is fully demonstrable.

@@ -8,7 +8,6 @@ const nextConfig = {
       { protocol: "https", hostname: "**.qlub.io" },
     ],
   },
-  eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false },
 };
 

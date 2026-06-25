@@ -13,6 +13,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - **ADR 0001** — No committed secrets; `AUTH_SECRET` mandatory; no fallback; no backdoor scripts; hardened seed with crypto-random passwords.
 - **ADR 0002** — All table mutations require a valid admin session and vendor-scoped ownership check (IDOR fix).
 - **ADR 0003** — bun is the only package manager; Node ≥ 20 pinned via `engines` + `.nvmrc`; `eslint.ignoreDuringBuilds` removed; CI workflow enforces typecheck + lint on PRs.
+- **ADR 0006** — DR baseline: Neon-managed PITR/branching for Track A; restore runbook + RTO/RPO documented; Track B (domestic) DR deferred to Phase 5.
 - **Dual-track architecture** — Track A (Vercel + Neon, synthetic data only, separate repo/brand) vs Track B (domestic Iran infra, production). See PRD issue #1.
 - **Integer-rial money** — All monetary values are BigInt rial with no floats. Conversion only via `money.ts` at named boundaries.
 - **Server-authoritative pricing** — Bill computed from DB prices at order creation, snapshotted onto `OrderItem`. Payment verifies against the snapshot.
@@ -46,6 +47,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ `pnpm` in README/scripts despite `bun.lockb` → ✅ bun everywhere, no exceptions.
 - ❌ No `.nvmrc` or `engines` field → ✅ Both required for Node version pinning.
 - ❌ Incomplete `.env.example` missing `DIRECT_URL` → ✅ Document every required env var with comments.
+- ❌ `prisma migrate dev --create-only` blocks with drift prompt on an existing DB → ✅ Use `prisma migrate diff --from-empty --to-schema-datamodel --script` to generate baseline SQL, then `prisma migrate resolve --applied <name>` to mark it applied.
+- ❌ `require()` inside test files causes `@typescript-eslint/no-require-imports` lint error → ✅ Use top-level ES import for all node:fs/path functions.
 
 ## Dependencies & Tooling
 
@@ -79,4 +82,5 @@ See `docs/adr/` for full ADRs. Key decisions:
 - #4 — Tooling standardisation (bun, Node pin, CI, env example)
 
 **In progress / next:**
-- M1 remaining issues per milestone branch `feat/m1-foundation-safety`
+- #6 — Postgres migration + DR baseline (done on `feat/m2-data-money-core`)
+- M2 remaining: #7 (money.ts + BigInt), #8 (tenant isolation), #9 (server-authoritative pricing)

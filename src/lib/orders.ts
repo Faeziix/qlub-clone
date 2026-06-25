@@ -5,6 +5,18 @@ import { nanoid } from "nanoid";
 import { Prisma } from "@prisma/client";
 import type { CartLine, PaymentMethod, SplitType } from "./types";
 
+async function nextVendorOrderNumber(vendorId: string): Promise<string> {
+  const updated = await db.$queryRaw<{ seq: number }[]>`
+    UPDATE "Vendor"
+    SET "vendorOrderSeq" = "vendorOrderSeq" + 1
+    WHERE "id" = ${vendorId}
+    RETURNING "vendorOrderSeq" AS seq
+  `;
+  const seq = updated[0]?.seq;
+  if (seq === undefined) throw new Error(`Vendor ${vendorId} not found during order number generation`);
+  return `Q-${String(seq).padStart(6, "0")}`;
+}
+
 export async function createOrderFromCart(input: {
   vendorSlug: string;
   tableCode?: string | null;
@@ -32,11 +44,13 @@ export async function createOrderFromCart(input: {
       })
     : null;
 
+  const orderNumber = await nextVendorOrderNumber(vendor.id);
+
   const order = await db.order.create({
     data: {
       vendorId: vendor.id,
       tableId: table?.id,
-      orderNumber: `Q-${Date.now().toString().slice(-6)}-${nanoid(3)}`,
+      orderNumber,
       type: input.type ?? "qsr",
       status: "placed",
       guestName: input.guestName,

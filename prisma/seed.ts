@@ -82,18 +82,6 @@ const eggStyle = {
     { name: "Omelette" },
   ],
 };
-const breadChoice = {
-  name: "Choice of bread",
-  required: true,
-  minSelect: 1,
-  maxSelect: 1,
-  options: [
-    { name: "Sourdough", isDefault: true },
-    { name: "Flûte à l'ancienne" },
-    { name: "Multigrain" },
-    { name: "Brioche", priceDelta: 3 },
-  ],
-};
 const extras = {
   name: "Add extras",
   minSelect: 0,
@@ -583,6 +571,9 @@ async function seedVendor(opts: {
   logoUrl?: string;
   coverUrl?: string;
   description?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
   serviceChargePct?: number;
   taxPct?: number;
   menus: SeedMenu[];
@@ -591,21 +582,25 @@ async function seedVendor(opts: {
     data: {
       slug: opts.slug,
       name: opts.name,
-      country: "ae",
-      currency: "AED",
+      country: "ir",
+      currency: "IRR",
+      locale: "fa",
+      timezone: "Asia/Tehran",
       theme: opts.theme,
       logoUrl: opts.logoUrl,
       coverUrl: opts.coverUrl,
       description: opts.description,
-      supportedLangs: JSON.stringify(["en", "ar", "fr", "es", "tr", "ru"]),
-      address: "The Dubai Mall, Downtown Dubai, UAE",
-      phone: "+971 4 000 0000",
-      email: "hello@example.com",
-      serviceChargePct: opts.serviceChargePct ?? 7,
-      taxPct: opts.taxPct ?? 5,
+      supportedLangs: ["fa", "en"],
+      address: opts.address ?? "تهران، ایران",
+      phone: opts.phone,
+      email: opts.email,
+      serviceChargePct: opts.serviceChargePct ?? 10,
+      taxPct: opts.taxPct ?? 0,
       taxInclusive: true,
+      vatEnabled: false,
+      vatPct: 0,
       tippingEnabled: true,
-      tipPresets: JSON.stringify([10, 15, 20]),
+      tipPresets: [5, 10, 15],
     },
   });
 
@@ -636,7 +631,7 @@ async function seedVendor(opts: {
             description: it.description,
             price: BigInt(it.price),
             imageUrl: it.imageUrl,
-            tags: JSON.stringify(it.tags ?? []),
+            tags: it.tags ?? [],
             calories: it.calories,
             sortOrder: i,
             modifierGroups: it.modifierGroups
@@ -803,27 +798,31 @@ async function main() {
   await db.vendor.deleteMany();
 
   const paul = await seedVendor({
-    slug: "paul-uae",
-    name: "Paul - UAE",
+    slug: "paul-ir",
+    name: "پل — تهران",
     theme: "darkgold",
     description:
-      "French bakery & café, depuis 1889. Freshly baked breads, viennoiseries and all-day brunch.",
+      "نانوایی و کافه فرانسوی، از ۱۸۸۹. نان تازه، وینیازری و صبحانه تمام روز.",
     logoUrl: UNS("photo-1559925393-8be0ec4767c8"),
     coverUrl: `${CDN}/372604/mo9oanvaspd80xtxea8_Entrecote%20Steak%20Frites.jpg`,
-    serviceChargePct: 7,
-    taxPct: 5,
+    address: "تهران، خیابان ولیعصر، پاساژ پارسیان",
+    phone: "+98 21 0000 0000",
+    email: "hello@paul-ir.example.com",
+    serviceChargePct: 10,
+    taxPct: 0,
     menus: paulMenus,
   });
   await seedOrders(paul.vendor.id, paul.items, paul.tables);
 
   // Second demo vendor so the platform feels multi-tenant
   const bistro = await seedVendor({
-    slug: "olive-bistro",
-    name: "Olive & Thyme Bistro",
+    slug: "olive-bistro-ir",
+    name: "زیتون بیسترو",
     theme: "emerald",
-    description: "Mediterranean small plates & wood-fired mains.",
+    description: "غذاهای کوچک مدیترانه‌ای و کباب‌های هیزمی.",
     logoUrl: UNS("photo-1552566626-52f8b828add9"),
     coverUrl: UNS("photo-1414235077428-338989a2e8c0"),
+    address: "اصفهان، خیابان چهارباغ",
     menus: [paulMenus[1], paulMenus[3]],
   });
   await seedOrders(bistro.vendor.id, bistro.items, bistro.tables, 1000);
@@ -831,10 +830,10 @@ async function main() {
   // Staff users — each gets a unique cryptographically-random password,
   // printed once so the operator can sign in. No shared/static credential.
   const demoStaff: { email: string; name: string; role: "superadmin" | "owner" | "manager" | "staff"; vendorId: string | null }[] = [
-    { email: "admin@qlub.io", name: "Platform Admin", role: "superadmin", vendorId: null },
-    { email: "owner@paul.ae", name: "Pierre Dubois", role: "owner", vendorId: paul.vendor.id },
-    { email: "manager@paul.ae", name: "Yara Haddad", role: "manager", vendorId: paul.vendor.id },
-    { email: "owner@olive.ae", name: "Elena Rossi", role: "owner", vendorId: bistro.vendor.id },
+    { email: "admin@qlub.ir", name: "مدیر پلتفرم", role: "superadmin", vendorId: null },
+    { email: "owner@paul-ir.example.com", name: "علی رضایی", role: "owner", vendorId: paul.vendor.id },
+    { email: "manager@paul-ir.example.com", name: "مریم احمدی", role: "manager", vendorId: paul.vendor.id },
+    { email: "owner@olive-bistro-ir.example.com", name: "سارا محمدی", role: "owner", vendorId: bistro.vendor.id },
   ];
 
   const generatedCredentials: { email: string; password: string }[] = [];
@@ -853,7 +852,7 @@ async function main() {
   }
 
   console.log("✅ Seed complete.");
-  console.log("   Customer: /qr/ae/paul-uae");
+  console.log("   Customer: /qr/ir/paul-ir");
   console.log("   Admin:    /admin/login");
   console.log("   Generated staff credentials (shown once — copy them now):");
   for (const { email, password } of generatedCredentials) {

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Qlub Iran — Autonomous Issue Loop (issue-cycle workflow)</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2430; --line: #2d3644;
+    --ink: #e6edf3; --muted: #8b949e; --brand: #d29922; --green: #3fb950;
+    --red: #f85149; --blue: #58a6ff; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .sub { color: var(--muted); margin: 0 0 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 18px 0 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+  .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 14px 0; overflow-x: auto; }
+  .mermaid { display: flex; justify-content: center; }
+  ul { padding-left: 20px; }
+  li { margin: 5px 0; }
+  code { background: var(--surface2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 13px; color: var(--brand); }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  footer { margin-top: 50px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Autonomous Issue Loop</h1>
+  <p class="sub">How <code>/loop /next-issue</code> drives the deterministic <code>issue-cycle</code> workflow — select → implement ↔ review → ship — one GitHub issue at a time, for <code>Faeziix/qlub-clone</code>.</p>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#1f6feb"></i> deterministic JS control flow</span>
+    <span><i class="dot" style="background:#bc8cff"></i> AI agent (fresh context each spawn)</span>
+    <span><i class="dot" style="background:#3fb950"></i> success / approved path</span>
+    <span><i class="dot" style="background:#f85149"></i> stop / pause for human</span>
+    <span><i class="dot" style="background:#d29922"></i> decision</span>
+  </div>
+
+  <h2>1 · End-to-end flow</h2>
+  <div class="card">
+    <pre class="mermaid">
+flowchart TD
+    start(["/loop /next-issue"]):::loop --> cmd["next-issue command —<br/>calls Workflow issue-cycle.js"]:::js
+    cmd --> selA["🤖 select agent —<br/>find next unblocked ready-for-agent issue"]:::agent
+
+    selA --> found{"found a workable issue?"}:::dec
+    found -->|no| done["return done:true"]:::js
+    done --> endNone["⛔ End loop —<br/>report what is blocked / HITL"]:::stop
+    found -->|yes| claim["label issue in-progress ·<br/>create branch feat/issue-N"]:::js
+
+    claim --> round["round = 0"]:::js
+    round --> gate{"more rounds left? cap 3"}:::dec
+    gate -->|no| notconv["approved = false"]:::js
+    notconv --> ship
+    gate -->|yes| impl["🤖 implement agent, round r —<br/>build on branch · tests-first · commit · push<br/>rounds 2+ get prior review notes"]:::agent
+    impl --> rev["🤖 independent review agent, round r —<br/>diff vs main · run tests ·<br/>check every acceptance criterion"]:::agent
+    rev --> approved{"review approved?"}:::dec
+    approved -->|yes| ok["approved = true · break"]:::js
+    ok --> ship
+    approved -->|no| inc["round++ · log blocking items"]:::js
+    inc --> gate
+
+    ship["🤖 ship agent"]:::agent --> shipdec{"approved?"}:::dec
+    shipdec -->|yes| readypr["✅ open READY PR —<br/>Closes #N · mapped to criteria"]:::ok
+    shipdec -->|no| draftpr["📝 open DRAFT PR + comment ·<br/>keep in-progress label"]:::stop
+    readypr --> ret
+    draftpr --> ret
+
+    ret["return approved · stopLoop · prUrl"]:::js --> interp{"stopLoop?"}:::dec
+    interp -->|"yes — not converged"| endStop["⛔ End loop —<br/>draft PR needs human"]:::stop
+    interp -->|"no — approved"| cont["continue loop"]:::ok
+    cont --> start
+
+    classDef loop fill:#21262d,stroke:#8b949e,color:#e6edf3;
+    classDef js fill:#0d2d6b,stroke:#1f6feb,color:#cae0ff;
+    classDef agent fill:#3a2a5d,stroke:#bc8cff,color:#eaddff;
+    classDef dec fill:#3d2f0a,stroke:#d29922,color:#ffe9b3;
+    classDef ok fill:#0f3d22,stroke:#3fb950,color:#aff5c8;
+    classDef stop fill:#4a1410,stroke:#f85149,color:#ffc7c2;
+    </pre>
+  </div>
+
+  <h2>2 · The inner convergence loop (one issue)</h2>
+  <p class="sub">Why it can't spin forever and why the reviewer can't rubber-stamp.</p>
+  <div class="card">
+    <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant JS as Workflow (JS)
+    participant I as 🤖 Implementer
+    participant R as 🤖 Independent Reviewer
+    participant GH as GitHub / branch
+
+    JS->>I: implement round 1 — issue + acceptance criteria
+    I->>GH: commit + push to feat/issue-N
+    JS->>R: review round 1 — diff vs main, run tests
+    R-->>JS: approved = false, with blocking items
+    Note over JS: rounds left, thread blocking items forward
+    JS->>I: implement round 2 — plus reviewer blocking list
+    I->>GH: commit fixes
+    JS->>R: review round 2
+    R-->>JS: approved = true
+    Note over JS: break, go to Ship — ready PR
+    JS->>GH: open PR, Closes #N
+    </pre>
+  </div>
+
+  <h2>3 · Loop-control states</h2>
+  <div class="card">
+    <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Selecting
+    Selecting --> NoWork: no unblocked issue
+    Selecting --> Working: claimed issue + branch
+    Working --> Reviewing: implement round
+    Reviewing --> Working: not approved, rounds left
+    Reviewing --> Approved: review approved
+    Working --> Exhausted: cap reached, not approved
+    Approved --> ShipReady: open READY PR
+    Exhausted --> ShipDraft: open DRAFT PR + pause
+    ShipReady --> Selecting: continue loop, next issue
+    ShipDraft --> [*]: stop for human
+    NoWork --> [*]: stop, report blocked or HITL
+</pre>
+  </div>
+
+  <h2>What makes it trustworthy</h2>
+  <ul>
+    <li><span class="pill">bounded</span> The <code>while (round &lt; MAX_ROUNDS)</code> guarantees at most 3 implement↔review passes — no infinite ping-pong.</li>
+    <li><span class="pill">independent</span> Each review is a <b>fresh agent</b> reading the diff and running tests itself, so it verifies rather than trusts the implementer's summary.</li>
+    <li><span class="pill">clean context</span> Every box marked 🤖 is a brand-new subagent — the main loop only keeps short summaries, so context never bloats across issues.</li>
+    <li><span class="pill">fail-safe</span> Non-convergence never ships silently: it opens a <b>draft</b> PR, comments, and pauses the whole loop for you.</li>
+    <li><span class="pill">dependency-aware</span> Selection only picks issues whose every "Blocked by" is <b>closed</b>, so the graph order is respected and HITL gates (legal #5, Postgres #6) hard-stop the loop.</li>
+  </ul>
+
+  <footer>
+    Source: <code>.claude/workflows/issue-cycle.js</code> · driver: <code>.claude/commands/next-issue.md</code> · run with <code>/loop /next-issue</code>.<br/>
+    Diagrams render client-side via Mermaid (loaded from CDN — needs internet on first open).
+  </footer>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "dark",
+    themeVariables: { fontSize: "14px", fontFamily: "Inter, system-ui, sans-serif" },
+    flowchart: { curve: "basis", nodeSpacing: 45, rankSpacing: 50 },
+    securityLevel: "loose",
+  });
+</script>
+</body>
+</html>

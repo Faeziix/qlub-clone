@@ -14,18 +14,16 @@
     "db:studio": "prisma studio",
     "setup": "prisma generate && prisma db push && pnpm db:seed"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "eslint-config-next": "^16.2.9",
     "jose": "^5.10.0",
     "lucide-react": "^0.469.0",
     "nanoid": "^5.1.16",
-    "next": "15.1.4",
+    "next": "^16.2.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "recharts": "^2.15.4",

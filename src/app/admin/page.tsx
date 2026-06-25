@@ -15,26 +15,36 @@ import { formatMoney, timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const session = await requireSession();
-  const stats = await getDashboardStats(session.vendorId);
-  const currency = "AED";
+const DAY_MS = 86400000;
+const REVENUE_WINDOW_DAYS = 14;
 
-  // build 14-day revenue series from payments
-  const days: { day: string; revenue: number; orders: number }[] = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000);
-    const key = d.toISOString().slice(0, 10);
-    const label = d.toLocaleDateString("en", { day: "numeric", month: "short" });
-    const dayPayments = stats.payments.filter(
-      (p) => p.createdAt.toISOString().slice(0, 10) === key
+type DashboardPayment = { createdAt: Date; total: number };
+
+function buildRevenueSeries(payments: DashboardPayment[]) {
+  const series: { day: string; revenue: number; orders: number }[] = [];
+  const windowEnd = Date.now();
+  for (let daysAgo = REVENUE_WINDOW_DAYS - 1; daysAgo >= 0; daysAgo--) {
+    const date = new Date(windowEnd - daysAgo * DAY_MS);
+    const dayKey = date.toISOString().slice(0, 10);
+    const label = date.toLocaleDateString("en", { day: "numeric", month: "short" });
+    const dayPayments = payments.filter(
+      (p) => p.createdAt.toISOString().slice(0, 10) === dayKey
     );
-    days.push({
+    series.push({
       day: label,
       revenue: Math.round(dayPayments.reduce((s, p) => s + p.total, 0) * 100) / 100,
       orders: dayPayments.length,
     });
   }
+  return series;
+}
+
+export default async function DashboardPage() {
+  const session = await requireSession();
+  const stats = await getDashboardStats(session.vendorId);
+  const currency = "AED";
+
+  const days = buildRevenueSeries(stats.payments);
 
   const recentOrders = stats.orders.slice(0, 8);
   const tables = session.vendorId

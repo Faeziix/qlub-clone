@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/Button";
 import { Utensils } from "lucide-react";
 
 const DEMO_ACCOUNTS = [
-  { email: "owner@paul.ae", label: "Paul UAE owner" },
-  { email: "manager@paul.ae", label: "Paul UAE manager" },
   { email: "admin@qlub.io", label: "platform superadmin" },
+  { email: "owner@paul.ae", label: "Paul owner" },
+  { email: "manager@paul.ae", label: "Paul manager" },
+  { email: "owner@olive.ae", label: "Olive Bistro owner" },
 ];
 
 export function LoginForm({ showDemoAccounts }: { showDemoAccounts: boolean }) {

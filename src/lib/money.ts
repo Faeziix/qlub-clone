@@ -84,6 +84,19 @@ export function parseRialFromInput(input: string): bigint {
   return tomanToRial(toman);
 }
 
+// ─────────────────────────── API serialization ────────────────────────────────
+
+/**
+ * JSON replacer that serializes BigInt values as strings.
+ * Use this when posting money values to API routes — JSON.stringify cannot
+ * serialize BigInt natively and will throw a TypeError.
+ * The corresponding API Zod schema (bigintFromJson) accepts both number and string.
+ */
+export function jsonBigIntReplacer(_key: string, value: unknown): unknown {
+  if (typeof value === "bigint") return value.toString();
+  return value;
+}
+
 // ─────────────────────────── payment utilities ───────────────────────────────
 
 /**

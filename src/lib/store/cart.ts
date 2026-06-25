@@ -4,6 +4,20 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { CartLine, SelectedModifier } from "@/lib/types";
 import { lineTotal } from "@/lib/pricing";
 
+const BIGINT_PREFIX = "__bigint__:";
+
+function bigintReplacer(_key: string, value: unknown): unknown {
+  if (typeof value === "bigint") return `${BIGINT_PREFIX}${value}`;
+  return value;
+}
+
+function bigintReviver(_key: string, value: unknown): unknown {
+  if (typeof value === "string" && value.startsWith(BIGINT_PREFIX)) {
+    return BigInt(value.slice(BIGINT_PREFIX.length));
+  }
+  return value;
+}
+
 function signature(itemId: string, mods: SelectedModifier[], notes?: string) {
   const m = [...mods]
     .map((x) => x.optionId)
@@ -80,7 +94,10 @@ export const useCart = create<CartState>()(
     }),
     {
       name: "qlub-cart",
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => localStorage, {
+        replacer: bigintReplacer,
+        reviver: bigintReviver,
+      }),
       partialize: (s) => ({
         vendorSlug: s.vendorSlug,
         tableCode: s.tableCode,

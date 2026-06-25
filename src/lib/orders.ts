@@ -384,6 +384,87 @@ export async function recordPayment(input: {
   return { ...result, deduplicated: false };
 }
 
+/**
+ * Confirms a pending (reserved) payment leg as succeeded.
+ *
+ * Called after the IPG gateway callback confirms the charge. Acquires a
+ * FOR UPDATE lock on the order, re-validates the invariant, marks the
+ * Payment row as succeeded, and updates Order.amountPaid atomically.
+ *
+ * M2 stub: the payment API calls this immediately after initiatePayment
+ * (no real gateway redirect). M6 will wire the real IPG callback URL.
+ */
+export async function confirmPendingPayment(paymentId: string) {
+  const pending = await db.payment.findUniqueOrThrow({
+    where: { id: paymentId },
+  });
+
+  if (pending.status === "succeeded") {
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: pending.orderId },
+    });
+    return {
+      payment: pending,
+      fullyPaid: isFullyPaid(order.amountPaid, order.total),
+      amountPaid: order.amountPaid,
+      alreadyConfirmed: true,
+    };
+  }
+
+  const result = await db.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${pending.orderId} FOR UPDATE`;
+
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: pending.orderId },
+      include: { payments: true },
+    });
+
+    const succeededLegs = order.payments.filter((p) => p.status === "succeeded");
+    const alreadyPaid = succeededLegs.reduce((s, p) => s + p.amount, 0n);
+
+    const allLegs = [
+      ...succeededLegs.map((p) => ({ amount: p.amount, tipAmount: p.tipAmount })),
+      { amount: pending.amount, tipAmount: pending.tipAmount },
+    ];
+
+    const invariantCheck = validatePaymentLegsAgainstSnapshot(order.total, allLegs);
+    if (!invariantCheck.valid) {
+      throw new Error(
+        `Invariant violation on confirm: paidTotal ${invariantCheck.paidTotal} ` +
+          `exceeds snapshotTotal ${invariantCheck.snapshotTotal}`
+      );
+    }
+
+    const payment = await tx.payment.update({
+      where: { id: paymentId },
+      data: { status: "succeeded", verifiedAt: new Date(), expiresAt: null },
+    });
+
+    const newAmountPaid = alreadyPaid + pending.amount;
+    const fullyPaid = isFullyPaid(newAmountPaid, order.total);
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        amountPaid: newAmountPaid,
+        tipAmount: order.tipAmount + pending.tipAmount,
+        status: fullyPaid ? "paid" : order.status,
+      },
+    });
+
+    if (fullyPaid && order.tableId) {
+      await tx.diningTable.update({
+        where: { id: order.tableId },
+        data: { status: "available" },
+      });
+    }
+
+    return { payment, fullyPaid, amountPaid: newAmountPaid };
+  });
+
+  return { ...result, alreadyConfirmed: false };
+}
+
 export async function createReview(input: {
   vendorSlug: string;
   paymentId: string;

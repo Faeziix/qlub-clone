@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import {
   Check,
   ChevronLeft,
@@ -15,7 +16,7 @@ import type { PaymentMethod, SplitType } from "@/lib/types";
 import { makeT, dirFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { evenSplit, tipFromPct } from "@/lib/pricing";
-import { formatRialAsToman, parseRialFromInput } from "@/lib/money";
+import { formatRialAsToman, parseRialFromInput, jsonBigIntReplacer } from "@/lib/money";
 import { nanoid } from "nanoid";
 import { Button } from "@/components/ui/Button";
 import { StarRating } from "@/components/ui/StarRating";
@@ -132,26 +133,34 @@ export function PaymentFlow({
     setProcessing(true);
     setError(null);
     try {
-      await new Promise((r) => setTimeout(r, 1200)); // simulate gateway
-      const res = await fetch("/api/payments", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          orderId: order.id,
-          amount: baseAmount,
-          tipAmount: tip,
-          method,
-          splitType: split,
-          splitMeta:
-            split === "even"
-              ? { parts, partIndex }
-              : split === "items"
-                ? { items: selectedItems }
-                : undefined,
-          idempotencyKey: idempotencyKey.current,
-        }),
-      });
-      const data = await res.json();
+      const splitMeta =
+        split === "even"
+          ? { parts, partIndex }
+          : split === "items"
+            ? { items: selectedItems }
+            : undefined;
+
+      const payload = JSON.parse(
+        JSON.stringify(
+          {
+            orderId: order.id,
+            amount: baseAmount,
+            tipAmount: tip,
+            method,
+            splitType: split,
+            splitMeta,
+            idempotencyKey: idempotencyKey.current,
+          },
+          jsonBigIntReplacer
+        )
+      );
+
+      const { data } = await axios.post<{
+        ok: boolean;
+        payment?: { id: string };
+        error?: string;
+      }>("/api/payments", payload);
+
       if (!data.ok) throw new Error(data.error ?? "Payment failed");
       setCompletedPaymentId(data.payment?.id ?? null);
       setStep("success");
@@ -523,19 +532,15 @@ function ReviewScreen({
   async function submit() {
     setBusy(true);
     try {
-      await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          vendorSlug,
-          paymentId,
-          rating: rating || 5,
-          foodRating: food || undefined,
-          serviceRating: service || undefined,
-          ambienceRating: ambience || undefined,
-          comment: comment.trim() || undefined,
-          guestName: name.trim() || undefined,
-        }),
+      await axios.post("/api/reviews", {
+        vendorSlug,
+        paymentId,
+        rating: rating || 5,
+        foodRating: food || undefined,
+        serviceRating: service || undefined,
+        ambienceRating: ambience || undefined,
+        comment: comment.trim() || undefined,
+        guestName: name.trim() || undefined,
       });
       onDone();
     } finally {

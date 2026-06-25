@@ -106,3 +106,25 @@ Round 2 (2026-06-26) — blocking items resolved:
 - `src/components/customer/PaymentFlow.tsx` — generates `nanoid(32)` client nonce per session, sends as `idempotencyKey` on every payment POST, wiring live-path dedup.
 - `src/app/globals.css` + `tailwind.config.ts` — added `--warning-soft` CSS variable and `warning.soft` / `success.soft` Tailwind tokens.
 - `src/lib/__tests__/server-authoritative-pricing.test.ts` — rewrote invariant tests to assert correct semantics; added integration-style `recordPayment`-path simulation tests (7 new cases); added property-based test for individual-leg validity.
+
+Round 3 (2026-06-26) — round-2 review P0 blockers resolved:
+
+**P0-1: BigInt JSON serialization on live paths** (was: TypeError crash in browser)
+- `src/lib/money.ts` — added `jsonBigIntReplacer` (JSON replacer that serializes BigInt as string); this is the canonical serialization boundary per ADR §1 (#7 intent).
+- `src/lib/store/cart.ts` — replaced `createJSONStorage(() => localStorage)` with a custom `replacer`/`reviver` pair (`bigintReplacer` / `bigintReviver`) using a `"__bigint__:<value>"` tag. BigInt values in `CartLine.unitPrice` and `SelectedModifier.priceDelta` now round-trip through localStorage without TypeError.
+- `src/components/customer/CartSheet.tsx` — migrated from `fetch` to `axios`; cart lines are serialized through `JSON.parse(JSON.stringify(lines, jsonBigIntReplacer))` before POST so bigint fields are sent as strings (accepted by the Zod `bigintFromJson` schema).
+- `src/components/customer/PaymentFlow.tsx` — migrated from `fetch` to `axios` (per CLAUDE.md); `baseAmount` (bigint) and `tip` (bigint) are now serialized via `jsonBigIntReplacer` before the payment POST; review submit also migrated to axios.
+
+**P0-2: `initiatePayment` had zero callers — split-leg reservation never exercised**
+- `src/app/api/payments/route.ts` — rewired to call `initiatePayment` (reserve leg with FOR UPDATE + invariant + TTL) then `confirmPendingPayment` (upgrade pending → succeeded). `idempotencyKey` is now required (not optional) in the route schema, matching the M2 client which always sends `nanoid(32)`.
+- `src/lib/orders.ts` — added `confirmPendingPayment(paymentId)`: acquires FOR UPDATE on the order, re-validates the invariant, updates the Payment row from `pending` to `succeeded`, and updates `Order.amountPaid` atomically. M6 will replace the immediate-confirm step with the real IPG gateway callback; the two-step structure is already correct for that wiring.
+
+**P0-3: Invariant tests exercised a re-implementation, not the real code**
+- `src/lib/__tests__/orders-payment-invariant.test.ts` — new test file (18 tests) that mocks `@/lib/db` via `vi.mock` and exercises the real `recordPayment`, `initiatePayment`, and `confirmPendingPayment` functions. Covers: full payment, partial split legs, remaining-balance rejection, invariant violation, idempotency dedup, FOR UPDATE verification (asserts `$queryRaw` is called and the SQL contains `for update`), table release, and the full reserve-then-settle path.
+- `vitest.config.ts` — added `"server-only"` alias pointing to `src/__mocks__/server-only.ts` (no-op stub) so `orders.ts` can be imported in vitest without the Next.js server-only guard throwing.
+- `src/__mocks__/server-only.ts` — stub module.
+
+Known gaps tracked for later milestones:
+- Tenant/auth on payment path (any caller with an orderId can POST a payment) — M4 (Access & Anti-Abuse).
+- Real IPG gateway integration (M6 replaces the immediate-confirm stub in `confirmPendingPayment`).
+- `gateway` and `stub` payment status are not yet in the Payment flow — M6.

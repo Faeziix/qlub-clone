@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import { Trash2, ShoppingBag, AlertTriangle } from "lucide-react";
 import type { VendorWithMenus } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
 import { computeBill, lineTotal } from "@/lib/pricing";
-import { formatRialAsToman } from "@/lib/money";
+import { formatRialAsToman, jsonBigIntReplacer } from "@/lib/money";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -46,17 +47,20 @@ export function CartSheet({
     setError(null);
     setPriceChanges([]);
     try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          vendorSlug: vendor.slug,
-          tableCode,
-          type: tableCode ? "dinein" : "qsr",
-          lines,
-        }),
-      });
-      const data = await res.json();
+      const { data } = await axios.post<{
+        ok: boolean;
+        order: { id: string };
+        priceChanges: PriceChangeNotice[];
+        error?: string;
+      }>(
+        "/api/orders",
+        JSON.parse(
+          JSON.stringify(
+            { vendorSlug: vendor.slug, tableCode, type: tableCode ? "dinein" : "qsr", lines },
+            jsonBigIntReplacer
+          )
+        )
+      );
       if (!data.ok) throw new Error(data.error ?? "Failed to place order");
 
       if (data.priceChanges && data.priceChanges.length > 0) {

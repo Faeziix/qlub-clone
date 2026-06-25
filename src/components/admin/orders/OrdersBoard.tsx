@@ -13,6 +13,7 @@ import { Card, StatusPill, EmptyRow } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { timeAgo, parseJSON, cn } from "@/lib/utils";
+import { formatRialAsToman } from "@/lib/money";
 import { updateOrderStatus, cancelOrder } from "@/app/admin/orders/actions";
 
 // --- Types -------------------------------------------------------------------
@@ -213,7 +214,7 @@ function OrderRow({
 
       <div className="flex items-center justify-between gap-3 sm:justify-end">
         <span className="text-base font-extrabold tabular-nums">
-          {order.currency} {order.total}
+          {formatRialAsToman(BigInt(order.total))} تومان
         </span>
         <div onClick={(e) => e.stopPropagation()}>
           <OrderActions order={order} />
@@ -309,7 +310,7 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                   )}
                 </div>
                 <span className="shrink-0 text-sm font-semibold tabular-nums">
-                  {order.currency} {it.lineTotal}
+                  {formatRialAsToman(BigInt(it.lineTotal))} تومان
                 </span>
               </div>
             );
@@ -319,18 +320,18 @@ function OrderDetail({ order }: { order: BoardOrder }) {
 
       {/* Totals */}
       <div className="rounded-2xl border border-line p-4">
-        {totalRow("Subtotal", `${order.currency} ${order.subtotal}`)}
+        {totalRow("Subtotal", `${formatRialAsToman(BigInt(order.subtotal))} تومان`)}
         {BigInt(order.discount) > 0n &&
-          totalRow("Discount", `- ${order.currency} ${order.discount}`)}
+          totalRow("Discount", `- ${formatRialAsToman(BigInt(order.discount))} تومان`)}
         {BigInt(order.serviceCharge) > 0n &&
-          totalRow("Service charge", `${order.currency} ${order.serviceCharge}`)}
-        {BigInt(order.tax) > 0n && totalRow("Tax", `${order.currency} ${order.tax}`)}
+          totalRow("Service charge", `${formatRialAsToman(BigInt(order.serviceCharge))} تومان`)}
+        {BigInt(order.tax) > 0n && totalRow("Tax", `${formatRialAsToman(BigInt(order.tax))} تومان`)}
         {BigInt(order.tipAmount) > 0n &&
-          totalRow("Tip", `${order.currency} ${order.tipAmount}`)}
-        {totalRow("Total", `${order.currency} ${order.total}`, true)}
+          totalRow("Tip", `${formatRialAsToman(BigInt(order.tipAmount))} تومان`)}
+        {totalRow("Total", `${formatRialAsToman(BigInt(order.total))} تومان`, true)}
         {BigInt(order.amountPaid) > 0n &&
           BigInt(order.amountPaid) < BigInt(order.total) &&
-          totalRow("Paid", `${order.currency} ${order.amountPaid}`)}
+          totalRow("Paid", `${formatRialAsToman(BigInt(order.amountPaid))} تومان`)}
       </div>
 
       {/* Payments */}
@@ -358,11 +359,11 @@ function OrderDetail({ order }: { order: BoardOrder }) {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-sm font-semibold tabular-nums">
-                    {order.currency} {p.total}
+                    {formatRialAsToman(BigInt(p.total))} تومان
                   </p>
                   {BigInt(p.tipAmount) > 0n && (
                     <p className="text-xs text-muted">
-                      incl. {order.currency} {p.tipAmount} tip
+                      incl. {formatRialAsToman(BigInt(p.tipAmount))} تومان tip
                     </p>
                   )}
                 </div>

@@ -695,7 +695,7 @@ function SummaryRow({
     <div className="flex items-center justify-between text-muted">
       <span>{label}</span>
       <span className="font-semibold text-ink">
-        {c} {v}
+        {c} {formatRialAsToman(BigInt(v))}
       </span>
     </div>
   );

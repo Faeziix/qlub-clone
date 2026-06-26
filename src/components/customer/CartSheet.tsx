@@ -15,18 +15,27 @@ import { MoneyText } from "@/components/ui/MoneyText";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CartLineItem } from "./_components/CartLineItem";
 
+interface ActiveOrderRef {
+  id: string;
+  orderNumber: string;
+}
+
 export function CartSheet({
   open,
   onClose,
   vendor,
   lang,
   tableCode,
+  activeOrder,
+  onOrderPlaced,
 }: {
   open: boolean;
   onClose: () => void;
   vendor: VendorWithMenus;
   lang: string;
   tableCode: string | null;
+  activeOrder: ActiveOrderRef | null;
+  onOrderPlaced: (orderId: string) => void;
 }) {
   const t = makeT(lang);
   const router = useRouter();
@@ -35,6 +44,7 @@ export function CartSheet({
   const [error, setError] = React.useState<string | null>(null);
   const [pendingOrderId, setPendingOrderId] = React.useState<string | null>(null);
   const [showPriceChangedNotice, setShowPriceChangedNotice] = React.useState(false);
+  const [showNewOrderConfirm, setShowNewOrderConfirm] = React.useState(false);
 
   const bill = computeBill(lines, {
     serviceChargePct: vendor.serviceChargePct,
@@ -50,18 +60,22 @@ export function CartSheet({
     );
   }
 
-  async function placeOrder() {
+  function serializeLines() {
+    return lines.map((l) => ({
+      ...l,
+      unitPrice: bigintToJson(l.unitPrice),
+      modifiers: l.modifiers.map((m) => ({
+        ...m,
+        priceDelta: bigintToJson(m.priceDelta),
+      })),
+    }));
+  }
+
+  async function placeNewOrder() {
     setPlacing(true);
     setError(null);
+    setShowNewOrderConfirm(false);
     try {
-      const serializedLines = lines.map((l) => ({
-        ...l,
-        unitPrice: bigintToJson(l.unitPrice),
-        modifiers: l.modifiers.map((m) => ({
-          ...m,
-          priceDelta: bigintToJson(m.priceDelta),
-        })),
-      }));
       const { data } = await axios.post<{
         ok: boolean;
         order: { id: string };
@@ -71,9 +85,10 @@ export function CartSheet({
         vendorSlug: vendor.slug,
         tableCode,
         type: tableCode ? "dinein" : "qsr",
-        lines: serializedLines,
+        lines: serializeLines(),
       });
       if (!data.ok) throw new Error(data.error ?? t("orderFailed"));
+      onOrderPlaced(data.order.id);
       if (data.priceChanged) {
         setPendingOrderId(data.order.id);
         setShowPriceChangedNotice(true);
@@ -84,6 +99,51 @@ export function CartSheet({
       setError(e instanceof Error ? e.message : t("orderFailed"));
     } finally {
       setPlacing(false);
+    }
+  }
+
+  async function appendToExistingOrder() {
+    if (!activeOrder) return;
+    setPlacing(true);
+    setError(null);
+    try {
+      const { data } = await axios.patch<{
+        ok: boolean;
+        order: { id: string };
+        priceChanged: boolean;
+        error?: string;
+      }>(`/api/orders/${activeOrder.id}`, {
+        vendorSlug: vendor.slug,
+        lines: serializeLines(),
+      });
+      if (!data.ok) {
+        const msg = data.error ?? t("appendFailed");
+        if (msg.includes("payment is in progress")) throw new Error(t("appendBlocked"));
+        if (msg.includes("cannot be modified")) throw new Error(t("appendTerminal"));
+        throw new Error(msg);
+      }
+      if (data.priceChanged) {
+        setPendingOrderId(activeOrder.id);
+        setShowPriceChangedNotice(true);
+      } else {
+        clear();
+        onClose();
+        router.push(
+          `/qr/${vendor.country}/${vendor.slug}/pay?order=${activeOrder.id}&lang=${lang}`
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("appendFailed"));
+    } finally {
+      setPlacing(false);
+    }
+  }
+
+  function handlePrimaryAction() {
+    if (activeOrder) {
+      appendToExistingOrder();
+    } else {
+      placeNewOrder();
     }
   }
 
@@ -115,6 +175,30 @@ export function CartSheet({
                 setShowPriceChangedNotice(false);
                 setPendingOrderId(null);
               }}
+            >
+              {t("goBack")}
+            </Button>
+          </div>
+        </div>
+      </Sheet>
+    );
+  }
+
+  if (showNewOrderConfirm && activeOrder) {
+    return (
+      <Sheet open={open} onClose={() => setShowNewOrderConfirm(false)} title={t("confirmNewOrder")} height="tall">
+        <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-10 text-center">
+          <p className="text-sm leading-relaxed text-muted">
+            {t("confirmNewOrderHint").replace("{orderNumber}", activeOrder.orderNumber)}
+          </p>
+          <div className="w-full space-y-3">
+            <Button fullWidth size="lg" loading={placing} onClick={placeNewOrder}>
+              {t("confirmNewOrder")}
+            </Button>
+            <Button
+              fullWidth
+              variant="ghost"
+              onClick={() => setShowNewOrderConfirm(false)}
             >
               {t("goBack")}
             </Button>
@@ -167,12 +251,27 @@ export function CartSheet({
               fullWidth
               size="lg"
               loading={placing}
-              onClick={placeOrder}
+              onClick={handlePrimaryAction}
               className="justify-between px-5"
             >
-              <span>{t("placeOrder")}</span>
+              <span>
+                {activeOrder
+                  ? t("addToExistingOrder").replace("{orderNumber}", activeOrder.orderNumber)
+                  : t("placeOrder")}
+              </span>
               <MoneyText rial={bill.total} className="text-brand-fg" />
             </Button>
+            {activeOrder && (
+              <Button
+                fullWidth
+                variant="ghost"
+                size="md"
+                className="mt-2"
+                onClick={() => setShowNewOrderConfirm(true)}
+              >
+                {t("newOrder")}
+              </Button>
+            )}
           </div>
         </div>
       )}

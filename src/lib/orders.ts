@@ -99,6 +99,7 @@ export async function createOrderFromCart(input: {
     where: { slug: input.vendorSlug },
   });
   if (!vendor) throw new Error("Vendor not found");
+  if (!vendor.active) throw new Error("Vendor is suspended");
   if (!input.lines.length) throw new Error("Cart is empty");
 
   const table = input.tableCode
@@ -363,6 +364,7 @@ export async function createReview(input: {
     where: { slug: input.vendorSlug },
   });
   if (!vendor) throw new Error("Vendor not found");
+  if (!vendor.active) throw new Error("Vendor is suspended");
 
   return db.review.create({
     data: {

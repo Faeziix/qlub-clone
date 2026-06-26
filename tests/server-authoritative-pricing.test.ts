@@ -67,6 +67,7 @@ const stubVendor = {
   taxInclusive: false,
   vatEnabled: false,
   vatPct: 0,
+  active: true,
 };
 
 function makeItem(id: string, price: bigint) {

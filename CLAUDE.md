@@ -74,6 +74,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ Using `requireSession` (no RBAC) in sensitive server actions → ✅ Replace with `requireRole(minimum)` from `src/lib/rbac.ts` to enforce role hierarchy at the action level.
 - ❌ `new TZDate(Date | number, tz)` does not work — TS overloads require `Date` or `number` separately → ✅ Use a conditional branch: `typeof date === "number" ? new TZDate(date, tz) : new TZDate(date, tz)`
 - ❌ `Intl.NumberFormat` with `style: 'currency', currency: 'IRR'` renders incorrectly for Iranian users → ✅ Use `toman-formatter.ts` exclusively; never IRR currency style.
+- ❌ Test fixtures for `createOrderFromCart` missing `active: true` on the vendor mock → ✅ Always include `active: true` in vendor stubs because `createOrderFromCart` enforces the suspension check.
+- ❌ `bun test` runs bun's native test runner (ignores vitest.config.ts aliases) → ✅ Use `bun run test` to invoke vitest via the package.json script so aliases (including `server-only` stub) apply.
 - ❌ Banking-holiday calendar must be updated annually (religious holidays shift ~10 days/year) → ✅ Update `IRANIAN_BANKING_HOLIDAYS` in `banking-holidays.ts` at each Nowruz; see `docs/i18n/banking-holiday-calendar.md`.
 
 ## Dependencies & Tooling
@@ -106,6 +108,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/table-token.ts` — `cryptoPasscode()` (crypto-secure 4-digit passcode); `signTableToken({ vendorId, tableId }, opts?)` (HMAC-SHA256 JWS); `verifyTableToken(token)` (returns payload or null)
 - `src/app/api/qr/route.ts` — `GET /api/qr?data=<url>&size=<px>` — server-side QR PNG generation via `qrcode` lib, no external service
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
+- `src/lib/queries-active.ts` — `getVendorBySlugActive` — like `getVendorBySlug` but returns null for suspended (active=false) vendors; used by all public customer routes
+- `src/app/[locale]/admin/superadmin/actions.ts` — Superadmin server actions: `createTenant`, `suspendTenant`, `reactivateTenant`, `provisionOwner`, `listTenants`, `listPlatformStaff`, `changeStaffRole`, `deactivateStaff`, `reactivateStaff`
+- `src/components/customer/SuspendedTenantPage.tsx` — RTL Farsi-first "restaurant suspended" page shown instead of 404/500 for suspended tenants
 
 ## API & Data Layer
 
@@ -137,5 +142,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 - #16 — Self-hosted QR (`/api/qr`, `qrcode` lib, no third-party service); crypto passcodes (`crypto.getRandomValues`); signed table tokens (HMAC-SHA256 JWS embedding `vendorId`+`tableId`); guest entry validates + rejects tampered/foreign tokens
 
+- #27 — Superadmin tenant & owner management console: create/suspend/reactivate vendors, provision owner accounts, platform-wide staff management, suspension guard on customer routes
+
 **In progress / next:**
-- M4 complete — no remaining issues
+- M4 complete

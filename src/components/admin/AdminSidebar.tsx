@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu as MenuIcon,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn, initials } from "@/lib/utils";
@@ -27,6 +28,10 @@ const NAV_ITEMS = [
   { href: "/admin/settings", key: "settings", icon: Settings },
 ] as const;
 
+const SUPERADMIN_NAV_ITEMS = [
+  { href: "/admin/superadmin", key: "superadmin", icon: ShieldCheck },
+] as const;
+
 export function AdminSidebar({
   user,
   vendorName,
@@ -38,6 +43,7 @@ export function AdminSidebar({
   const [open, setOpen] = useState(false);
   const t = useTranslations("admin.nav");
   const tCommon = useTranslations("admin.common");
+  const isSuperadmin = user.role === "superadmin";
 
   return (
     <>
@@ -107,6 +113,32 @@ export function AdminSidebar({
               </Link>
             );
           })}
+
+          {isSuperadmin && (
+            <>
+              <div className="my-2 border-t border-line" />
+              {SUPERADMIN_NAV_ITEMS.map((item) => {
+                const active = pathname.startsWith(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
+                      active
+                        ? "bg-brand text-brand-fg"
+                        : "text-muted hover:bg-surface-2 hover:text-ink"
+                    )}
+                  >
+                    <Icon size={18} />
+                    {t(item.key)}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         <div className="border-t border-line p-3">

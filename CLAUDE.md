@@ -149,6 +149,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/components/customer/_components/MenuSkeleton.tsx` — `MenuSkeleton` (menu browse shimmer skeleton) and `LandingSkeleton` (landing page shimmer skeleton); used by `loading.tsx` at the vendor menu route
 - `src/components/customer/_components/ItemCard.tsx` — redesigned menu item card: brand-gradient image fallback, RTL "+" add indicator, `data-money` price, tabular-nums, diet badges
 - `src/components/customer/_components/CategoryChips.tsx` — category chip strip with auto-scroll active chip, `role=tablist`/`aria-selected` a11y, i18n `aria-label`, `localizedName` for Farsi/English display
+- `src/components/customer/_components/CartLineItem.tsx` — individual cart line card: item name, modifier list (·-joined), optional notes, quantity stepper (min=0 removes), MoneyText price aligned end
 
 ## API & Data Layer
 
@@ -194,3 +195,4 @@ See `docs/adr/` for full ADRs. Key decisions:
 **Done (M7 issues):**
 - #36 — Mobile-first shell + design foundation: `localeDetection: false` (Farsi-default routing fix); category chips now use `localizedName(c, lang)`; missing makeT keys added (`back`, `language`, `noSearchResults`); desktop frame (`md:bg-surface-2` outer + `md:shadow-float` column); `MenuSkeleton` + `LandingSkeleton` shimmer loading components; `loading.tsx` for vendor menu page; `PRODUCT.md` and `DESIGN.md` at repo root; ADR-0024
 - #38 — Menu browse + item cards redesign + render freeze fix: `ItemCard` component with image fallback (brand gradient + initial), RTL-aware "+" indicator, `data-money` price attr, tabular-nums; `CategoryChips` with auto-scroll active chip into view, `role=tablist`/`aria-selected`, i18n `aria-label`; `MenuBrowseHeader` extracted; `React.useTransition` for menu switches (non-urgent renders + opacity fade during `isPending`); `React.useDeferredValue` for search query (non-blocking filtering); `requestAnimationFrame` wrapping `scrollIntoView`; menu tabs hidden when only 1 menu; `categoryNav` i18n key added to fa/en dicts
+- #40 — Cart redesign + clear-after-placement bug fix: `CartSheet` rewritten with `CartLineItem` component (extracted to `_components/`); `clear()` called in `navigateToPayment` so cart empties immediately on successful order placement; `MoneyText` used for all money display (Persian numerals, tabular-nums, `data-money`); `BillBreakdown` renders subtotal/service/tax rows conditionally + always shows a total row; sticky CTA footer shows loading spinner; error displayed inline above button; empty state with browse-menu CTA

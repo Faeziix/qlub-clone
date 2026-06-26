@@ -106,6 +106,14 @@ const en: Dict = {
   back: "Back",
   language: "Language",
   noSearchResults: 'No items match "{query}".',
+  viewMenu: "View Menu",
+  findMyBill: "Find my bill",
+  enterOrderNumber: "Enter order number",
+  orderNumber: "Order number",
+  orderNumberHint: "Find your order number on your receipt or ask your server.",
+  orderNotFound: "No order found with that number. Please check and try again.",
+  selectMenuToContinue: "Choose a menu to continue",
+  noMenusAvailable: "No menus available right now.",
 };
 
 const fa: Dict = {
@@ -182,6 +190,14 @@ const fa: Dict = {
   back: "بازگشت",
   language: "زبان",
   noSearchResults: 'هیچ آیتمی با "{query}" مطابقت ندارد.',
+  viewMenu: "مشاهده منو",
+  findMyBill: "جستجوی صورتحساب",
+  enterOrderNumber: "شماره سفارش را وارد کنید",
+  orderNumber: "شماره سفارش",
+  orderNumberHint: "شماره سفارش روی رسید شما یا از گارسون قابل دریافت است.",
+  orderNotFound: "سفارشی با این شماره یافت نشد. لطفاً دوباره بررسی کنید.",
+  selectMenuToContinue: "یک منو برای ادامه انتخاب کنید",
+  noMenusAvailable: "در حال حاضر منویی در دسترس نیست.",
 };
 
 const dicts: Record<string, Dict> = { fa, en };

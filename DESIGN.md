@@ -177,12 +177,32 @@ Loading states use the `.skeleton` CSS class from `globals.css`:
 - `StarRating` — `src/components/ui/StarRating.tsx` — 1–5 star input
 
 ### Customer-specific
-- `MenuExperience` — stateful shell (landing → menu browsing)
+- `MenuExperience` — stateful shell with three internal states:
+  - **Landing main**: hero + two entry points (View Menu / Pay the bill)
+  - **Menu picker**: card grid for selecting among multiple menus (only when vendor has > 1 menu)
+  - **Browsing**: full menu browsing with sticky header, category chips, item list
+- `VenueHero` (sub-component of MenuExperience) — cover photo with gradient fallback; logo with initials fallback
+- `MenuTile` (sub-component of MenuExperience) — menu picker card with image or branded gradient fallback
+- `PayBillSheet` — bottom sheet for looking up an existing order by its vendor-scoped order number; navigates to `/pay?order=<id>` on success
 - `ItemSheet` — item detail + modifier picker bottom sheet
 - `CartSheet` — cart review + bill summary + place order
 - `PaymentFlow` — bill split → tip → method → IPG redirect → confirmation
 - `LanguageSheet` — locale switcher bottom sheet
 - `MenuSkeleton` / `LandingSkeleton` — shimmer loading placeholders
+
+### Landing entry points
+
+The venue landing presents two primary CTAs below the hero section:
+
+| CTA | Color | Action |
+|---|---|---|
+| مشاهده منو / View Menu | `--brand` (primary) | If 1 menu → enters browsing directly; if multiple → shows MenuPicker panel |
+| پرداخت صورتحساب / Pay the bill | `--cta` (red, positive) | Opens `PayBillSheet` for order number lookup |
+
+**Hero fallbacks (no blank boxes):**
+- Cover image missing → diagonal gradient from `--brand` to `--brand-soft`
+- Logo missing → rounded square with restaurant name initials on `--brand` background
+- Menu tile image missing → gradient from `--brand-soft` to `--surface-2` with menu name text overlay
 
 ### RTL-aware icon usage
 - `ChevronLeft` — back navigation (mirrors in RTL)

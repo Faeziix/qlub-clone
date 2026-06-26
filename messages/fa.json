@@ -108,7 +108,15 @@
     "remove": "حذف",
     "decreaseQty": "کاهش تعداد",
     "increaseQty": "افزایش تعداد",
-    "kcal": "کیلوکالری"
+    "kcal": "کیلوکالری",
+    "viewMenu": "مشاهده منو",
+    "findMyBill": "جستجوی صورتحساب",
+    "enterOrderNumber": "شماره سفارش را وارد کنید",
+    "orderNumber": "شماره سفارش",
+    "orderNumberHint": "شماره سفارش روی رسید شما یا از گارسون قابل دریافت است.",
+    "orderNotFound": "سفارشی با این شماره یافت نشد. لطفاً دوباره بررسی کنید.",
+    "selectMenuToContinue": "یک منو برای ادامه انتخاب کنید",
+    "noMenusAvailable": "در حال حاضر منویی در دسترس نیست."
   },
   "admin": {
     "nav": {

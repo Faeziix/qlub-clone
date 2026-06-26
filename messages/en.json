@@ -108,7 +108,15 @@
     "remove": "Remove",
     "decreaseQty": "Decrease quantity",
     "increaseQty": "Increase quantity",
-    "kcal": "kcal"
+    "kcal": "kcal",
+    "viewMenu": "View Menu",
+    "findMyBill": "Find my bill",
+    "enterOrderNumber": "Enter order number",
+    "orderNumber": "Order number",
+    "orderNumberHint": "Find your order number on your receipt or ask your server.",
+    "orderNotFound": "No order found with that number. Please check and try again.",
+    "selectMenuToContinue": "Choose a menu to continue",
+    "noMenusAvailable": "No menus available right now."
   },
   "admin": {
     "nav": {

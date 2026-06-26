@@ -37,13 +37,24 @@ Restaurant staff get a live order board with status transitions. Owners manage m
 
 ### 1. QR → Menu → Order → Pay
 
+The venue landing presents two clear entry points:
+
+**View Menu (مشاهده منو)**:
 ```
-Scan QR  →  /qr/ir/<slug>  →  Browse menu (Farsi/RTL)
+Scan QR  →  /qr/ir/<slug>  →  Landing (two CTAs)
+  →  "View Menu"  →  Browse menu (Farsi/RTL)
   →  Select items + modifiers  →  Cart  →  Place Order (server prices)
   →  Bill summary  →  Choose split / tip / method
   →  IPG redirect (domestic gateway)
   →  Callback  →  Server verify  →  Payment confirmed
   →  Optional: leave review (one per payer per bill)
+```
+
+**Pay the Bill (پرداخت صورتحساب)**:
+```
+Scan QR  →  /qr/ir/<slug>  →  Landing (two CTAs)
+  →  "Pay the bill"  →  Enter order number  →  Lookup via /api/orders/lookup
+  →  /qr/ir/<slug>/pay?order=<id>  →  Bill summary  →  Pay
 ```
 
 ### 2. Split-Bill Flow

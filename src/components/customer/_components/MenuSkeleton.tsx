@@ -74,20 +74,17 @@ export function LandingSkeleton() {
     <div className="min-h-screen bg-bg md:bg-surface-2">
       <div className="mx-auto max-w-app min-h-screen bg-bg md:shadow-float">
         {/* Cover image skeleton */}
-        <SkeletonBlock className="h-60 w-full rounded-none" />
+        <SkeletonBlock className="h-56 w-full rounded-none" />
         {/* Vendor info card skeleton */}
-        <div className="relative -mt-12 rounded-t-3xl bg-surface px-5 pb-6 pt-14 text-center shadow-float">
-          <SkeletonBlock className="absolute inset-x-0 -top-12 mx-auto h-24 w-24 rounded-2xl" />
+        <div className="relative -mt-14 rounded-t-3xl bg-surface px-5 pb-6 pt-16 text-center shadow-float">
+          <SkeletonBlock className="absolute inset-x-0 -top-7 mx-auto h-16 w-16 rounded-2xl" />
           <SkeletonBlock className="mx-auto h-7 w-48" />
           <SkeletonBlock className="mx-auto mt-2 h-4 w-64" />
         </div>
-        {/* Menu cards skeleton */}
-        <div className="px-5 pt-4">
-          <SkeletonBlock className="mb-3 h-4 w-28" />
-          <div className="grid grid-cols-2 gap-4">
-            <SkeletonBlock className="aspect-[4/3] w-full rounded-2xl" />
-            <SkeletonBlock className="aspect-[4/3] w-full rounded-2xl" />
-          </div>
+        {/* Entry point buttons skeleton */}
+        <div className="px-5 pt-5 space-y-3">
+          <SkeletonBlock className="h-14 w-full rounded-2xl" />
+          <SkeletonBlock className="h-14 w-full rounded-2xl" />
         </div>
       </div>
     </div>

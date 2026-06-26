@@ -99,6 +99,10 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/digit-normalizer.ts` — Digit normalization: `normalizeDigits`, `normalizePhoneForValidation`, `isPersianDigit`, `isArabicIndicDigit`
 - `src/lib/jalali.ts` — Jalali dates in Tehran: `toTehranDate`, `getJalaliParts`, `formatJalaliDate`, `formatJalaliDateTime`, `isTehranFriday`, `isTehranThursday`, `addDaysTehran`
 - `src/lib/banking-holidays.ts` — Iranian banking holidays: `isBankingHoliday`, `isIranianWeekend`, `isOfficialHoliday`, `nextBankingDay`, `addBankingDays`, `settlementDueDate`, `IRANIAN_BANKING_HOLIDAYS`
+- `src/lib/rate-limiter.ts` — `RateLimiter` interface; `InMemoryRateLimiter` (default, dev); `RedisRateLimiter` (production, when `REDIS_URL` set); `buildRateLimiter(options)` factory
+- `src/lib/limiters.ts` — Singleton limiter instances: `getLimiter("publicApi" | "adminAction" | "login")`
+- `src/lib/sanitize.ts` — `sanitizeFreeText(input, maxLength?)` — strips script/HTML/javascript: from free-text fields
+- `src/lib/csrf.ts` — `checkOrigin(request)` — CSRF/origin check for public POST routes
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
 
 ## API & Data Layer
@@ -127,5 +131,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 **Done (M4 issues):**
 - #14 — Admin auth: edge middleware, RBAC, session hardening, audit log
 
+- #15 — Abuse controls: rate limiting (Redis + in-memory), login lockout, zod validation hardening, free-text sanitization, CSRF/origin checks, generic error responses
+
 **In progress / next:**
-- M4: remaining issues
+- M4 complete — no remaining issues

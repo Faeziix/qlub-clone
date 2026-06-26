@@ -122,7 +122,8 @@
       "password": "رمز عبور",
       "signIn": "ورود",
       "demoAccounts": "حساب‌های نمایشی",
-      "invalidCredentials": "ایمیل یا رمز عبور نامعتبر است."
+      "invalidCredentials": "ایمیل یا رمز عبور نامعتبر است.",
+      "tooManyAttempts": "تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً بعداً دوباره امتحان کنید."
     },
     "dashboard": {
       "pageTitle": "داشبورد",

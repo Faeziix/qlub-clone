@@ -77,6 +77,54 @@ This closes the IDOR identified in PRD §3.2 / user story 31. See
 `tests/tables-actions-idor.test.ts` enforces this invariant: unauthenticated
 calls, cross-vendor writes, and authorised own-vendor writes are all tested.
 
+## Rate limiting, login lockout, and abuse controls (ADR-0015)
+
+### Rate limiters
+
+Three named limiters are configured in `src/lib/limiters.ts`:
+
+| Limiter | Applies to | Key | Window | Max |
+|---|---|---|---|---|
+| `publicApi` | `/api/orders`, `/api/payments`, `/api/reviews` | `<route>:<ip>` | 60 s | 60 req |
+| `adminAction` | (reserved for future use) | `admin:<userId>` | 60 s | 120 req |
+| `login` | Admin login action | `login:<email>` | 5 min | 5 attempts |
+
+Two adapters are available (`src/lib/rate-limiter.ts`):
+
+- **`InMemoryRateLimiter`** — default when `REDIS_URL` is absent; process-local,
+  not shared across instances.
+- **`RedisRateLimiter`** — active when `REDIS_URL` is set; shared across all
+  instances and survives restarts. **Production MUST use this.**
+
+### Login lockout
+
+Admin login checks the per-email rate limit before touching the database. After
+5 failed attempts in a 5-minute window the login action returns
+`{ errorKey: "tooManyAttempts" }` without revealing whether the account exists.
+On success the counter is reset so a legitimate user is not permanently locked.
+
+### CSRF / origin checks
+
+All public POST routes (`/api/orders`, `/api/payments`, `/api/reviews`) verify
+the `Origin` request header against the request host and `NEXT_PUBLIC_APP_URL`
+via `checkOrigin(req)` (`src/lib/csrf.ts`). Cross-origin requests are rejected
+with a generic `400` response. Requests with no `Origin` header are allowed
+(server-to-server / curl).
+
+### Free-text sanitization
+
+`sanitizeFreeText` (`src/lib/sanitize.ts`) strips `<script>` blocks, all HTML
+tags, and `javascript:` URLs from user-supplied strings (`notes`, `comment`,
+`guestName`) before persistence. Applied server-side in all three public API
+routes. React JSX escaping is the defence-in-depth layer at render time.
+
+### Generic error responses
+
+All `catch` blocks in the three public API routes return `"Bad request"` with no
+internal detail (no Prisma error messages, no stack traces, no entity names).
+
+See `docs/adr/0015-rate-limiting-csrf-zod-sanitization.md` for the full record.
+
 ## Regression guard
 
 `tests/repo-safety.test.ts` fails if a committed `.env`, the `mint-token`

@@ -122,7 +122,8 @@
       "password": "Password",
       "signIn": "Sign in",
       "demoAccounts": "Demo accounts",
-      "invalidCredentials": "Invalid email or password."
+      "invalidCredentials": "Invalid email or password.",
+      "tooManyAttempts": "Too many login attempts. Please try again later."
     },
     "dashboard": {
       "pageTitle": "Dashboard",

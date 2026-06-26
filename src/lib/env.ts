@@ -16,3 +16,7 @@ export function assertServerEnv() {
 export function isDemoSeedingEnabled() {
   return process.env.NODE_ENV !== "production" && process.env.SEED_DEMO === "true";
 }
+
+export function redisUrl(): string | undefined {
+  return process.env.REDIS_URL || undefined;
+}

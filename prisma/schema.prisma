@@ -39,6 +39,7 @@ model Vendor {
   ibanVerifiedAt       DateTime?
   nationalId           String?
   eNamadStatus         EnamadStatus  @default(none)
+  otpGateEnabled       Boolean       @default(false)
   active               Boolean       @default(true)
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
@@ -152,10 +153,11 @@ model Order {
   type          OrderType    @default(qsr)
   status        OrderStatus  @default(open)
   source        OrderSource  @default(qr)
-  guestName     String?
-  guestPhone    String?
-  notes         String?
-  currency      String       @default("IRR")
+  guestName        String?
+  guestPhone       String?
+  phoneVerifiedAt  DateTime?
+  notes            String?
+  currency         String       @default("IRR")
   subtotal      BigInt       @default(0)
   serviceCharge BigInt       @default(0)
   tax           BigInt       @default(0)

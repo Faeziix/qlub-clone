@@ -20,6 +20,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - **ADR 0009** — Server-authoritative pricing: re-fetch DB prices at order creation; honored-price rule with `priceChanged` flag; `$transaction` wrapping for all money writes; `initiatePaymentLeg` with TTL reservation; idempotency keys persisted and deduplicated.
 - **ADR 0010** — next-intl Farsi-first RTL foundation: `[locale]` path segment; default locale `fa`; `app/[locale]/layout.tsx` sets `<html lang dir>` server-side; middleware handles cookie + Accept-Language; removed 6 dead locales; Vazirmatn font; imperative DOM dir mutations removed.
 - **ADR 0011** — Persian formatting deep modules: `toman-formatter.ts` owns Toman display (never IRR Intl style), `digit-normalizer.ts` normalizes both Persian (U+06F0) and Arabic-Indic (U+0660) digit families, `jalali.ts` enforces Asia/Tehran via TZDate, `banking-holidays.ts` provides the static holiday calendar and settlement-day arithmetic.
+- **ADR 0019** — Guest phone + SMS OTP: 6-digit CSPRNG code, SHA-256 hash stored (never plaintext), 2-min TTL, 5-attempt cap, per-phone + per-IP Redis rate limits. Two SMS provider adapters behind `SmsProvider` interface + console dev adapter. `SmsUnavailableError` signals graceful degradation (payment proceeds). Operator override via `POST /api/admin/otp-override` (staff+, tenant-isolated, audited). `Vendor.otpGateEnabled` controls the optional pre-fire gate.
 - **Dual-track architecture** — Track A (Vercel + Neon, synthetic data only, separate repo/brand) vs Track B (domestic Iran infra, production). See PRD issue #1.
 - **Integer-rial money** — All monetary values are BigInt rial with no floats. Conversion only via `money.ts` at named boundaries.
 - **Server-authoritative pricing** — Bill computed from DB prices at order creation, snapshotted onto `OrderItem`. Payment verifies against the snapshot.
@@ -111,6 +112,14 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/queries-active.ts` — `getVendorBySlugActive` — like `getVendorBySlug` but returns null for suspended (active=false) vendors; used by all public customer routes
 - `src/app/[locale]/admin/superadmin/actions.ts` — Superadmin server actions: `createTenant`, `suspendTenant`, `reactivateTenant`, `provisionOwner`, `listTenants`, `listPlatformStaff`, `changeStaffRole`, `deactivateStaff`, `reactivateStaff`
 - `src/components/customer/SuspendedTenantPage.tsx` — RTL Farsi-first "restaurant suspended" page shown instead of 404/500 for suspended tenants
+- `src/app/api/admin/orders/route.ts` — `GET /api/admin/orders` — JWT-authed, tenant-scoped, cursor-paginated order list for the live order board
+- `src/app/[locale]/admin/orders/_hooks/useOrdersPolling.ts` — `useOrdersPolling(initialOrders, opts)` — client-side polling hook (axios, 8 s interval, merge-by-id, cursor pagination)
+- `src/lib/phone.ts` — `normalizePhoneToE164(rawPhone)` — converts Persian/Arabic-Indic digits + local Iranian format to E.164; throws `PhoneNormalizationError` for invalid numbers
+- `src/lib/sms-provider.ts` — `SmsProvider` interface; `ConsoleSmsProvider` (dev, logs code); `buildSmsProvider()` factory (chains primary/fallback HTTP adapters, falls back to console in non-prod, `unavailable` in prod without creds); `resetSmsProviderForTesting()`
+- `src/lib/otp.ts` — `requestOtp({ rawPhone, ip })`, `verifyOtp({ rawPhone, code })`; SHA-256 hashed codes; 2-min TTL; 5-attempt cap; per-phone + per-IP Redis rate limits; `InMemoryOtpStorage` (dev fallback); `resetOtpStorageForTesting()` + `resetOtpRateLimitersForTesting()` for tests
+- `src/app/api/otp/request/route.ts` — `POST /api/otp/request` — public OTP request endpoint
+- `src/app/api/otp/verify/route.ts` — `POST /api/otp/verify` — public OTP verify endpoint; sets `Order.phoneVerifiedAt`
+- `src/app/api/admin/otp-override/route.ts` — `POST /api/admin/otp-override` — staff+ operator override; sets `Order.phoneVerifiedAt` + audit log
 
 ## API & Data Layer
 
@@ -144,5 +153,6 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 - #27 — Superadmin tenant & owner management console: create/suspend/reactivate vendors, provision owner accounts, platform-wide staff management, suspension guard on customer routes
 
-**In progress / next:**
-- M4 complete
+**Done (M5 issues):**
+- #17 — Real-time order board v1: `/api/admin/orders` polling endpoint (cursor pagination, JWT auth, tenant isolation); `useOrdersPolling` hook (axios, 8 s, merge-by-id); RBAC-gated status transitions (staff = workflow only, manager+ = all incl. cancel/paid/open); ceiling-split payment display (parentPaymentId badge)
+- #18 — Guest phone + SMS OTP: `phone.ts` E.164 normalizer (Persian/Arabic-Indic → ASCII → E.164); `sms-provider.ts` two-provider chain with console dev adapter; `otp.ts` lifecycle (SHA-256 hash, 2-min TTL, 5-attempt cap, Redis rate limits); `/api/otp/request` + `/api/otp/verify` public routes; `/api/admin/otp-override` staff+ override; schema: `Order.phoneVerifiedAt` + `Vendor.otpGateEnabled`; ADR-0019

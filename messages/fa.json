@@ -148,7 +148,7 @@
       "guest": "مهمان",
       "status": "وضعیت",
       "time": "زمان",
-      "perPaidBill": "به ازای هر صورتحساب پرداختی",
+      "perOrder": "به ازای هر سفارش",
       "staffTips": "انعام کارکنان",
       "live": "زنده",
       "paid": "پرداخت شده",
@@ -209,7 +209,10 @@
       "paymentMethodCard": "کارت بانکی",
       "paymentMethodCash": "نقدی",
       "paymentMethodIpg": "پرداخت آنلاین (IPG)",
-      "paymentMethodUnknown": "سایر"
+      "paymentMethodUnknown": "سایر",
+      "ceilingSubCharges": "تقسیم سقف: {n} شارژ",
+      "loadMore": "بارگذاری بیشتر",
+      "livePolling": "زنده"
     },
     "menu": {
       "pageTitle": "منو",

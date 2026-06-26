@@ -1,6 +1,10 @@
 import "server-only";
 import { db } from "./db";
 import { bigintToNumber } from "./money";
+import {
+  computePeriodDelta,
+  buildTehranWindowBounds,
+} from "./dashboard-analytics";
 
 function localesToMap<T extends { locale: string }>(
   rows: T[],
@@ -153,44 +157,111 @@ export async function getOrder(orderId: string) {
   };
 }
 
-/** Admin: dashboard metrics for a vendor (or all, for superadmin). */
-export async function getDashboardStats(vendorId: string | null) {
-  const where = vendorId ? { vendorId } : {};
-  const since = new Date(Date.now() - 30 * 86400000);
+/**
+ * Aggregates revenue, tips, and distinct-order count for a set of succeeded
+ * payments entirely in the database via Prisma aggregate + groupBy. No JS loop
+ * touches the monetary sums; the database engine does the arithmetic.
+ *
+ * Returns plain bigint values so callers can use money.ts helpers on them.
+ */
+async function sqlAggregatePayments(
+  vendorFilter: { vendorId?: string },
+  from: Date,
+  to: Date
+): Promise<{ revenueRial: bigint; tipsRial: bigint; distinctOrderCount: number }> {
+  const where = {
+    ...vendorFilter,
+    status: "succeeded" as const,
+    createdAt: { gte: from, lt: to },
+  };
 
-  const [orders, payments, reviews, items, tables] = await Promise.all([
-    db.order.findMany({
-      where: { ...where, createdAt: { gte: since } },
-      orderBy: { createdAt: "desc" },
+  const [sums, distinctOrders] = await Promise.all([
+    db.payment.aggregate({
+      where,
+      _sum: { amount: true, tipAmount: true },
     }),
-    db.payment.findMany({
-      where: { ...where, status: "succeeded", createdAt: { gte: since } },
+    db.payment.groupBy({
+      by: ["orderId"],
+      where,
     }),
-    db.review.findMany({ where, orderBy: { createdAt: "desc" } }),
-    db.menuItem.count({ where }),
-    db.diningTable.count({ where }),
   ]);
 
-  const revenueRial = payments.reduce((s, p) => s + p.total, 0n);
-  const tipsRial = payments.reduce((s, p) => s + p.tipAmount, 0n);
+  const revenueRial = sums._sum.amount ?? 0n;
+  const tipsRial = sums._sum.tipAmount ?? 0n;
+  const distinctOrderCount = distinctOrders.length;
+
+  return { revenueRial, tipsRial, distinctOrderCount };
+}
+
+/** Admin: dashboard metrics for a vendor (or all, for superadmin). */
+export async function getDashboardStats(vendorId: string | null) {
+  const vendorFilter = vendorId ? { vendorId } : {};
+  const STATS_WINDOW_DAYS = 30;
+  const CHART_WINDOW_DAYS = 14;
+  const now = new Date();
+  const { windowStart, prevWindowStart, prevWindowEnd } = buildTehranWindowBounds(
+    STATS_WINDOW_DAYS,
+    now
+  );
+  const chartWindowStart = buildTehranWindowBounds(CHART_WINDOW_DAYS, now).windowStart;
+
+  const [
+    orders,
+    currentAgg,
+    prevAgg,
+    chartPayments,
+    reviews,
+    items,
+    tables,
+  ] = await Promise.all([
+    db.order.findMany({
+      where: { ...vendorFilter, createdAt: { gte: windowStart } },
+      orderBy: { createdAt: "desc" },
+    }),
+    sqlAggregatePayments(vendorFilter, windowStart, now),
+    sqlAggregatePayments(vendorFilter, prevWindowStart, prevWindowEnd),
+    db.payment.findMany({
+      where: {
+        ...vendorFilter,
+        status: "succeeded",
+        createdAt: { gte: chartWindowStart },
+      },
+      select: { orderId: true, amount: true, tipAmount: true, total: true, createdAt: true },
+    }),
+    db.review.findMany({ where: vendorFilter, orderBy: { createdAt: "desc" } }),
+    db.menuItem.count({ where: vendorFilter }),
+    db.diningTable.count({ where: vendorFilter }),
+  ]);
+
   const avgOrderRial =
-    payments.length > 0 ? revenueRial / BigInt(payments.length) : 0n;
+    currentAgg.distinctOrderCount > 0
+      ? currentAgg.revenueRial / BigInt(currentAgg.distinctOrderCount)
+      : 0n;
+
+  const revenueDelta = computePeriodDelta(currentAgg.revenueRial, prevAgg.revenueRial);
+  const orderCountDelta = computePeriodDelta(
+    BigInt(currentAgg.distinctOrderCount),
+    BigInt(prevAgg.distinctOrderCount)
+  );
+
   const avgRating = reviews.length
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
     : 0;
 
   return {
-    revenue: bigintToNumber(revenueRial),
-    tips: bigintToNumber(tipsRial),
+    revenue: bigintToNumber(currentAgg.revenueRial),
+    tips: bigintToNumber(currentAgg.tipsRial),
     orderCount: orders.length,
-    paidCount: payments.length,
+    paidCount: currentAgg.distinctOrderCount,
     avgOrder: bigintToNumber(avgOrderRial),
+    revenueDelta,
+    orderCountDelta,
     avgRating,
     reviewCount: reviews.length,
     itemCount: items,
     tableCount: tables,
     orders,
-    payments,
+    payments: chartPayments,
     reviews,
   };
 }

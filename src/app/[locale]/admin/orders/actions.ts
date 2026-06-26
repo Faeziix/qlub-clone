@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/rbac";
+import { requireRole, assertRole } from "@/lib/rbac";
 import { recordAuditEvent } from "@/lib/audit";
 import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
 
@@ -17,6 +17,17 @@ const ALLOWED_STATUSES = [
 ] as const;
 
 type OrderStatus = (typeof ALLOWED_STATUSES)[number];
+
+/**
+ * Transitions only staff may advance (kitchen/floor workflow).
+ * All roles at or above "staff" may perform these.
+ */
+const STAFF_PERMITTED_TRANSITIONS: ReadonlySet<OrderStatus> = new Set([
+  "placed",
+  "preparing",
+  "ready",
+  "served",
+]);
 
 /** Find an order, asserting it belongs to the current session's vendor scope. */
 async function scopedOrder(orderId: string) {
@@ -46,7 +57,12 @@ export async function updateOrderStatus(orderId: string, status: string) {
   if (!ALLOWED_STATUSES.includes(status as OrderStatus)) {
     throw new Error(`Invalid status: ${status}`);
   }
+
   const { order, session } = await scopedOrder(orderId);
+
+  if (!STAFF_PERMITTED_TRANSITIONS.has(status as OrderStatus)) {
+    assertRole(session, "manager");
+  }
 
   await db.order.update({
     where: { id: orderId },
@@ -68,6 +84,7 @@ export async function updateOrderStatus(orderId: string, status: string) {
 
 export async function cancelOrder(orderId: string) {
   const { order, session } = await scopedOrder(orderId);
+  assertRole(session, "manager");
 
   await db.order.update({
     where: { id: orderId },

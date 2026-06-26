@@ -13,33 +13,15 @@ import { db } from "@/lib/db";
 import { PageHeader, StatCard, Card, StatusPill } from "@/components/admin/ui";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { formatMoney, timeAgo } from "@/lib/utils";
-import { bigintToNumber } from "@/lib/money";
+import { computeRevenueSeries } from "@/lib/dashboard-analytics";
 
 export const dynamic = "force-dynamic";
 
-const DAY_MS = 86400000;
 const REVENUE_WINDOW_DAYS = 14;
 
-type DashboardPayment = { createdAt: Date; total: bigint };
-
-function buildRevenueSeries(payments: DashboardPayment[]) {
-  const series: { day: string; revenue: number; orders: number }[] = [];
-  const windowEnd = Date.now();
-  for (let daysAgo = REVENUE_WINDOW_DAYS - 1; daysAgo >= 0; daysAgo--) {
-    const date = new Date(windowEnd - daysAgo * DAY_MS);
-    const dayKey = date.toISOString().slice(0, 10);
-    const label = date.toLocaleDateString("en", { day: "numeric", month: "short" });
-    const dayPayments = payments.filter(
-      (p) => p.createdAt.toISOString().slice(0, 10) === dayKey
-    );
-    const rialTotal = dayPayments.reduce((s, p) => s + p.total, 0n);
-    series.push({
-      day: label,
-      revenue: bigintToNumber(rialTotal),
-      orders: dayPayments.length,
-    });
-  }
-  return series;
+function formatDelta(delta: number): string {
+  const sign = delta >= 0 ? "+" : "";
+  return `${sign}${delta.toFixed(1)}%`;
 }
 
 export default async function DashboardPage() {
@@ -48,11 +30,17 @@ export default async function DashboardPage() {
   const stats = await getDashboardStats(session.vendorId);
 
   const vendorCurrency = session.vendorId
-    ? (await db.vendor.findUnique({ where: { id: session.vendorId }, select: { currency: true } }))?.currency ?? "IRR"
+    ? (
+        await db.vendor.findUnique({
+          where: { id: session.vendorId },
+          select: { currency: true },
+        })
+      )?.currency ?? "IRR"
     : "IRR";
   const currency = vendorCurrency;
 
-  const days = buildRevenueSeries(stats.payments);
+  const chartSeries = computeRevenueSeries(stats.payments, REVENUE_WINDOW_DAYS, new Date());
+  const days = chartSeries.map((b) => ({ day: b.label, revenue: b.revenue, orders: b.orders }));
 
   const recentOrders = stats.orders.slice(0, 8);
   const tables = session.vendorId
@@ -91,20 +79,26 @@ export default async function DashboardPage() {
           label={t("revenue")}
           value={formatMoney(stats.revenue)}
           icon={<DollarSign size={18} />}
-          delta={{ value: "+12.4%", positive: true }}
+          delta={{
+            value: formatDelta(stats.revenueDelta),
+            positive: stats.revenueDelta >= 0,
+          }}
         />
         <StatCard
           label={t("orders")}
           value={String(stats.orderCount)}
           icon={<ReceiptText size={18} />}
-          delta={{ value: "+8.1%", positive: true }}
+          delta={{
+            value: formatDelta(stats.orderCountDelta),
+            positive: stats.orderCountDelta >= 0,
+          }}
           hint={`${stats.paidCount} ${t("paid")}`}
         />
         <StatCard
           label={t("avgOrder")}
           value={formatMoney(stats.avgOrder || 0)}
           icon={<TrendingUp size={18} />}
-          hint={t("perPaidBill")}
+          hint={t("perOrder")}
         />
         <StatCard
           label={t("tips")}

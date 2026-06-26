@@ -162,6 +162,18 @@ Full-height bottom-sheet for item selection — modifiers, quantity, and instruc
 - **Footer layout**: non-scrollable, `bg-surface/95 backdrop-blur-sm`, `safe-bottom`. `QuantityStepper size="lg"` + full-width Button with label and live total on opposite ends (`justify-between`).
 - **Server-authoritative total**: `lineTotal = (unitPriceRial + sum(modifier.priceDelta)) × qty` — computed from BigInt item price, never from client strings.
 
+### Receipt + Review screen (`src/app/[locale]/payment/success/`)
+
+Post-payment flow composed of three focused components orchestrated by `PaymentSuccessClient`:
+
+- **`ReceiptDisplay`** — full-page receipt card rendered after a confirmed payment. Shows: vendor name, order number, line items with quantity × name → lineTotal, then a totals breakdown (subtotal / service charge / VAT / tip) followed by a bold total row. Two CTAs: "Rate experience" (primary, brand, only shown when `paymentId` is present) and "Back to menu" (ghost).
+- **`ReviewForm`** — review capture screen. Slide-in back button returns to receipt. Header shows vendor name. An `OverallRatingSection` card (large 44 px stars) captures the mandatory overall rating; a `SubRatingRow` list (22 px stars, card with dividers) captures food / service / ambience. Optional comment textarea and name input. Submit is disabled until overall ≥ 1.
+- **`ThankYouScreen`** — post-submit confirmation with `Heart` icon in brand-soft circle, thank-you copy, and "Browse menu" CTA.
+
+**Money display**: `formatRialAsTomanPersian` for Farsi, `formatRialAsTomanLatin` + " T" suffix for English. Numbers from the DB arrive as `number` (RSC→client boundary); they are cast to `BigInt` for formatter calls.
+
+**RTL**: all three components receive `dir` from `dirFor(lang)` and set it on the root element. Line-item quantity badge uses `me-1.5` (logical margin). `ChevronRight` / `ChevronLeft` in the back button are selected based on `dir`.
+
 ### PersianDate (`src/components/ui/PersianDate.tsx`)
 
 Renders a `Date` as Jalali string in a `<time>` element.

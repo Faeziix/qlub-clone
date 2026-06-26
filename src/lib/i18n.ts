@@ -153,6 +153,12 @@ const en: Dict = {
   paymentFailedBody: "Your payment was not completed. You can try again.",
   tryAgain: "Try again",
   viewReceipt: "View receipt",
+  overallRating: "Overall",
+  orderSummary: "Order summary",
+  paidWith: "Paid",
+  receiptFor: "Receipt for",
+  leaveReview: "Leave a review",
+  skipReview: "Skip",
 };
 
 const fa: Dict = {
@@ -276,6 +282,12 @@ const fa: Dict = {
   paymentFailedBody: "پرداخت شما تکمیل نشد. می‌توانید دوباره تلاش کنید.",
   tryAgain: "تلاش دوباره",
   viewReceipt: "مشاهده رسید",
+  overallRating: "امتیاز کلی",
+  orderSummary: "خلاصه سفارش",
+  paidWith: "پرداخت شده",
+  receiptFor: "رسید برای",
+  leaveReview: "ثبت نظر",
+  skipReview: "رد کردن",
 };
 
 const dicts: Record<string, Dict> = { fa, en };

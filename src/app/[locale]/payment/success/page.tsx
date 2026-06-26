@@ -1,11 +1,3 @@
-/**
- * /payment/success — shown after the payment gateway callback confirms success.
- *
- * The gateway callback at /api/payments/callback redirects here after
- * server-side verification. The page fetches order data to display the receipt
- * and optionally lets the diner submit a review.
- */
-
 import { notFound } from "next/navigation";
 import { getOrder } from "@/lib/queries";
 import { PaymentSuccessClient } from "./_components/PaymentSuccessClient";
@@ -37,12 +29,24 @@ export default async function PaymentSuccessPage({
     ? (order.vendor.theme as ThemePreset)
     : undefined;
 
+  const receiptItems = order.items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    quantity: item.quantity,
+    lineTotal: item.lineTotal,
+  }));
+
   return (
     <TenantThemeProvider theme={{ preset }}>
       <PaymentSuccessClient
         lang={locale}
         orderNumber={order.orderNumber}
         total={order.total}
+        subtotal={order.subtotal}
+        tipAmount={order.tipAmount}
+        serviceCharge={order.serviceCharge}
+        tax={order.tax}
+        items={receiptItems}
         vendorName={order.vendor.name}
         vendorSlug={order.vendor.slug}
         country={order.vendor.country}

@@ -144,6 +144,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/app/api/payments/sweep/route.ts` — `POST /api/payments/sweep` — scheduled reconciliation sweep endpoint (requires `x-sweep-secret`)
 - `src/lib/payment/wallet-service.ts` — `issueRefundAsPayout` (float-guarded ledgered payout + sets Payment.status=refunded atomically), `depositFloat` (operator pre-funds wallet), `getWalletBalance`, `getWalletLedger`, `resolveOverpaymentViaRefund` (overpay unwind delegates to issueRefundAsPayout)
 - `src/components/customer/_components/MenuSkeleton.tsx` — `MenuSkeleton` (menu browse shimmer skeleton) and `LandingSkeleton` (landing page shimmer skeleton); used by `loading.tsx` at the vendor menu route
+- `src/components/customer/_components/ItemCard.tsx` — redesigned menu item card: brand-gradient image fallback, RTL "+" add indicator, `data-money` price, tabular-nums, diet badges
+- `src/components/customer/_components/CategoryChips.tsx` — category chip strip with auto-scroll active chip, `role=tablist`/`aria-selected` a11y, i18n `aria-label`, `localizedName` for Farsi/English display
 
 ## API & Data Layer
 
@@ -188,3 +190,4 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 **Done (M7 issues):**
 - #36 — Mobile-first shell + design foundation: `localeDetection: false` (Farsi-default routing fix); category chips now use `localizedName(c, lang)`; missing makeT keys added (`back`, `language`, `noSearchResults`); desktop frame (`md:bg-surface-2` outer + `md:shadow-float` column); `MenuSkeleton` + `LandingSkeleton` shimmer loading components; `loading.tsx` for vendor menu page; `PRODUCT.md` and `DESIGN.md` at repo root; ADR-0024
+- #38 — Menu browse + item cards redesign + render freeze fix: `ItemCard` component with image fallback (brand gradient + initial), RTL-aware "+" indicator, `data-money` price attr, tabular-nums; `CategoryChips` with auto-scroll active chip into view, `role=tablist`/`aria-selected`, i18n `aria-label`; `MenuBrowseHeader` extracted; `React.useTransition` for menu switches (non-urgent renders + opacity fade during `isPending`); `React.useDeferredValue` for search query (non-blocking filtering); `requestAnimationFrame` wrapping `scrollIntoView`; menu tabs hidden when only 1 menu; `categoryNav` i18n key added to fa/en dicts

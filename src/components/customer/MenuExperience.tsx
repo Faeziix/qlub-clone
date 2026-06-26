@@ -2,27 +2,35 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Search, Globe, ChevronLeft, ShoppingBag, UtensilsCrossed, CreditCard, ArrowLeft } from "lucide-react";
-import type { VendorWithMenus, ItemWithModifiers } from "@/lib/queries";
+import {
+  Search,
+  Globe,
+  ChevronLeft,
+  ShoppingBag,
+  UtensilsCrossed,
+  CreditCard,
+  ArrowLeft,
+} from "lucide-react";
+import type { VendorWithMenus } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
-import { makeT, dirFor, localizedName, localizedDescription } from "@/lib/i18n";
+import { makeT, dirFor, localizedName } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
 import { formatRialAsToman } from "@/lib/money";
-import { DietBadge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { ItemSheet } from "./ItemSheet";
 import { CartSheet } from "./CartSheet";
 import { LanguageSheet } from "./LanguageSheet";
 import { PayBillSheet } from "./PayBillSheet";
+import { ItemCard } from "./_components/ItemCard";
+import { CategoryChips } from "./_components/CategoryChips";
+import type { ItemWithModifiers } from "@/lib/queries";
 
-function displayPrice(rialAmount: bigint | number, locale: string): string {
-  const rial =
-    typeof rialAmount === "bigint" ? rialAmount : BigInt(Math.round(rialAmount));
+function subtotalLabel(rialAmount: bigint, locale: string): string {
   return locale === "fa"
-    ? formatRialAsTomanPersian(rial)
-    : `${formatRialAsToman(rial)} Toman`;
+    ? formatRialAsTomanPersian(rialAmount)
+    : `${formatRialAsToman(rialAmount)} Toman`;
 }
 
 type LandingView = "main" | "menuPicker";
@@ -44,12 +52,14 @@ export function MenuExperience({
   const [activeMenu, setActiveMenu] = React.useState(0);
   const [entered, setEntered] = React.useState(false);
   const [landingView, setLandingView] = React.useState<LandingView>("main");
-  const [query, setQuery] = React.useState("");
+  const [rawQuery, setRawQuery] = React.useState("");
+  const query = React.useDeferredValue(rawQuery);
   const [activeItem, setActiveItem] = React.useState<ItemWithModifiers | null>(null);
   const [cartOpen, setCartOpen] = React.useState(false);
   const [langOpen, setLangOpen] = React.useState(false);
   const [payBillOpen, setPayBillOpen] = React.useState(false);
   const [activeCat, setActiveCat] = React.useState(0);
+  const [isPending, startMenuTransition] = React.useTransition();
 
   const cart = useCart();
   const [hydrated, setHydrated] = React.useState(false);
@@ -60,13 +70,10 @@ export function MenuExperience({
   }, []);
 
   const count = hydrated ? cart.count() : 0;
-  const subtotal = hydrated ? cart.subtotal() : 0;
+  const subtotal = hydrated ? cart.subtotal() : 0n;
 
   const menu = menus[activeMenu];
-  const categories = React.useMemo(
-    () => menu?.categories ?? [],
-    [menu]
-  );
+  const categories = React.useMemo(() => menu?.categories ?? [], [menu]);
 
   const filtered = React.useMemo(() => {
     if (!query.trim()) return categories;
@@ -77,7 +84,7 @@ export function MenuExperience({
         items: c.items.filter(
           (i) =>
             localizedName(i, lang).toLowerCase().includes(q) ||
-            localizedDescription(i, lang)?.toLowerCase().includes(q)
+            (i.description?.toLowerCase().includes(q) ?? false)
         ),
       }))
       .filter((c) => c.items.length > 0);
@@ -95,13 +102,31 @@ export function MenuExperience({
   }
 
   function handleSelectMenu(index: number) {
-    setActiveMenu(index);
-    setActiveCat(0);
-    setEntered(true);
-    setLandingView("main");
+    startMenuTransition(() => {
+      setActiveMenu(index);
+      setActiveCat(0);
+      setEntered(true);
+      setLandingView("main");
+    });
   }
 
-  // ── Landing screen ──
+  function handleSwitchMenu(index: number) {
+    startMenuTransition(() => {
+      setActiveMenu(index);
+      setActiveCat(0);
+      setRawQuery("");
+    });
+  }
+
+  function handleSelectCategory(categoryId: string, index: number) {
+    setActiveCat(index);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`cat-${categoryId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   if (!entered) {
     return (
       <div dir={dir} className="min-h-screen bg-bg md:bg-surface-2">
@@ -156,96 +181,44 @@ export function MenuExperience({
     );
   }
 
-  // ── Menu browsing screen ──
   return (
     <div dir={dir} className="min-h-screen bg-bg md:bg-surface-2">
       <div className="mx-auto max-w-app min-h-screen bg-bg pb-28 md:shadow-float">
-        <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-line">
-          <div className="flex items-center gap-2 px-4 py-3">
-            <button
-              onClick={() => setEntered(false)}
-              className="grid h-9 w-9 place-items-center rounded-full bg-surface-2"
-              aria-label={t("back")}
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <h1 className="flex-1 truncate text-lg font-bold">{vendor.name}</h1>
-            <button
-              onClick={() => setLangOpen(true)}
-              className="grid h-9 w-9 place-items-center rounded-full bg-surface-2"
-              aria-label={t("language")}
-            >
-              <Globe size={18} />
-            </button>
-          </div>
+        <MenuBrowseHeader
+          vendor={vendor}
+          menu={menu}
+          menus={menus}
+          categories={categories}
+          lang={lang}
+          rawQuery={rawQuery}
+          activeCat={activeCat}
+          t={t}
+          onBack={() => setEntered(false)}
+          onLanguageOpen={() => setLangOpen(true)}
+          onQueryChange={setRawQuery}
+          onSwitchMenu={handleSwitchMenu}
+          onSelectCategory={handleSelectCategory}
+          activeMenu={activeMenu}
+        />
 
-          <div className="px-4 pb-3">
-            <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3">
-              <Search size={18} className="text-muted" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={`${t("search")} "${menu.name}"`}
-                className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted"
-              />
-            </div>
-          </div>
-
-          <div className="no-scrollbar flex gap-1 overflow-x-auto px-3 pb-1">
-            {menus.map((m, i) => (
-              <button
-                key={m.id}
-                onClick={() => {
-                  setActiveMenu(i);
-                  setActiveCat(0);
-                  setQuery("");
-                }}
-                className={cn(
-                  "shrink-0 border-b-2 px-3 pb-2 pt-1 text-sm font-bold uppercase tracking-wide transition-colors",
-                  i === activeMenu
-                    ? "border-brand text-brand"
-                    : "border-transparent text-muted"
-                )}
-              >
-                {m.name}
-              </button>
-            ))}
-          </div>
-
-          {!query && (
-            <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-3">
-              {categories.map((c, i) => (
-                <button
-                  key={c.id}
-                  onClick={() => {
-                    setActiveCat(i);
-                    document
-                      .getElementById(`cat-${c.id}`)
-                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                  className={cn(
-                    "shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors",
-                    i === activeCat
-                      ? "bg-brand text-brand-fg"
-                      : "bg-surface-2 text-ink"
-                  )}
-                >
-                  {localizedName(c, lang)}
-                </button>
-              ))}
-            </div>
+        <main
+          className={cn(
+            "px-4 transition-opacity duration-normal",
+            isPending && "opacity-50"
           )}
-        </header>
-
-        <main className="px-4">
+        >
           {filtered.map((cat) => (
-            <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-44 pt-5">
+            <section
+              key={cat.id}
+              id={`cat-${cat.id}`}
+              className="scroll-mt-52 pt-5"
+            >
               <h2 className="mb-3 text-xl font-extrabold">
                 {localizedName(cat, lang)}
               </h2>
               <div className="space-y-3">
                 {cat.items.map((item) => (
-                  <ItemRow
+                  <ItemCard
                     key={item.id}
                     item={item}
                     lang={lang}
@@ -255,13 +228,15 @@ export function MenuExperience({
               </div>
             </section>
           ))}
+
           {filtered.length === 0 && (
             <EmptyState
               icon={<Search size={28} />}
-              title={t("noSearchResults").replace("{query}", query)}
+              title={t("noSearchResults").replace("{query}", rawQuery)}
               className="py-16"
             />
           )}
+
           <LandingFooter t={t} />
         </main>
       </div>
@@ -270,6 +245,7 @@ export function MenuExperience({
         <div className="fixed inset-x-0 bottom-0 z-40 safe-bottom">
           <div className="mx-auto max-w-app px-4 pb-4">
             <button
+              type="button"
               onClick={() => setCartOpen(true)}
               className="flex w-full items-center justify-between rounded-2xl bg-brand px-5 py-4 text-brand-fg shadow-float animate-slide-up"
             >
@@ -280,7 +256,7 @@ export function MenuExperience({
                 {t("viewOrder")}
               </span>
               <span className="flex items-center gap-2 font-bold">
-                {displayPrice(subtotal, lang)}
+                {subtotalLabel(subtotal, lang)}
                 <ShoppingBag size={18} />
               </span>
             </button>
@@ -315,6 +291,118 @@ export function MenuExperience({
         title={t("changeLanguage")}
       />
     </div>
+  );
+}
+
+interface MenuBrowseHeaderProps {
+  vendor: VendorWithMenus;
+  menu: VendorWithMenus["menus"][number];
+  menus: VendorWithMenus["menus"];
+  categories: VendorWithMenus["menus"][number]["categories"];
+  lang: string;
+  rawQuery: string;
+  activeCat: number;
+  activeMenu: number;
+  t: (key: string) => string;
+  onBack: () => void;
+  onLanguageOpen: () => void;
+  onQueryChange: (q: string) => void;
+  onSwitchMenu: (index: number) => void;
+  onSelectCategory: (categoryId: string, index: number) => void;
+}
+
+function MenuBrowseHeader({
+  vendor,
+  menu,
+  menus,
+  categories,
+  lang,
+  rawQuery,
+  activeCat,
+  activeMenu,
+  t,
+  onBack,
+  onLanguageOpen,
+  onQueryChange,
+  onSwitchMenu,
+  onSelectCategory,
+}: MenuBrowseHeaderProps) {
+  const hasMultipleMenus = menus.length > 1;
+  const menuName = localizedName(menu, lang);
+
+  return (
+    <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-line">
+      <div className="flex items-center gap-2 px-4 py-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="grid h-9 w-9 place-items-center rounded-full bg-surface-2 transition-colors hover:bg-line"
+          aria-label={t("back")}
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <h1 className="flex-1 truncate text-lg font-bold">{vendor.name}</h1>
+        <button
+          type="button"
+          onClick={onLanguageOpen}
+          className="grid h-9 w-9 place-items-center rounded-full bg-surface-2 transition-colors hover:bg-line"
+          aria-label={t("language")}
+        >
+          <Globe size={18} />
+        </button>
+      </div>
+
+      <div className="px-4 pb-3">
+        <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3">
+          <Search size={18} className="shrink-0 text-muted" />
+          <input
+            value={rawQuery}
+            onChange={(e) => onQueryChange(e.target.value)}
+            placeholder={`${t("search")} ${menuName}`}
+            className="h-10 w-full bg-transparent text-sm outline-none placeholder:text-muted"
+          />
+          {rawQuery && (
+            <button
+              type="button"
+              onClick={() => onQueryChange("")}
+              className="shrink-0 text-muted hover:text-ink"
+              aria-label={t("back")}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      </div>
+
+      {hasMultipleMenus && (
+        <div className="no-scrollbar flex gap-1 overflow-x-auto px-3 pb-1">
+          {menus.map((m, i) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onSwitchMenu(i)}
+              className={cn(
+                "shrink-0 border-b-2 px-3 pb-2 pt-1 text-sm font-bold uppercase tracking-wide transition-colors",
+                i === activeMenu
+                  ? "border-brand text-brand"
+                  : "border-transparent text-muted hover:text-ink"
+              )}
+            >
+              {localizedName(m, lang)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!rawQuery && (
+        <CategoryChips
+          categories={categories}
+          activeCat={activeCat}
+          lang={lang}
+          onSelect={onSelectCategory}
+        />
+      )}
+    </header>
   );
 }
 
@@ -358,6 +446,7 @@ function VenueHero({
         )}
         <div className="absolute inset-0 bg-black/20" aria-hidden />
         <button
+          type="button"
           onClick={onLanguageOpen}
           className="absolute start-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-sm font-semibold shadow-card backdrop-blur"
         >
@@ -472,13 +561,16 @@ function MenuPickerPanel({
     <div className="px-5 pt-4 pb-4" dir={dir}>
       <div className="flex items-center gap-2 mb-4">
         <button
+          type="button"
           onClick={onBack}
           className="grid h-8 w-8 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink transition-colors"
           aria-label={t("back")}
         >
           <ArrowLeft size={16} aria-hidden />
         </button>
-        <p className="text-sm font-semibold text-muted">{t("selectMenuToContinue")}</p>
+        <p className="text-sm font-semibold text-muted">
+          {t("selectMenuToContinue")}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -503,6 +595,7 @@ function MenuTile({
 
   return (
     <button
+      type="button"
       onClick={onClick}
       className="group overflow-hidden rounded-2xl bg-surface text-start shadow-card transition-transform active:scale-95"
     >
@@ -543,56 +636,12 @@ function MenuTileFallback({ name }: { name: string }) {
   );
 }
 
-function ItemRow({
-  item,
-  lang,
-  onClick,
-}: {
-  item: ItemWithModifiers;
-  lang: string;
-  onClick: () => void;
-}) {
-  const tags = Array.isArray(item.tags) ? item.tags : [];
-  const name = localizedName(item, lang);
-  const description = localizedDescription(item, lang);
-  return (
-    <button
-      onClick={onClick}
-      className="flex w-full gap-3 rounded-2xl bg-surface p-3 text-start shadow-card transition-transform active:scale-[0.98]"
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <h3 className="font-bold">{name}</h3>
-          {tags.slice(0, 2).map((tag) => (
-            <DietBadge key={tag} tag={tag} />
-          ))}
-        </div>
-        {description && (
-          <p className="mt-1 line-clamp-2 text-sm text-muted">{description}</p>
-        )}
-        <p className="mt-2 font-bold text-brand">
-          {displayPrice(item.price, lang)}
-        </p>
-      </div>
-      {item.imageUrl ? (
-        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-2">
-          <Image
-            src={item.imageUrl}
-            alt={name}
-            fill
-            className="object-cover"
-            unoptimized
-          />
-        </div>
-      ) : null}
-    </button>
-  );
-}
-
 function LandingFooter({ t }: { t: (k: string) => string }) {
   return (
     <footer className="py-8 text-center">
-      <p className="text-2xl font-black tracking-tight text-muted/40">{"qlub_"}</p>
+      <p className="text-2xl font-black tracking-tight text-muted/40">
+        {"qlub_"}
+      </p>
       <p className="mt-1 text-xs text-muted">
         {t("termsPrefix")}{" "}
         <span className="underline">{t("terms")}</span>

@@ -114,6 +114,7 @@ const en: Dict = {
   orderNotFound: "No order found with that number. Please check and try again.",
   selectMenuToContinue: "Choose a menu to continue",
   noMenusAvailable: "No menus available right now.",
+  categoryNav: "Menu categories",
 };
 
 const fa: Dict = {
@@ -198,6 +199,7 @@ const fa: Dict = {
   orderNotFound: "سفارشی با این شماره یافت نشد. لطفاً دوباره بررسی کنید.",
   selectMenuToContinue: "یک منو برای ادامه انتخاب کنید",
   noMenusAvailable: "در حال حاضر منویی در دسترس نیست.",
+  categoryNav: "دسته‌بندی‌های منو",
 };
 
 const dicts: Record<string, Dict> = { fa, en };

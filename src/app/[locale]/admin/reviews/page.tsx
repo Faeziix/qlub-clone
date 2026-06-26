@@ -121,7 +121,7 @@ export default async function ReviewsPage() {
           t={{
             allRatings: t("allRatings"),
             noReviews: t("noReviews"),
-            noFilteredReviews: t("noFilteredReviews"),
+            noFilteredReviews: t.raw("noFilteredReviews"),
             anonymous: t("anonymous"),
             order: t("order"),
             food: t("food"),

@@ -148,6 +148,7 @@
       "guest": "Guest",
       "status": "Status",
       "time": "Time",
+      "total": "Total",
       "perOrder": "per distinct order",
       "staffTips": "staff tips",
       "live": "live",

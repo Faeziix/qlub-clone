@@ -92,6 +92,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ `localeDetection: true` in `src/i18n/routing.ts` causes next-intl to redirect `/qr/ir/<slug>` to `/en/qr/ir/<slug>` for English-browser users, breaking the Farsi-first mandate → ✅ Set `localeDetection: false` so the default locale (fa) is always served unless the user explicitly navigates to `/en/...`.
 - ❌ Category chip buttons rendered `{c.name}` (DB default) instead of `{localizedName(c, lang)}`, showing Farsi names even in English mode → ✅ All displayed names in customer UI must use `localizedName(node, lang)` so the active locale's translation is shown.
 - ❌ i18n keys used in `MenuExperience` (`back`, `language`, `noSearchResults`) existed only in `messages/*.json` (next-intl admin files) but NOT in the `en`/`fa` dicts in `src/lib/i18n.ts` used by `makeT()` → ✅ Always add keys to `src/lib/i18n.ts` dicts when used by customer-facing components that call `makeT()`; `messages/*.json` is a separate namespace for next-intl admin routes.
+- ❌ Inline modifier groups in seed.ts (not reusing the shared top-level consts) were added without `faName` on the group or any options, so `localizedName()` fell back to English for those groups/options → ✅ Every inline `modifierGroups` entry and every `options` entry needs `faName` alongside `name`; audit all non-const inline groups in seed.ts when adding new items.
+- ❌ Hardcoded `z-[200]`/`z-[300]` in component className bypasses the design token system → ✅ Use the Tailwind token aliases `z-overlay` (= var(--z-overlay) = 200) and `z-modal` (= var(--z-modal) = 300) defined in tailwind.config.ts.
+- ❌ `h-5 w-5 rounded-md` (border-radius 6px) on a 20×20px indicator still reads as a circle to users → ✅ Use `rounded` (4px) for multi-select checkbox indicators so the circular vs square affordance is clearly distinct from `rounded-full` radio buttons.
 
 ## Dependencies & Tooling
 

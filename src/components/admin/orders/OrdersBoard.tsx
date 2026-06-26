@@ -210,10 +210,17 @@ function OrderRow({
   const itemCount = order.items.reduce((s, i) => s + i.quantity, 0);
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(order)}
-      className="group flex w-full flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-start shadow-card transition-colors hover:border-brand/40 hover:bg-surface-2/40 sm:flex-row sm:items-center"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(order);
+        }
+      }}
+      className="group flex w-full cursor-pointer flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-start shadow-card transition-colors hover:border-brand/40 hover:bg-surface-2/40 sm:flex-row sm:items-center"
     >
       <div className="flex min-w-0 flex-1 items-start gap-3">
         <span
@@ -269,7 +276,7 @@ function OrderRow({
           className="hidden text-muted transition-transform group-hover:translate-x-0.5 sm:block"
         />
       </div>
-    </button>
+    </div>
   );
 }
 

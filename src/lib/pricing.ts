@@ -71,27 +71,30 @@ export function tipFromPct(base: bigint, pct: number): bigint {
 /**
  * Recomputes order totals after appending a delta subtotal to an existing order.
  * Used by appendItemsToOrder to update the order row after adding a new round.
+ * Mirrors computeBill: discount is subtracted from subtotal before service/tax.
  */
 export function recomputeOrderTotals(
   existingSubtotal: bigint,
   appendedSubtotal: bigint,
   config: PricingConfig,
-  tipAmount: bigint
+  tipAmount: bigint,
+  discount: bigint = 0n
 ): { subtotal: bigint; serviceCharge: bigint; tax: bigint; total: bigint } {
   const subtotal = existingSubtotal + appendedSubtotal;
-  const serviceCharge = pct(subtotal, config.serviceChargePct);
+  const taxable = subtotal > discount ? subtotal - discount : 0n;
+  const serviceCharge = pct(taxable, config.serviceChargePct);
 
   let tax: bigint;
   let total: bigint;
 
   if (config.taxInclusive) {
-    const base = subtotal + serviceCharge;
+    const base = taxable + serviceCharge;
     const taxFactor = BigInt(Math.round(config.taxPct * 100));
     tax = base - (base * 10_000n) / (10_000n + taxFactor);
     total = base + tipAmount;
   } else {
-    tax = pct(subtotal + serviceCharge, config.taxPct);
-    total = subtotal + serviceCharge + tax + tipAmount;
+    tax = pct(taxable + serviceCharge, config.taxPct);
+    total = taxable + serviceCharge + tax + tipAmount;
   }
 
   return { subtotal, serviceCharge, tax, total };

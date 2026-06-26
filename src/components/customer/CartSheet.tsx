@@ -102,6 +102,13 @@ export function CartSheet({
     }
   }
 
+  function localizedAppendError(serverMsg: string | undefined): string {
+    const msg = serverMsg ?? "";
+    if (msg.includes("payment is in progress")) return t("appendBlocked");
+    if (msg.includes("cannot be modified")) return t("appendTerminal");
+    return t("appendFailed");
+  }
+
   async function appendToExistingOrder() {
     if (!activeOrder) return;
     setPlacing(true);
@@ -117,10 +124,8 @@ export function CartSheet({
         lines: serializeLines(),
       });
       if (!data.ok) {
-        const msg = data.error ?? t("appendFailed");
-        if (msg.includes("payment is in progress")) throw new Error(t("appendBlocked"));
-        if (msg.includes("cannot be modified")) throw new Error(t("appendTerminal"));
-        throw new Error(msg);
+        setError(localizedAppendError(data.error));
+        return;
       }
       if (data.priceChanged) {
         setPendingOrderId(activeOrder.id);
@@ -133,7 +138,10 @@ export function CartSheet({
         );
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("appendFailed"));
+      const serverMsg = axios.isAxiosError(e)
+        ? (e.response?.data as { error?: string } | undefined)?.error
+        : undefined;
+      setError(localizedAppendError(serverMsg));
     } finally {
       setPlacing(false);
     }

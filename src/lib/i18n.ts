@@ -123,7 +123,7 @@ const en: Dict = {
   decreaseQty: "Decrease quantity",
   increaseQty: "Increase quantity",
   myOrder: "My Order",
-  myOrderTitle: "سفارش من",
+  myOrderTitle: "My Order",
   orderStatus: "Order status",
   addMoreItems: "Add more items",
   reorderRound: "Order another round",

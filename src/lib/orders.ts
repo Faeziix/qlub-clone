@@ -506,7 +506,7 @@ export async function appendItemsToOrder(input: {
     const pendingPayments = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM "Payment"
       WHERE "orderId" = ${input.orderId}
-        AND status = ANY(${BLOCKING_PAYMENT_STATUSES})
+        AND status::text = ANY(${BLOCKING_PAYMENT_STATUSES})
       LIMIT 1
     `;
     if (pendingPayments.length > 0) {
@@ -526,7 +526,8 @@ export async function appendItemsToOrder(input: {
         taxPct: vendor.taxPct,
         taxInclusive: vendor.taxInclusive,
       },
-      orderRow.tipAmount
+      orderRow.tipAmount,
+      orderRow.discount
     );
 
     await tx.orderItem.createMany({

@@ -16,7 +16,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { makeT, dirFor } from "@/lib/i18n";
-import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsTomanPersian, formatRialAsTomanLatin } from "@/lib/toman-formatter";
 import type { CustomerOrderSnapshot, CustomerOrderItem, OrderStatus } from "@/lib/types";
 
 const POLL_INTERVAL_MS = 10_000;
@@ -25,9 +25,7 @@ const STATUS_STEPS = ["placed", "preparing", "ready", "served"] as const;
 
 function rialDisplay(amountStr: string, lang: string): string {
   const r = BigInt(amountStr);
-  if (lang === "fa") return formatRialAsTomanPersian(r);
-  const toman = r / 10n;
-  return `${toman.toLocaleString("en")} Toman`;
+  return lang === "fa" ? formatRialAsTomanPersian(r) : formatRialAsTomanLatin(r);
 }
 
 function statusLabel(status: OrderStatus, t: (k: string) => string): string {
@@ -97,11 +95,11 @@ function StatusIndicator({
 }
 
 function OrderItemRow({ item, lang }: { item: CustomerOrderItem; lang: string }) {
-  const lineTotal = BigInt(item.lineTotal);
+  const lineTotalRial = BigInt(item.lineTotal);
   const display =
     lang === "fa"
-      ? formatRialAsTomanPersian(lineTotal)
-      : `${(lineTotal / 10n).toLocaleString("en")} T`;
+      ? formatRialAsTomanPersian(lineTotalRial)
+      : formatRialAsTomanLatin(lineTotalRial);
 
   return (
     <div className="flex items-start justify-between gap-3 py-2.5">

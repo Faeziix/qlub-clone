@@ -788,6 +788,63 @@ describe("Reconciliation sweep — runReconciliationSweep logic", () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
+// 10b. Sweep — ambiguous-past-expiry does NOT abort subsequent payments (continue, not return)
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("Reconciliation sweep — loop-abort regression (AC3)", () => {
+  it("an ambiguous past-expiry payment does not halt sweep of remaining payments in the batch", async () => {
+    const adapter = new SimulatedPaymentAdapter();
+
+    const { ref: ambigRef } = await adapter.request({ merchantId: "m", amount: 100_000n, callbackUrl: "cb", orderId: "ord-ambig" });
+    const { ref: paidRef } = await adapter.request({ merchantId: "m", amount: 200_000n, callbackUrl: "cb", orderId: "ord-paid" });
+    adapter.simulatePaid(paidRef);
+
+    const db = new FakeDatabase();
+    db.seedOrder({ id: "ord-ambig", vendorId: "v", total: 100_000n });
+    db.seedOrder({ id: "ord-paid", vendorId: "v", total: 200_000n });
+
+    const ambigPayment = db.seedPayment({
+      id: "p-ambig",
+      orderId: "ord-ambig",
+      vendorId: "v",
+      amount: 100_000n,
+      tipAmount: 0n,
+      trackId: ambigRef,
+      expiresAt: new Date(Date.now() - 1),
+    });
+
+    const paidPayment = db.seedPayment({
+      id: "p-paid",
+      orderId: "ord-paid",
+      vendorId: "v",
+      amount: 200_000n,
+      tipAmount: 0n,
+      trackId: paidRef,
+      expiresAt: new Date(Date.now() - 1),
+    });
+
+    const opsQueue: OpsQueueEntry[] = [];
+
+    await runReconciliationSweep({
+      payments: [ambigPayment, paidPayment] as SweepablePayment[],
+      provider: adapter,
+      onVerified: (paymentId, orderId, amount, ref) => {
+        fakeRecordVerified(db, paymentId, orderId, amount, ref);
+      },
+      onFailed: (paymentId) => { fakeRecordFailed(db, paymentId); },
+      onExpired: (paymentId) => { fakeExpirePayment(db, paymentId); },
+      onAmbiguous: (entry) => { opsQueue.push(entry); },
+    });
+
+    expect(opsQueue).toHaveLength(1);
+    expect(opsQueue[0].paymentId).toBe("p-ambig");
+
+    expect(db.getPayment("p-paid")!.status).toBe("succeeded");
+    expect(db.getOrder("ord-paid")!.status).toBe("paid");
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // 11. Sweep — buildReconciliationSweepRunner (configured runner)
 // ──────────────────────────────────────────────────────────────────────────────
 

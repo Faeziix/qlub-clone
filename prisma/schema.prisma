@@ -225,6 +225,21 @@ model Payment {
   @@index([status])
 }
 
+model OpsQueueEntry {
+  id          String   @id @default(cuid())
+  paymentId   String
+  orderId     String
+  vendorId    String
+  reason      String
+  resolvedAt  DateTime?
+  inquiredAt  DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([vendorId])
+  @@index([resolvedAt])
+}
+
 model Review {
   id             String   @id @default(cuid())
   vendorId       String

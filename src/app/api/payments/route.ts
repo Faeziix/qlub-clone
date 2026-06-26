@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { initiatePaymentLeg } from "@/lib/orders";
+import { initiatePaymentLeg, initiateSubChargeLegs } from "@/lib/orders";
 import { serializePayment } from "@/lib/api-serializers";
 import { bigintFromJson } from "@/lib/money";
 import { nanoid } from "nanoid";
 import { checkOrigin } from "@/lib/csrf";
 import { getLimiter } from "@/lib/limiters";
 import { getPaymentProvider } from "@/lib/payment/factory";
+import {
+  computeCeilingSplit,
+  IPG_TRANSACTION_CEILING_RIAL,
+} from "@/lib/payment/ceiling-split";
 
 const schema = z.object({
   orderId: z.string().min(1).max(100),
@@ -44,20 +48,65 @@ export async function POST(req: Request) {
   try {
     const data = schema.parse(await req.json());
     const idempotencyKey = data.idempotencyKey ?? `pay_${nanoid(21)}`;
-    const leg = await initiatePaymentLeg({
-      orderId: data.orderId,
-      amount: bigintFromJson(data.amount),
-      tipAmount: data.tipAmount != null ? bigintFromJson(data.tipAmount) : 0n,
-      method: data.method,
-      idempotencyKey,
-      splitType: data.splitType,
-      splitMeta: data.splitMeta,
-      payerName: data.payerName,
-      payerEmail: data.payerEmail,
-    });
+    const amount = bigintFromJson(data.amount);
+    const tipAmount = data.tipAmount != null ? bigintFromJson(data.tipAmount) : 0n;
 
     if (data.method === "ipg") {
+      const splitResult = computeCeilingSplit({
+        amount,
+        tipAmount,
+        ceiling: IPG_TRANSACTION_CEILING_RIAL,
+      });
+
       const provider = getPaymentProvider();
+
+      if (splitResult.requiresSplit) {
+        const subLegs = await initiateSubChargeLegs({
+          orderId: data.orderId,
+          chunks: splitResult.chunks,
+          method: data.method,
+          baseIdempotencyKey: idempotencyKey,
+          splitType: data.splitType,
+          splitMeta: data.splitMeta,
+          payerName: data.payerName,
+          payerEmail: data.payerEmail,
+        });
+
+        const firstLeg = subLegs[0];
+        const callbackUrl = buildCallbackUrl(req, firstLeg.id);
+        const { ref } = await provider.request({
+          merchantId: firstLeg.vendorId,
+          amount: firstLeg.total,
+          callbackUrl,
+          orderId: data.orderId,
+          description: `پرداخت سفارش (قسط ۱ از ${subLegs.length})`,
+        });
+
+        await storePendingTrackId(firstLeg.id, ref);
+        const gatewayRedirectUrl = provider.redirectUrl(ref);
+
+        return NextResponse.json({
+          ok: true,
+          payment: serializePayment(firstLeg),
+          gatewayRedirectUrl,
+          trackId: ref,
+          subChargeCount: subLegs.length,
+          remainingSubCharges: subLegs.slice(1).map((l) => serializePayment(l)),
+        });
+      }
+
+      const leg = await initiatePaymentLeg({
+        orderId: data.orderId,
+        amount,
+        tipAmount,
+        method: data.method,
+        idempotencyKey,
+        splitType: data.splitType,
+        splitMeta: data.splitMeta,
+        payerName: data.payerName,
+        payerEmail: data.payerEmail,
+      });
+
       const callbackUrl = buildCallbackUrl(req, leg.id);
       const { ref } = await provider.request({
         merchantId: leg.vendorId,
@@ -68,8 +117,8 @@ export async function POST(req: Request) {
       });
 
       await storePendingTrackId(leg.id, ref);
-
       const gatewayRedirectUrl = provider.redirectUrl(ref);
+
       return NextResponse.json({
         ok: true,
         payment: serializePayment(leg),
@@ -77,6 +126,18 @@ export async function POST(req: Request) {
         trackId: ref,
       });
     }
+
+    const leg = await initiatePaymentLeg({
+      orderId: data.orderId,
+      amount,
+      tipAmount,
+      method: data.method,
+      idempotencyKey,
+      splitType: data.splitType,
+      splitMeta: data.splitMeta,
+      payerName: data.payerName,
+      payerEmail: data.payerEmail,
+    });
 
     return NextResponse.json({ ok: true, payment: serializePayment(leg) });
   } catch {

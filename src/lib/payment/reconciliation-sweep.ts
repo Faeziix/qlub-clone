@@ -98,7 +98,7 @@ export async function runReconciliationSweep(input: ReconciliationSweepInput): P
         reason: "gateway_inquiry_pending_past_expiry",
         inquiredAt: now,
       });
-      return;
+      continue;
     }
 
     await input.onAmbiguous({

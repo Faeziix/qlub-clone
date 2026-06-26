@@ -10,19 +10,20 @@
  *
  *   inquire → succeeded  → record as verified (auto-complete)
  *   inquire → failed     → record as failed (release reservation)
- *   inquire → pending, past expiry → surface to ops queue (ambiguous)
+ *   inquire → pending, past expiry → write to OpsQueueEntry (durable, superadmin visible)
  *   trackId missing      → record as expired (no way to inquire)
  *
  * Auth: requires SWEEP_SECRET header matching the SWEEP_SECRET env var.
  * This prevents unauthorised callers from draining rate-limit quotas at the
- * gateway. Set SWEEP_SECRET to a strong random value in the environment.
+ * gateway. SWEEP_SECRET MUST be set in production (cron invoker sets it).
  *
- * Tenant isolation: the sweep operates across all vendors but records ops-queue
- * entries with vendorId so superadmin can filter by tenant.
+ * Tenant isolation: the sweep operates across all vendors but OpsQueueEntry
+ * rows carry vendorId so superadmin can filter by tenant.
  */
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { nanoid } from "nanoid";
 import { getPaymentProvider } from "@/lib/payment/factory";
 import {
   transitionToVerifying,
@@ -34,7 +35,7 @@ import {
   runReconciliationSweep,
   SWEEP_STALENESS_MINUTES,
 } from "@/lib/payment/reconciliation-sweep";
-import type { OpsQueueEntry, SweepablePayment } from "@/lib/payment/reconciliation-sweep";
+import type { SweepablePayment } from "@/lib/payment/reconciliation-sweep";
 
 const SWEEP_STALENESS_CUTOFF_MS = SWEEP_STALENESS_MINUTES * 60 * 1000;
 
@@ -66,8 +67,6 @@ export async function POST(req: Request): Promise<NextResponse> {
   });
 
   const provider = getPaymentProvider();
-  const opsQueue: OpsQueueEntry[] = [];
-
   const resolvedCount = { verified: 0, failed: 0, expired: 0, ambiguous: 0 };
 
   await runReconciliationSweep({
@@ -87,7 +86,16 @@ export async function POST(req: Request): Promise<NextResponse> {
       resolvedCount.expired++;
     },
     onAmbiguous: async (entry) => {
-      opsQueue.push(entry);
+      await db.opsQueueEntry.create({
+        data: {
+          id: `ops_${nanoid(16)}`,
+          paymentId: entry.paymentId,
+          orderId: entry.orderId,
+          vendorId: entry.vendorId,
+          reason: entry.reason,
+          inquiredAt: entry.inquiredAt,
+        },
+      });
       resolvedCount.ambiguous++;
     },
   });
@@ -96,6 +104,5 @@ export async function POST(req: Request): Promise<NextResponse> {
     ok: true,
     swept: stalePayments.length,
     resolved: resolvedCount,
-    opsQueue,
   });
 }

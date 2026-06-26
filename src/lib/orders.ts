@@ -4,6 +4,7 @@ import { computeBill, lineTotal } from "./pricing";
 import { nanoid } from "nanoid";
 import { Prisma, OrderStatus } from "@prisma/client";
 import type { CartLine, PaymentMethod, SplitType } from "./types";
+import type { SubChargeChunk } from "./payment/ceiling-split";
 
 const LEG_RESERVATION_TTL_MS = 15 * 60 * 1000;
 
@@ -246,6 +247,109 @@ export async function initiatePaymentLeg(input: {
         expiresAt,
       },
     });
+  });
+}
+
+/**
+ * Creates multiple pending Payment rows for a ceiling-split leg (PRD §6.4).
+ * Each chunk becomes a separate Payment row linked via parentPaymentId.
+ * parentPaymentId is a synthetic group key (not a FK to Payment) — it links
+ * all sub-charges in a split group so the sweep and fullyPaid check can
+ * enumerate them.
+ *
+ * The order is not credited until ALL sub-charge callbacks verify (each call
+ * to recordPaymentVerified increments amountPaid by that chunk's amount).
+ *
+ * Idempotent: repeated calls with the same baseIdempotencyKey return the
+ * existing sub-charge rows without creating duplicates.
+ *
+ * Returns sub-charge Payment rows in chunk order. The caller sends each
+ * one to the gateway sequentially (first immediately; subsequent ones after
+ * each prior sub-charge succeeds).
+ */
+export async function initiateSubChargeLegs(input: {
+  orderId: string;
+  chunks: SubChargeChunk[];
+  method: PaymentMethod;
+  baseIdempotencyKey: string;
+  splitType?: SplitType;
+  splitMeta?: Record<string, unknown> | null;
+  payerName?: string;
+  payerEmail?: string;
+}) {
+  return db.$transaction(async (tx) => {
+    const firstSubKey = `${input.baseIdempotencyKey}_sub0`;
+    const existingFirst = await tx.$queryRaw<{ id: string; parentPaymentId: string | null }[]>`
+      SELECT id, "parentPaymentId" FROM "Payment"
+      WHERE "idempotencyKey" = ${firstSubKey}
+      LIMIT 1
+    `;
+    if (existingFirst.length > 0 && existingFirst[0].parentPaymentId) {
+      const subCharges = await tx.payment.findMany({
+        where: { parentPaymentId: existingFirst[0].parentPaymentId },
+        orderBy: { createdAt: "asc" },
+      });
+      if (subCharges.length > 0) return subCharges;
+    }
+
+    const orderRows = await tx.$queryRaw<
+      { id: string; vendorId: string; currency: string; total: bigint; amountPaid: bigint }[]
+    >`
+      SELECT id, "vendorId", currency, total, "amountPaid"
+      FROM "Order"
+      WHERE id = ${input.orderId}
+      FOR UPDATE
+    `;
+    if (!orderRows.length) throw new Error("Order not found");
+    const orderRow = orderRows[0];
+
+    const pendingPayments = await tx.$queryRaw<{ amount: bigint }[]>`
+      SELECT amount FROM "Payment"
+      WHERE "orderId" = ${input.orderId}
+        AND status = 'pending'
+        AND "expiresAt" > NOW()
+    `;
+
+    const reservedBalance = pendingPayments.reduce((s, p) => s + p.amount, 0n);
+    const remaining = orderRow.total - orderRow.amountPaid - reservedBalance;
+    const totalSplitAmount = input.chunks.reduce((s, c) => s + c.amount, 0n);
+
+    if (remaining <= 0n) throw new Error("Order is already fully paid or reserved");
+    if (totalSplitAmount > remaining) {
+      throw new Error(`Split amount exceeds remaining balance (${remaining})`);
+    }
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const groupId = `csg_${nanoid(16)}`;
+
+    const subCharges = await Promise.all(
+      input.chunks.map((chunk, idx) =>
+        tx.payment.create({
+          data: {
+            vendorId: orderRow.vendorId,
+            orderId: orderRow.id,
+            amount: chunk.amount,
+            tipAmount: chunk.tipAmount,
+            total: chunk.gatewayTotal,
+            currency: orderRow.currency,
+            method: input.method,
+            status: "pending",
+            splitType: input.splitType ?? "full",
+            splitMeta: input.splitMeta
+              ? (input.splitMeta as Prisma.InputJsonValue)
+              : Prisma.DbNull,
+            payerName: input.payerName,
+            payerEmail: input.payerEmail,
+            reference: `pay_${nanoid(16)}`,
+            idempotencyKey: `${input.baseIdempotencyKey}_sub${idx}`,
+            parentPaymentId: groupId,
+            expiresAt,
+          },
+        })
+      )
+    );
+
+    return subCharges;
   });
 }
 

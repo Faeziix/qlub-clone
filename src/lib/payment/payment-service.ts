@@ -12,6 +12,11 @@
  *   verifying → succeeded (recordPaymentVerified — "already processed", idempotent)
  *   pending/verifying → expired (expirePayment — TTL passed, no gateway success)
  *   succeeded → refunded  (recordPaymentRefunded — payout unwind for overpay/refund)
+ *
+ * Overpay handling (PRD §5.4.2):
+ *   On recordPaymentVerified, if amountPaid is ALREADY >= total before crediting
+ *   this payment, the order is already fully paid — mark the incoming payment
+ *   as refunded immediately and surface it for payout unwind. From day one.
  */
 
 import "server-only";
@@ -42,7 +47,7 @@ export async function recordPaymentVerified(input: {
   orderId: string;
   amount: bigint;
   gatewayReference?: string;
-}): Promise<{ fullyPaid: boolean; idempotent: boolean }> {
+}): Promise<{ fullyPaid: boolean; idempotent: boolean; overpaid: boolean }> {
   return db.$transaction(async (tx) => {
     const updated = await tx.$executeRaw`
       UPDATE "Payment"
@@ -61,9 +66,9 @@ export async function recordPaymentVerified(input: {
       });
       if (existing?.status === "succeeded") {
         const order = await tx.order.findUnique({ where: { id: input.orderId } });
-        return { fullyPaid: order ? order.amountPaid >= order.total : false, idempotent: true };
+        return { fullyPaid: order ? order.amountPaid >= order.total : false, idempotent: true, overpaid: false };
       }
-      return { fullyPaid: false, idempotent: false };
+      return { fullyPaid: false, idempotent: false, overpaid: false };
     }
 
     const orderRows = await tx.$queryRaw<
@@ -74,8 +79,19 @@ export async function recordPaymentVerified(input: {
       WHERE id = ${input.orderId}
       FOR UPDATE
     `;
-    if (!orderRows.length) return { fullyPaid: false, idempotent: false };
+    if (!orderRows.length) return { fullyPaid: false, idempotent: false, overpaid: false };
     const orderRow = orderRows[0];
+
+    const alreadyFullyPaid = orderRow.amountPaid >= orderRow.total;
+    if (alreadyFullyPaid) {
+      await tx.$executeRaw`
+        UPDATE "Payment"
+        SET status = 'refunded'
+        WHERE id = ${input.paymentId}
+          AND status = 'succeeded'
+      `;
+      return { fullyPaid: true, idempotent: false, overpaid: true };
+    }
 
     const newAmountPaid = orderRow.amountPaid + input.amount;
     const fullyPaid = newAmountPaid >= orderRow.total;
@@ -95,7 +111,7 @@ export async function recordPaymentVerified(input: {
       });
     }
 
-    return { fullyPaid, idempotent: false };
+    return { fullyPaid, idempotent: false, overpaid: false };
   });
 }
 

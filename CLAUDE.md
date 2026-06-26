@@ -43,7 +43,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 ## Patterns & Conventions
 
 - Route: `/qr/[country]/[vendor]` — `country` is fixed to `ir` in production.
-- Admin routes: `/admin/*` — edge JWT-guarded via `middleware.ts`.
+- Admin routes: `/admin/*` — JWT-guarded via `proxy.ts` (Next 16 convention; nodejs runtime — renamed from the deprecated edge `middleware.ts`).
 - Server actions: always include auth check + vendor ownership verification.
 - Prisma: use `$transaction` + `SELECT … FOR UPDATE` for concurrent money operations.
 - Tests: assert external behavior (inputs → outputs/state), not implementation details.
@@ -84,6 +84,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ State machine had no `verifying` intermediate state — concurrent callbacks could both apply `recordPaymentVerified` and double-credit `order.amountPaid` → ✅ `transitionToVerifying` claims the payment atomically (`WHERE status='pending'`); only the first caller gets 1 row; subsequent callers get 0 and return idempotent success.
 - ❌ `PaymentStatus` enum missing `verifying` value — adding it after the fact requires `ALTER TYPE ... ADD VALUE` not a full enum recreate in Postgres → ✅ Use `ALTER TYPE "PaymentStatus" ADD VALUE IF NOT EXISTS 'verifying' AFTER 'pending'` in the migration.
 - ❌ Ceiling-split tip distribution: proportionally splitting tip by bill chunks can produce gatewayTotal > ceiling → ✅ Split the TOTAL (amount+tip) by ceiling, then derive amount/tip portions from each total chunk proportionally.
+- ❌ Next 16 keeps deploying `src/middleware.ts` on the deprecated **edge** runtime, which can throw `MIDDLEWARE_INVOCATION_FAILED` at runtime even when the build passes → ✅ Rename to `src/proxy.ts` with `export default function proxy(...)` (Next 16 convention, **nodejs** runtime). `config.matcher` is unchanged; `jose`/`process.env` run fine on Node; `next-intl/middleware` import path is unchanged.
+- ❌ Vercel build fails with `P1012 Environment variable not found: DIRECT_URL` during `prisma migrate deploy` even though `prisma generate` passed (generate doesn't resolve datasource `env()`; migrate does) → ✅ Set both `DATABASE_URL` (pooled, `-pooler` host) and `DIRECT_URL` (unpooled, no `-pooler`) in Vercel env for Production/Preview. `prisma.config.ts` only loads a local `.env`, so Vercel needs them in project settings.
 
 ## Dependencies & Tooling
 

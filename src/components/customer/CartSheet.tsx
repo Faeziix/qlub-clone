@@ -2,18 +2,23 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, ShoppingBag, AlertTriangle } from "lucide-react";
+import { ShoppingBag, AlertTriangle } from "lucide-react";
 import type { VendorWithMenus } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
-import { formatAmount } from "@/lib/utils";
-import { computeBill, lineTotal } from "@/lib/pricing";
+import { computeBill } from "@/lib/pricing";
 import { bigintToJson } from "@/lib/money";
 import axios from "axios";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
-import { QuantityStepper } from "@/components/ui/QuantityStepper";
+import { MoneyText } from "@/components/ui/MoneyText";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { CartLineItem } from "./_components/CartLineItem";
+
+interface ActiveOrderRef {
+  id: string;
+  orderNumber: string;
+}
 
 export function CartSheet({
   open,
@@ -21,20 +26,25 @@ export function CartSheet({
   vendor,
   lang,
   tableCode,
+  activeOrder,
+  onOrderPlaced,
 }: {
   open: boolean;
   onClose: () => void;
   vendor: VendorWithMenus;
   lang: string;
   tableCode: string | null;
+  activeOrder: ActiveOrderRef | null;
+  onOrderPlaced: (orderId: string) => void;
 }) {
   const t = makeT(lang);
   const router = useRouter();
-  const { lines, setQty, removeLine } = useCart();
+  const { lines, setQty, removeLine, clear } = useCart();
   const [placing, setPlacing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [pendingOrderId, setPendingOrderId] = React.useState<string | null>(null);
   const [showPriceChangedNotice, setShowPriceChangedNotice] = React.useState(false);
+  const [showNewOrderConfirm, setShowNewOrderConfirm] = React.useState(false);
 
   const bill = computeBill(lines, {
     serviceChargePct: vendor.serviceChargePct,
@@ -43,34 +53,42 @@ export function CartSheet({
   });
 
   function navigateToPayment(orderId: string) {
+    clear();
     onClose();
     router.push(
       `/qr/${vendor.country}/${vendor.slug}/pay?order=${orderId}&lang=${lang}`
     );
   }
 
-  async function placeOrder() {
+  function serializeLines() {
+    return lines.map((l) => ({
+      ...l,
+      unitPrice: bigintToJson(l.unitPrice),
+      modifiers: l.modifiers.map((m) => ({
+        ...m,
+        priceDelta: bigintToJson(m.priceDelta),
+      })),
+    }));
+  }
+
+  async function placeNewOrder() {
     setPlacing(true);
     setError(null);
+    setShowNewOrderConfirm(false);
     try {
-      const serializedLines = lines.map((l) => ({
-        ...l,
-        unitPrice: bigintToJson(l.unitPrice),
-        modifiers: l.modifiers.map((m) => ({
-          ...m,
-          priceDelta: bigintToJson(m.priceDelta),
-        })),
-      }));
-      const { data } = await axios.post<{ ok: boolean; order: { id: string }; priceChanged: boolean; error?: string }>(
-        "/api/orders",
-        {
-          vendorSlug: vendor.slug,
-          tableCode,
-          type: tableCode ? "dinein" : "qsr",
-          lines: serializedLines,
-        }
-      );
+      const { data } = await axios.post<{
+        ok: boolean;
+        order: { id: string };
+        priceChanged: boolean;
+        error?: string;
+      }>("/api/orders", {
+        vendorSlug: vendor.slug,
+        tableCode,
+        type: tableCode ? "dinein" : "qsr",
+        lines: serializeLines(),
+      });
       if (!data.ok) throw new Error(data.error ?? t("orderFailed"));
+      onOrderPlaced(data.order.id);
       if (data.priceChanged) {
         setPendingOrderId(data.order.id);
         setShowPriceChangedNotice(true);
@@ -84,16 +102,71 @@ export function CartSheet({
     }
   }
 
+  function localizedAppendError(serverMsg: string | undefined): string {
+    const msg = serverMsg ?? "";
+    if (msg.includes("payment is in progress")) return t("appendBlocked");
+    if (msg.includes("cannot be modified")) return t("appendTerminal");
+    return t("appendFailed");
+  }
+
+  async function appendToExistingOrder() {
+    if (!activeOrder) return;
+    setPlacing(true);
+    setError(null);
+    try {
+      const { data } = await axios.patch<{
+        ok: boolean;
+        order: { id: string };
+        priceChanged: boolean;
+        error?: string;
+      }>(`/api/orders/${activeOrder.id}`, {
+        vendorSlug: vendor.slug,
+        lines: serializeLines(),
+      });
+      if (!data.ok) {
+        setError(localizedAppendError(data.error));
+        return;
+      }
+      if (data.priceChanged) {
+        setPendingOrderId(activeOrder.id);
+        setShowPriceChangedNotice(true);
+      } else {
+        clear();
+        onClose();
+        router.push(
+          `/qr/${vendor.country}/${vendor.slug}/pay?order=${activeOrder.id}&lang=${lang}`
+        );
+      }
+    } catch (e) {
+      const serverMsg = axios.isAxiosError(e)
+        ? (e.response?.data as { error?: string } | undefined)?.error
+        : undefined;
+      setError(localizedAppendError(serverMsg));
+    } finally {
+      setPlacing(false);
+    }
+  }
+
+  function handlePrimaryAction() {
+    if (activeOrder) {
+      appendToExistingOrder();
+    } else {
+      placeNewOrder();
+    }
+  }
+
   if (showPriceChangedNotice && pendingOrderId) {
     return (
       <Sheet open={open} onClose={onClose} title={t("priceUpdated")} height="tall">
         <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-10 text-center">
           <div className="grid h-16 w-16 place-items-center rounded-full bg-warning/15 text-warning">
-            <AlertTriangle size={32} />
+            <AlertTriangle size={32} aria-hidden />
           </div>
           <div>
             <h2 className="text-lg font-extrabold">{t("priceUpdated")}</h2>
-            <p className="mt-2 text-sm text-muted">{t("priceUpdatedHint")}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              {t("priceUpdatedHint")}
+            </p>
           </div>
           <div className="w-full space-y-3">
             <Button
@@ -119,6 +192,30 @@ export function CartSheet({
     );
   }
 
+  if (showNewOrderConfirm && activeOrder) {
+    return (
+      <Sheet open={open} onClose={() => setShowNewOrderConfirm(false)} title={t("confirmNewOrder")} height="tall">
+        <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-10 text-center">
+          <p className="text-sm leading-relaxed text-muted">
+            {t("confirmNewOrderHint").replace("{orderNumber}", activeOrder.orderNumber)}
+          </p>
+          <div className="w-full space-y-3">
+            <Button fullWidth size="lg" loading={placing} onClick={placeNewOrder}>
+              {t("confirmNewOrder")}
+            </Button>
+            <Button
+              fullWidth
+              variant="ghost"
+              onClick={() => setShowNewOrderConfirm(false)}
+            >
+              {t("goBack")}
+            </Button>
+          </div>
+        </div>
+      </Sheet>
+    );
+  }
+
   return (
     <Sheet open={open} onClose={onClose} title={t("yourOrder")} height="tall">
       {lines.length === 0 ? (
@@ -134,90 +231,55 @@ export function CartSheet({
         />
       ) : (
         <div className="flex h-full flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-2">
-            <div className="space-y-3">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-3 pt-1">
+            <div className="space-y-2">
               {lines.map((l) => (
-                <div
+                <CartLineItem
                   key={l.lineId}
-                  className="rounded-2xl border border-line bg-surface p-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold">{l.name}</p>
-                      {l.modifiers.length > 0 && (
-                        <p className="mt-0.5 text-xs text-muted">
-                          {l.modifiers.map((m) => m.optionName).join(", ")}
-                        </p>
-                      )}
-                      {l.notes && (
-                        <p className="mt-0.5 text-xs italic text-muted">
-                          &quot;{l.notes}&quot;
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => removeLine(l.lineId)}
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted hover:text-danger"
-                      aria-label={t("remove")}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between">
-                    <QuantityStepper
-                      size="sm"
-                      value={l.quantity}
-                      onChange={(q) => setQty(l.lineId, q)}
-                      min={0}
-                      decreaseLabel={t("decreaseQty")}
-                      increaseLabel={t("increaseQty")}
-                    />
-                    <span className="font-bold">
-                      {vendor.currency} {formatAmount(lineTotal(l))}
-                    </span>
-                  </div>
-                </div>
+                  line={l}
+                  onQtyChange={(q) => setQty(l.lineId, q)}
+                  onRemove={() => removeLine(l.lineId)}
+                  removeLabel={t("remove")}
+                  decreaseLabel={t("decreaseQty")}
+                  increaseLabel={t("increaseQty")}
+                />
               ))}
             </div>
 
-            <div className="mt-5 space-y-2 rounded-2xl bg-surface-2 p-4 text-sm">
-              <Row label={t("subtotal")} value={bill.subtotal} c={vendor.currency} />
-              {bill.serviceCharge > 0n && (
-                <Row
-                  label={`${t("serviceCharge")} (${vendor.serviceChargePct}%)`}
-                  value={bill.serviceCharge}
-                  c={vendor.currency}
-                />
-              )}
-              {bill.tax > 0n && (
-                <Row
-                  label={`${t("tax")} ${vendor.taxInclusive ? "(incl.)" : ""}`}
-                  value={bill.tax}
-                  c={vendor.currency}
-                />
-              )}
-              <div className="my-1 border-t border-line" />
-              <div className="flex items-center justify-between text-base font-extrabold">
-                <span>{t("total")}</span>
-                <span>
-                  {vendor.currency} {formatAmount(bill.total)}
-                </span>
-              </div>
-            </div>
+            <BillBreakdown bill={bill} vendor={vendor} t={t} />
           </div>
 
-          <div className="shrink-0 border-t border-line bg-surface p-4 safe-bottom">
+          <div className="shrink-0 border-t border-line bg-surface px-4 pb-4 pt-3 safe-bottom">
             {error && (
-              <p className="mb-2 text-center text-sm text-danger">{error}</p>
+              <p className="mb-3 rounded-xl bg-danger/10 px-4 py-2.5 text-center text-sm font-medium text-danger">
+                {error}
+              </p>
             )}
             <Button
               fullWidth
               size="lg"
               loading={placing}
-              onClick={placeOrder}
+              onClick={handlePrimaryAction}
+              className="justify-between px-5"
             >
-              {t("placeOrder")} · {vendor.currency} {formatAmount(bill.total)}
+              <span>
+                {activeOrder
+                  ? t("addToExistingOrder").replace("{orderNumber}", activeOrder.orderNumber)
+                  : t("placeOrder")}
+              </span>
+              <MoneyText rial={bill.total} className="text-brand-fg" />
             </Button>
+            {activeOrder && (
+              <Button
+                fullWidth
+                variant="ghost"
+                size="md"
+                className="mt-2"
+                onClick={() => setShowNewOrderConfirm(true)}
+              >
+                {t("newOrder")}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -225,21 +287,60 @@ export function CartSheet({
   );
 }
 
-function Row({
+function BillBreakdown({
+  bill,
+  vendor,
+  t,
+}: {
+  bill: ReturnType<typeof computeBill>;
+  vendor: VendorWithMenus;
+  t: (key: string) => string;
+}) {
+  const hasExtras = bill.serviceCharge > 0n || bill.tax > 0n;
+
+  return (
+    <div className="mt-4 rounded-2xl bg-surface-2 px-4 py-3 space-y-2 text-sm">
+      {hasExtras && (
+        <>
+          <BillRow label={t("subtotal")} value={bill.subtotal} muted />
+          {bill.serviceCharge > 0n && (
+            <BillRow
+              label={`${t("serviceCharge")} (${vendor.serviceChargePct}%)`}
+              value={bill.serviceCharge}
+              muted
+            />
+          )}
+          {bill.tax > 0n && (
+            <BillRow
+              label={vendor.taxInclusive ? t("tax") : `${t("tax")} (${vendor.taxPct}%)`}
+              value={bill.tax}
+              muted
+            />
+          )}
+          <div className="border-t border-line" />
+        </>
+      )}
+      <div className="flex items-center justify-between">
+        <span className="font-extrabold text-ink">{t("total")}</span>
+        <MoneyText rial={bill.total} size="lg" />
+      </div>
+    </div>
+  );
+}
+
+function BillRow({
   label,
   value,
-  c,
+  muted = false,
 }: {
   label: string;
   value: bigint;
-  c: string;
+  muted?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between text-muted">
-      <span>{label}</span>
-      <span className="font-semibold text-ink">
-        {c} {formatAmount(value)}
-      </span>
+    <div className="flex items-center justify-between">
+      <span className={muted ? "text-muted" : "text-ink"}>{label}</span>
+      <MoneyText rial={value} muted={muted} size="sm" />
     </div>
   );
 }

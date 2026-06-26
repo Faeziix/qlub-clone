@@ -5,6 +5,18 @@ import type { CartLine, SelectedModifier } from "@/lib/types";
 import { lineTotal } from "@/lib/pricing";
 import { cartMoneyReplacer, cartMoneyReviver } from "@/lib/money";
 
+function normalizeModifier(m: SelectedModifier): SelectedModifier {
+  return { ...m, priceDelta: BigInt(m.priceDelta) };
+}
+
+function normalizeLine(l: CartLine): CartLine {
+  return {
+    ...l,
+    unitPrice: BigInt(l.unitPrice),
+    modifiers: l.modifiers.map(normalizeModifier),
+  };
+}
+
 function signature(itemId: string, mods: SelectedModifier[], notes?: string) {
   const m = [...mods]
     .map((x) => x.optionId)
@@ -91,6 +103,11 @@ export const useCart = create<CartState>()(
         tableCode: s.tableCode,
         lines: s.lines,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.lines = state.lines.map(normalizeLine);
+        }
+      },
     }
   )
 );

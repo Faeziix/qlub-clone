@@ -67,3 +67,35 @@ export function evenSplit(total: bigint, parts: number): bigint[] {
 export function tipFromPct(base: bigint, pct: number): bigint {
   return (base * BigInt(Math.round(pct * 100))) / 10_000n;
 }
+
+/**
+ * Recomputes order totals after appending a delta subtotal to an existing order.
+ * Used by appendItemsToOrder to update the order row after adding a new round.
+ * Mirrors computeBill: discount is subtracted from subtotal before service/tax.
+ */
+export function recomputeOrderTotals(
+  existingSubtotal: bigint,
+  appendedSubtotal: bigint,
+  config: PricingConfig,
+  tipAmount: bigint,
+  discount: bigint = 0n
+): { subtotal: bigint; serviceCharge: bigint; tax: bigint; total: bigint } {
+  const subtotal = existingSubtotal + appendedSubtotal;
+  const taxable = subtotal > discount ? subtotal - discount : 0n;
+  const serviceCharge = pct(taxable, config.serviceChargePct);
+
+  let tax: bigint;
+  let total: bigint;
+
+  if (config.taxInclusive) {
+    const base = taxable + serviceCharge;
+    const taxFactor = BigInt(Math.round(config.taxPct * 100));
+    tax = base - (base * 10_000n) / (10_000n + taxFactor);
+    total = base + tipAmount;
+  } else {
+    tax = pct(taxable + serviceCharge, config.taxPct);
+    total = taxable + serviceCharge + tax + tipAmount;
+  }
+
+  return { subtotal, serviceCharge, tax, total };
+}

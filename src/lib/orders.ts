@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "./db";
-import { computeBill, lineTotal } from "./pricing";
+import { computeBill, lineTotal, recomputeOrderTotals } from "./pricing";
 import { nanoid } from "nanoid";
 import { Prisma, OrderStatus } from "@prisma/client";
 import type { CartLine, PaymentMethod, SplitType } from "./types";
@@ -452,6 +452,110 @@ export async function recordPayment(input: {
   });
 
   return result;
+}
+
+const TERMINAL_STATUSES = new Set(["paid", "cancelled"]);
+const BLOCKING_PAYMENT_STATUSES = ["pending", "verifying"] as const;
+
+export async function appendItemsToOrder(input: {
+  orderId: string;
+  vendorSlug: string;
+  lines: CartLine[];
+}) {
+  if (!input.lines.length) throw new Error("No items to add");
+
+  const vendor = await db.vendor.findUnique({
+    where: { slug: input.vendorSlug },
+  });
+  if (!vendor) throw new Error("Vendor not found");
+  if (!vendor.active) throw new Error("Vendor is suspended");
+
+  const result = await db.$transaction(async (tx) => {
+    const orderRows = await tx.$queryRaw<
+      {
+        id: string;
+        vendorId: string;
+        currency: string;
+        subtotal: bigint;
+        serviceCharge: bigint;
+        tax: bigint;
+        discount: bigint;
+        tipAmount: bigint;
+        total: bigint;
+        amountPaid: bigint;
+        tableId: string | null;
+        status: string;
+      }[]
+    >`
+      SELECT id, "vendorId", currency, subtotal, "serviceCharge", tax,
+             discount, "tipAmount", total, "amountPaid", "tableId", status
+      FROM "Order"
+      WHERE id = ${input.orderId}
+      FOR UPDATE
+    `;
+    if (!orderRows.length) throw new Error("Order not found");
+    const orderRow = orderRows[0];
+
+    if (orderRow.vendorId !== vendor.id) {
+      throw new Error("Order does not belong to this vendor");
+    }
+    if (TERMINAL_STATUSES.has(orderRow.status)) {
+      throw new Error("Order cannot be modified");
+    }
+
+    const pendingPayments = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM "Payment"
+      WHERE "orderId" = ${input.orderId}
+        AND status::text = ANY(${BLOCKING_PAYMENT_STATUSES})
+      LIMIT 1
+    `;
+    if (pendingPayments.length > 0) {
+      throw new Error("Cannot modify order while a payment is in progress");
+    }
+
+    const resolvedLines = await resolveLinePricesInsideTx(tx, vendor.id, input.lines);
+    const priceChanged = detectPriceChange(input.lines, resolvedLines);
+
+    const appendedSubtotal = resolvedLines.reduce((s, l) => s + lineTotal(l), 0n);
+
+    const newTotals = recomputeOrderTotals(
+      orderRow.subtotal,
+      appendedSubtotal,
+      {
+        serviceChargePct: vendor.serviceChargePct,
+        taxPct: vendor.taxPct,
+        taxInclusive: vendor.taxInclusive,
+      },
+      orderRow.tipAmount,
+      orderRow.discount
+    );
+
+    await tx.orderItem.createMany({
+      data: resolvedLines.map((l) => ({
+        orderId: input.orderId,
+        itemId: l.itemId,
+        name: l.name,
+        unitPrice: l.unitPrice,
+        quantity: l.quantity,
+        modifiers: l.modifiers.map((m) => ({
+          ...m,
+          priceDelta: m.priceDelta.toString(),
+        })) as unknown as Prisma.InputJsonValue,
+        notes: l.notes,
+        lineTotal: lineTotal(l),
+      })),
+    });
+
+    const updatedOrder = await tx.order.update({
+      where: { id: input.orderId },
+      data: newTotals,
+      include: { items: true, vendor: true, table: true },
+    });
+
+    return { ...updatedOrder, priceChanged };
+  });
+
+  return { order: result, priceChanged: result.priceChanged };
 }
 
 export async function createReview(input: {

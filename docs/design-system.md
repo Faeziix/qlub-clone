@@ -137,6 +137,43 @@ Renders a rial `bigint` as Toman with `data-money` attribute and tabular numeral
 // renders: ۱۵ هزار تومان
 ```
 
+### QuantityStepper (`src/components/ui/QuantityStepper.tsx`)
+
+Inline `−` / `+` stepper for integer quantities. Three size variants:
+
+| Size | Button | Use case |
+|------|--------|----------|
+| `sm` | 28×28 px | Cart sidebar line items |
+| `md` | 36×36 px | Compact contexts |
+| `lg` | 44×44 px | Item detail sheet footer (meets 44 px touch target rule) |
+
+### ItemSheet (`src/components/customer/ItemSheet.tsx`)
+
+Full-height bottom-sheet for item selection — modifiers, quantity, and instructions. Key design rules:
+
+- **Hero image bleeds to top edge**: the component bypasses `Sheet` and constructs its own Radix `Dialog.Content` so the `h-64` image spans the full rounded-t-3xl top without a header gap.
+- **Floating controls overlay image**: drag handle (`bg-white/60`, `w-10`) and close button (`h-11 w-11` = 44 px) are `absolute` inside the dialog, z-indexed above the image.
+- **All touch targets ≥ 44 px**: modifier option rows are `min-h-[52px]`; close button and stepper buttons are 44 px.
+- **Modifier visual language**:
+  - Single-select (`maxSelect ≤ 1`): circle indicator (radio).
+  - Multi-select: rounded-square indicator (checkbox).
+  - Checked state: `border-brand bg-brand-soft` with `Check` icon.
+- **Instructions character cap**: `INSTRUCTIONS_MAX = 160` chars with live `charsLeft` counter, warming to `text-warning` below 20.
+- **Footer layout**: non-scrollable, `bg-surface/95 backdrop-blur-sm`, `safe-bottom`. `QuantityStepper size="lg"` + full-width Button with label and live total on opposite ends (`justify-between`).
+- **Server-authoritative total**: `lineTotal = (unitPriceRial + sum(modifier.priceDelta)) × qty` — computed from BigInt item price, never from client strings.
+
+### Receipt + Review screen (`src/app/[locale]/payment/success/`)
+
+Post-payment flow composed of three focused components orchestrated by `PaymentSuccessClient`:
+
+- **`ReceiptDisplay`** — full-page receipt card rendered after a confirmed payment. Shows: vendor name, order number, line items with quantity × name → lineTotal, then a totals breakdown (subtotal / service charge / VAT / tip) followed by a bold total row. Two CTAs: "Rate experience" (primary, brand, only shown when `paymentId` is present) and "Back to menu" (ghost).
+- **`ReviewForm`** — review capture screen. Slide-in back button returns to receipt. Header shows vendor name. An `OverallRatingSection` card (large 44 px stars) captures the mandatory overall rating; a `SubRatingRow` list (22 px stars, card with dividers) captures food / service / ambience. Optional comment textarea and name input. Submit is disabled until overall ≥ 1.
+- **`ThankYouScreen`** — post-submit confirmation with `Heart` icon in brand-soft circle, thank-you copy, and "Browse menu" CTA.
+
+**Money display**: `formatRialAsTomanPersian` for Farsi, `formatRialAsTomanLatin` + " T" suffix for English. Numbers from the DB arrive as `number` (RSC→client boundary); they are cast to `BigInt` for formatter calls.
+
+**RTL**: all three components receive `dir` from `dirFor(lang)` and set it on the root element. Line-item quantity badge uses `me-1.5` (logical margin). `ChevronRight` / `ChevronLeft` in the back button are selected based on `dir`.
+
 ### PersianDate (`src/components/ui/PersianDate.tsx`)
 
 Renders a `Date` as Jalali string in a `<time>` element.

@@ -35,7 +35,13 @@ export async function getVendorBySlug(slug: string) {
                   MenuItemTranslation: true,
                   modifierGroups: {
                     orderBy: { sortOrder: "asc" },
-                    include: { options: { orderBy: { sortOrder: "asc" } } },
+                    include: {
+                      ModifierGroupTranslation: true,
+                      options: {
+                        orderBy: { sortOrder: "asc" },
+                        include: { ModifierOptionTranslation: true },
+                      },
+                    },
                   },
                 },
               },
@@ -71,13 +77,21 @@ export async function getVendorBySlug(slug: string) {
           })),
           price: bigintToNumber(item.price),
           tags: Array.isArray(item.tags) ? (item.tags as string[]) : [],
-          modifierGroups: item.modifierGroups.map((group) => ({
-            ...group,
-            options: group.options.map((opt) => ({
-              ...opt,
-              priceDelta: bigintToNumber(opt.priceDelta),
-            })),
-          })),
+          modifierGroups: item.modifierGroups.map((group) => {
+            const { ModifierGroupTranslation, ...groupRest } = group;
+            return {
+              ...groupRest,
+              i18n: localesToMap(ModifierGroupTranslation, (t) => ({ name: t.name })),
+              options: group.options.map((opt) => {
+                const { ModifierOptionTranslation, ...optRest } = opt;
+                return {
+                  ...optRest,
+                  i18n: localesToMap(ModifierOptionTranslation, (t) => ({ name: t.name })),
+                  priceDelta: bigintToNumber(opt.priceDelta),
+                };
+              }),
+            };
+          }),
           };
         }),
         };

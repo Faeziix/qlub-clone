@@ -6,6 +6,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomInt, randomBytes } from "node:crypto";
+import { SignJWT } from "jose";
 
 const db = new PrismaClient();
 
@@ -17,26 +18,56 @@ function randomStaffPassword() {
   return randomBytes(18).toString("base64url");
 }
 
+const TABLE_TOKEN_ALGORITHM = "HS256";
+const TABLE_TOKEN_SUBJECT = "table-access";
+const TABLE_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 365;
+
+function tableSigningKey() {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error("AUTH_SECRET is required to sign seeded table tokens.");
+  }
+  return new TextEncoder().encode(secret);
+}
+
+async function signSeedTableToken(vendorId: string, tableId: string) {
+  return new SignJWT({ vendorId, tableId })
+    .setProtectedHeader({ alg: TABLE_TOKEN_ALGORITHM })
+    .setSubject(TABLE_TOKEN_SUBJECT)
+    .setIssuedAt()
+    .setExpirationTime(`${TABLE_TOKEN_TTL_SECONDS}s`)
+    .sign(tableSigningKey());
+}
+
+// Defaults to a per-account crypto-random password (no static credential in
+// committed source — see ADR-0001). For an easy known local login, set
+// SEED_STAFF_PASSWORD in an untracked .env.local; it is never committed.
+const SEED_STAFF_PASSWORD_OVERRIDE = process.env.SEED_STAFF_PASSWORD || null;
+
 const CDN = "https://cdn-customerapp.qlub.io/digital_menu/menu";
 const UNS = (id: string) => `https://images.unsplash.com/${id}?w=600&q=80&auto=format&fit=crop`;
 
 interface SeedItem {
   name: string;
+  faName?: string;
   description?: string;
+  faDescription?: string;
   price: number;
   imageUrl?: string;
   tags?: string[];
   calories?: number;
   modifierGroups?: {
     name: string;
+    faName?: string;
     minSelect?: number;
     maxSelect?: number;
     required?: boolean;
-    options: { name: string; priceDelta?: number; isDefault?: boolean }[];
+    options: { name: string; faName?: string; priceDelta?: number; isDefault?: boolean }[];
   }[];
 }
 interface SeedCategory {
   name: string;
+  faName?: string;
   items: SeedItem[];
 }
 interface SeedMenu {
@@ -49,51 +80,55 @@ const R = 10_000;
 
 const hotBeverage = {
   name: "Choose your hot beverage",
+  faName: "نوشیدنی گرم را انتخاب کنید",
   required: true,
   minSelect: 1,
   maxSelect: 1,
   options: [
-    { name: "Espresso", isDefault: true },
-    { name: "Cappuccino" },
-    { name: "Café Latte" },
-    { name: "English Breakfast Tea" },
-    { name: "Hot Chocolate", priceDelta: 4 * R },
+    { name: "Espresso", faName: "اسپرسو", isDefault: true },
+    { name: "Cappuccino", faName: "کاپوچینو" },
+    { name: "Café Latte", faName: "کافه لاته" },
+    { name: "English Breakfast Tea", faName: "چای صبحانه انگلیسی" },
+    { name: "Hot Chocolate", faName: "شکلات داغ", priceDelta: 4 * R },
   ],
 };
 const viennoiserie = {
   name: "Choose your viennoiserie",
+  faName: "شیرینی وینیازری را انتخاب کنید",
   required: true,
   minSelect: 1,
   maxSelect: 1,
   options: [
-    { name: "Butter Croissant", isDefault: true },
-    { name: "Pain au Chocolat" },
-    { name: "Pain aux Raisins" },
-    { name: "Almond Croissant", priceDelta: 5 * R },
+    { name: "Butter Croissant", faName: "کروسان کره‌ای", isDefault: true },
+    { name: "Pain au Chocolat", faName: "پن او شکلا" },
+    { name: "Pain aux Raisins", faName: "پن او کشمش" },
+    { name: "Almond Croissant", faName: "کروسان بادامی", priceDelta: 5 * R },
   ],
 };
 const eggStyle = {
   name: "How would you like your eggs?",
+  faName: "تخم‌مرغ را چطور می‌خواهید؟",
   required: true,
   minSelect: 1,
   maxSelect: 1,
   options: [
-    { name: "Sunny side up", isDefault: true },
-    { name: "Scrambled" },
-    { name: "Poached" },
-    { name: "Omelette" },
+    { name: "Sunny side up", faName: "نیمرو", isDefault: true },
+    { name: "Scrambled", faName: "تخم‌مرغ هم‌زده" },
+    { name: "Poached", faName: "تخم‌مرغ آب‌پز سبک" },
+    { name: "Omelette", faName: "املت" },
   ],
 };
 const extras = {
   name: "Add extras",
+  faName: "افزودنی‌ها",
   minSelect: 0,
   maxSelect: 5,
   options: [
-    { name: "Smoked Salmon", priceDelta: 18 * R },
-    { name: "Avocado", priceDelta: 12 * R },
-    { name: "Turkey Bacon", priceDelta: 10 * R },
-    { name: "Extra Egg", priceDelta: 6 * R },
-    { name: "Sautéed Mushrooms", priceDelta: 8 * R },
+    { name: "Smoked Salmon", faName: "سالمون دودی", priceDelta: 18 * R },
+    { name: "Avocado", faName: "آووکادو", priceDelta: 12 * R },
+    { name: "Turkey Bacon", faName: "بیکن بوقلمون", priceDelta: 10 * R },
+    { name: "Extra Egg", faName: "تخم‌مرغ اضافه", priceDelta: 6 * R },
+    { name: "Sautéed Mushrooms", faName: "قارچ سوته", priceDelta: 8 * R },
   ],
 };
 
@@ -104,26 +139,33 @@ const paulMenus: SeedMenu[] = [
     categories: [
       {
         name: "Breakfast Combo",
+        faName: "صبحانه ترکیبی",
         items: [
           {
             name: "Parisien",
+            faName: "پاریسیان",
             description:
               "1 hot beverage + 1 viennoiserie of your choice, ½ flûte à l'ancienne, butter & jam.",
+            faDescription: "یک نوشیدنی گرم + یک شیرینی وینیازری به انتخاب شما، نان باگت، کره و مربا.",
             price: 62 * R,
             tags: ["popular"],
             modifierGroups: [hotBeverage, viennoiserie],
           },
           {
             name: "Continental",
+            faName: "کانتیننتال",
             description:
               "1 hot beverage + 1 fresh orange juice + 1 viennoiserie of your choice + ½ flûte à l'ancienne, butter & jam.",
+            faDescription: "یک نوشیدنی گرم + آب پرتقال تازه + یک شیرینی وینیازری + نان باگت، کره و مربا.",
             price: 72 * R,
             modifierGroups: [hotBeverage, viennoiserie],
           },
           {
             name: "Complete",
+            faName: "کامل",
             description:
               "1 hot beverage + 1 fresh orange juice + 1 viennoiserie + ½ flûte à l'ancienne + 2 eggs any style, butter & jam.",
+            faDescription: "یک نوشیدنی گرم + آب پرتقال + شیرینی وینیازری + باگت + ۲ تخم‌مرغ، کره و مربا.",
             price: 88 * R,
             tags: ["chef-special"],
             modifierGroups: [hotBeverage, viennoiserie, eggStyle],
@@ -132,11 +174,14 @@ const paulMenus: SeedMenu[] = [
       },
       {
         name: "Eggs & Omelettes",
+        faName: "تخم‌مرغ و املت",
         items: [
           {
             name: "Eggs Benedict Salmon",
+            faName: "تخم‌مرغ بندیکت با سالمون",
             description:
               "Two poached eggs, smoked salmon, hollandaise sauce on a toasted muffin with hash brown.",
+            faDescription: "دو تخم‌مرغ آب‌پز، سالمون دودی، سس هولندز روی ماففین تست‌شده با هش براون.",
             price: 58 * R,
             imageUrl: `${CDN}/372608/mo9oxuh0998qeolnyln_Eggs%20Benedict%20Salmon.jpg`,
             tags: ["popular"],
@@ -145,36 +190,43 @@ const paulMenus: SeedMenu[] = [
           },
           {
             name: "Eggs Benedict Turkey Ham",
+            faName: "تخم‌مرغ بندیکت با بوقلمون",
             description:
               "Two poached eggs, turkey ham, hollandaise sauce on a toasted muffin with hash brown.",
+            faDescription: "دو تخم‌مرغ آب‌پز، ژامبون بوقلمون، سس هولندز روی ماففین تست‌شده با هش براون.",
             price: 52 * R,
             tags: ["halal"],
             modifierGroups: [extras],
           },
           {
             name: "Three Egg Omelette",
+            faName: "املت سه تخم‌مرغ",
             description:
               "Fluffy three-egg omelette with your choice of fillings, served with mixed greens.",
+            faDescription: "املت پف‌دار با سه تخم‌مرغ و مواد میانی به انتخاب شما، سرو شده با سبزیجات.",
             price: 46 * R,
             modifierGroups: [
               {
                 name: "Choose fillings",
+                faName: "انتخاب مواد میانی",
                 minSelect: 0,
                 maxSelect: 4,
                 options: [
-                  { name: "Cheese", isDefault: true },
-                  { name: "Mushroom" },
-                  { name: "Tomato" },
-                  { name: "Spinach" },
-                  { name: "Turkey Ham", priceDelta: 6 * R },
+                  { name: "Cheese", faName: "پنیر", isDefault: true },
+                  { name: "Mushroom", faName: "قارچ" },
+                  { name: "Tomato", faName: "گوجه‌فرنگی" },
+                  { name: "Spinach", faName: "اسفناج" },
+                  { name: "Turkey Ham", faName: "ژامبون بوقلمون", priceDelta: 6 * R },
                 ],
               },
             ],
           },
           {
             name: "Shakshuka",
+            faName: "شکشوکا",
             description:
               "Baked eggs in spiced tomato & pepper sauce, served with flûte à l'ancienne.",
+            faDescription: "تخم‌مرغ پخته در سس گوجه و فلفل ادویه‌دار، سرو شده با نان باگت.",
             price: 48 * R,
             tags: ["vegetarian", "spicy"],
           },
@@ -182,11 +234,14 @@ const paulMenus: SeedMenu[] = [
       },
       {
         name: "Sandwiches & Toasts",
+        faName: "ساندویچ و توست",
         items: [
           {
             name: "Avocado Toast",
+            faName: "توست آووکادو",
             description:
               "Smashed avocado, poached egg, cherry tomatoes, dukkah on multigrain sourdough.",
+            faDescription: "آووکادو له‌شده، تخم‌مرغ آب‌پز، گوجه گیلاسی و دوکا روی نان خمیرترش.",
             price: 44 * R,
             tags: ["vegetarian", "popular"],
             imageUrl: UNS("photo-1588137378633-dea1336ce1e2"),
@@ -194,24 +249,31 @@ const paulMenus: SeedMenu[] = [
           },
           {
             name: "Croque Monsieur",
+            faName: "کروک مسیو",
             description:
               "Toasted brioche, turkey ham, béchamel & gruyère cheese gratiné.",
+            faDescription: "بریوش تست‌شده، ژامبون بوقلمون، سس بشامل و پنیر گرویر.",
             price: 42 * R,
           },
           {
             name: "Croque Madame",
+            faName: "کروک مادام",
             description: "Croque Monsieur topped with a sunny-side-up egg.",
+            faDescription: "کروک مسیو با یک تخم‌مرغ نیمرو روی آن.",
             price: 46 * R,
           },
         ],
       },
       {
         name: "French Toast & Açaí",
+        faName: "فرنچ توست و آسائی",
         items: [
           {
             name: "Pain Perdu",
+            faName: "فرنچ توست",
             description:
               "Brioche French toast, caramelised, with fresh berries & vanilla ice cream.",
+            faDescription: "فرنچ توست بریوش کارامله‌شده با توت تازه و بستنی وانیلی.",
             price: 45 * R,
             imageUrl: `${CDN}/377374/moh4c5mq8gc97jlt4p_Pain%20Perdu.jpg`,
             tags: ["popular", "vegetarian"],
@@ -219,8 +281,10 @@ const paulMenus: SeedMenu[] = [
           },
           {
             name: "Açaí Bowl",
+            faName: "کاسه آسائی",
             description:
               "Açaí blend topped with granola, banana, strawberries & honey.",
+            faDescription: "پوره آسائی با گرانولا، موز، توت‌فرنگی و عسل.",
             price: 48 * R,
             tags: ["vegan"],
             imageUrl: UNS("photo-1590301157890-4810ed352733"),
@@ -235,18 +299,23 @@ const paulMenus: SeedMenu[] = [
     categories: [
       {
         name: "All Day Brunch",
+        faName: "برانچ تمام روز",
         items: [
           {
             name: "Smashed Avocado & Eggs",
+            faName: "آووکادو له‌شده با تخم‌مرغ",
             description:
               "Sourdough, smashed avocado, two poached eggs, feta & chilli flakes.",
+            faDescription: "نان خمیرترش، آووکادو له‌شده، دو تخم‌مرغ آب‌پز، پنیر فتا و فلفل تند.",
             price: 49 * R,
             tags: ["vegetarian"],
           },
           {
             name: "Salmon & Scrambled Eggs",
+            faName: "سالمون با تخم‌مرغ همزده",
             description:
               "Creamy scrambled eggs, smoked salmon, chives on toasted sourdough.",
+            faDescription: "تخم‌مرغ همزده خامه‌ای، سالمون دودی و پیازچه روی نان خمیرترش.",
             price: 56 * R,
             tags: ["popular"],
           },
@@ -254,24 +323,31 @@ const paulMenus: SeedMenu[] = [
       },
       {
         name: "Appetizers & Soups",
+        faName: "پیش‌غذا و سوپ",
         items: [
           {
             name: "French Onion Soup",
+            faName: "سوپ پیاز فرانسوی",
             description:
               "Slow-cooked onions, beef broth, gruyère crouton gratiné.",
+            faDescription: "پیاز آرام‌پخته در آبگوشت گاو با کروتون پنیر گرویر.",
             price: 38 * R,
             imageUrl: UNS("photo-1547592166-23ac45744acd"),
           },
           {
             name: "Burrata & Heirloom Tomato",
+            faName: "بوراتا با گوجه فرنگی",
             description:
               "Creamy burrata, heirloom tomatoes, basil pesto & aged balsamic.",
+            faDescription: "بوراتای خامه‌ای، گوجه فرنگی، پستوی ریحان و سرکه بالزامیک.",
             price: 52 * R,
             tags: ["vegetarian", "chef-special"],
           },
           {
             name: "Soup of the Day",
+            faName: "سوپ روز",
             description: "Ask your server — served with warm bread.",
+            faDescription: "از سرویردهنده بپرسید — سرو شده با نان گرم.",
             price: 32 * R,
             tags: ["vegetarian"],
           },
@@ -279,59 +355,71 @@ const paulMenus: SeedMenu[] = [
       },
       {
         name: "Sandwiches",
+        faName: "ساندویچ‌ها",
         items: [
           {
             name: "Le Parisien Baguette",
+            faName: "باگت پاریسیان",
             description:
               "Flûte à l'ancienne, turkey ham, emmental, butter & cornichons.",
+            faDescription: "باگت سنتی، ژامبون بوقلمون، پنیر امنتال، کره و خیارشور فرانسوی.",
             price: 42 * R,
           },
           {
             name: "Tuna Niçoise Baguette",
+            faName: "باگت تونا نیسواز",
             description: "Tuna, egg, olives, tomato & lettuce on baguette.",
+            faDescription: "ماهی تون، تخم‌مرغ، زیتون، گوجه و کاهو روی باگت.",
             price: 44 * R,
           },
         ],
       },
       {
         name: "Clubs & Burgers",
+        faName: "کلاب ساندویچ و برگر",
         items: [
           {
             name: "Paul Club Sandwich",
+            faName: "کلاب ساندویچ پل",
             description:
               "Triple-decker with grilled chicken, turkey bacon, egg, tomato & fries.",
+            faDescription: "ساندویچ سه‌طبقه با مرغ گریل، بیکن بوقلمون، تخم‌مرغ، گوجه و سیب‌زمینی.",
             price: 58 * R,
             tags: ["popular"],
             imageUrl: UNS("photo-1528735602780-2552fd46c7af"),
             modifierGroups: [
               {
                 name: "Choice of side",
+                faName: "انتخاب پیش‌غذا",
                 required: true,
                 minSelect: 1,
                 maxSelect: 1,
                 options: [
-                  { name: "French Fries", isDefault: true },
-                  { name: "Mixed Salad" },
-                  { name: "Sweet Potato Fries", priceDelta: 6 * R },
+                  { name: "French Fries", faName: "سیب‌زمینی سرخ‌کرده", isDefault: true },
+                  { name: "Mixed Salad", faName: "سالاد مخلوط" },
+                  { name: "Sweet Potato Fries", faName: "سیب‌زمینی شیرین سرخ‌شده", priceDelta: 6 * R },
                 ],
               },
             ],
           },
           {
             name: "Wagyu Beef Burger",
+            faName: "برگر واگیو",
             description:
               "Wagyu patty, cheddar, caramelised onion, brioche bun & fries.",
+            faDescription: "پتی واگیو، پنیر چدار، پیاز کارامله، نان بریوش و سیب‌زمینی.",
             price: 72 * R,
             tags: ["chef-special"],
             modifierGroups: [
               {
                 name: "Add-ons",
+                faName: "افزودنی‌ها",
                 minSelect: 0,
                 maxSelect: 3,
                 options: [
-                  { name: "Extra Cheese", priceDelta: 6 * R },
-                  { name: "Turkey Bacon", priceDelta: 10 * R },
-                  { name: "Fried Egg", priceDelta: 6 * R },
+                  { name: "Extra Cheese", faName: "پنیر اضافه", priceDelta: 6 * R },
+                  { name: "Turkey Bacon", faName: "بیکن بوقلمون", priceDelta: 10 * R },
+                  { name: "Fried Egg", faName: "تخم‌مرغ سرخ‌شده", priceDelta: 6 * R },
                 ],
               },
             ],
@@ -340,16 +428,21 @@ const paulMenus: SeedMenu[] = [
       },
       {
         name: "Salads",
+        faName: "سالادها",
         items: [
           {
             name: "Niçoise Salad",
+            faName: "سالاد نیسواز",
             description:
               "Seared tuna, green beans, egg, potato, olives & vinaigrette.",
+            faDescription: "ماهی تون سرخ‌شده، لوبیا سبز، تخم‌مرغ، سیب‌زمینی، زیتون و سس وینیگرت.",
             price: 54 * R,
           },
           {
             name: "Quinoa & Avocado Salad",
+            faName: "سالاد کینوا و آووکادو",
             description: "Quinoa, avocado, pomegranate, almonds & lemon dressing.",
+            faDescription: "کینوا، آووکادو، انار، بادام و سس لیمو.",
             price: 48 * R,
             tags: ["vegan", "gluten-free"],
           },
@@ -357,16 +450,21 @@ const paulMenus: SeedMenu[] = [
       },
       {
         name: "Pasta & Risotto",
+        faName: "پاستا و ریزوتو",
         items: [
           {
             name: "Truffle Mushroom Risotto",
+            faName: "ریزوتو قارچ و ترافل",
             description: "Arborio rice, wild mushrooms, parmesan & truffle oil.",
+            faDescription: "برنج آربوریو، قارچ وحشی، پنیر پارمزان و روغن ترافل.",
             price: 62 * R,
             tags: ["vegetarian", "chef-special"],
           },
           {
             name: "Penne Arrabbiata",
+            faName: "پنه آرابیاتا",
             description: "Penne in spicy tomato & garlic sauce, basil.",
+            faDescription: "پنه در سس گوجه تند و سیر با ریحان.",
             price: 46 * R,
             tags: ["vegetarian", "spicy"],
           },
@@ -374,11 +472,14 @@ const paulMenus: SeedMenu[] = [
       },
       {
         name: "French Traditional",
+        faName: "غذاهای سنتی فرانسوی",
         items: [
           {
             name: "Entrecôte Steak Frites",
+            faName: "استیک آنتره‌کوت با سیب‌زمینی",
             description:
               "Grilled ribeye, café de Paris butter, golden fries & green salad.",
+            faDescription: "ریب‌آی گریل‌شده، کره کافه دو پاری، سیب‌زمینی طلایی و سالاد سبز.",
             price: 96 * R,
             imageUrl: `${CDN}/372604/mo9oanvaspd80xtxea8_Entrecote%20Steak%20Frites.jpg`,
             tags: ["popular", "chef-special"],
@@ -386,36 +487,44 @@ const paulMenus: SeedMenu[] = [
             modifierGroups: [
               {
                 name: "How would you like it cooked?",
+                faName: "سطح پخت گوشت را انتخاب کنید",
                 required: true,
                 minSelect: 1,
                 maxSelect: 1,
                 options: [
-                  { name: "Medium Rare", isDefault: true },
-                  { name: "Medium" },
-                  { name: "Well Done" },
+                  { name: "Medium Rare", faName: "مدیوم ریر", isDefault: true },
+                  { name: "Medium", faName: "مدیوم" },
+                  { name: "Well Done", faName: "خوب‌پخته" },
                 ],
               },
             ],
           },
           {
             name: "Coq au Vin",
+            faName: "خورش مرغ با شراب",
             description: "Braised chicken, mushrooms, pearl onions in red wine jus.",
+            faDescription: "مرغ آرام‌پخته با قارچ و پیاز مروارید در عصاره شراب قرمز.",
             price: 68 * R,
           },
         ],
       },
       {
         name: "More Mains",
+        faName: "غذاهای اصلی",
         items: [
           {
             name: "Grilled Salmon Fillet",
+            faName: "فیله سالمون گریل",
             description: "Salmon, sautéed vegetables, lemon butter sauce.",
+            faDescription: "سالمون گریل‌شده با سبزیجات سرخ‌شده و سس کره لیمو.",
             price: 78 * R,
             tags: ["gluten-free"],
           },
           {
             name: "Roasted Chicken Supreme",
+            faName: "مرغ بریان",
             description: "Free-range chicken, mashed potato, mushroom sauce.",
+            faDescription: "مرغ آزادگردش با پوره سیب‌زمینی و سس قارچ.",
             price: 64 * R,
           },
         ],
@@ -428,28 +537,37 @@ const paulMenus: SeedMenu[] = [
     categories: [
       {
         name: "Patisserie",
+        faName: "شیرینی و دسر",
         items: [
           {
             name: "Tarte au Citron",
+            faName: "تارت لیمو",
             description: "Classic lemon tart with torched meringue.",
+            faDescription: "تارت لیمو کلاسیک با مرنگ شعله‌کشیده.",
             price: 36 * R,
             tags: ["vegetarian"],
           },
           {
             name: "Mille-Feuille",
+            faName: "میل‌فوی",
             description: "Layered puff pastry, vanilla crème pâtissière.",
+            faDescription: "لایه‌های خمیر هزارلا با کاسترد وانیل.",
             price: 38 * R,
             tags: ["popular", "vegetarian"],
           },
           {
             name: "Éclair au Chocolat",
+            faName: "اکلر شکلاتی",
             description: "Choux pastry, chocolate cream, chocolate glaze.",
+            faDescription: "خمیر شو با کرم شکلاتی و روکش شکلات.",
             price: 28 * R,
             tags: ["vegetarian"],
           },
           {
             name: "Crème Brûlée",
+            faName: "کرم بروله",
             description: "Vanilla custard with caramelised sugar crust.",
+            faDescription: "کاسترد وانیل با پوسته قند کارامله.",
             price: 34 * R,
             tags: ["vegetarian", "gluten-free"],
           },
@@ -457,17 +575,22 @@ const paulMenus: SeedMenu[] = [
       },
       {
         name: "Cakes & Sweets",
+        faName: "کیک و شیرینی",
         items: [
           {
             name: "Fondant au Chocolat",
+            faName: "فوندان شکلاتی",
             description: "Warm molten chocolate cake, vanilla ice cream.",
+            faDescription: "کیک شکلاتی گرم با مرکز مذاب، سرو شده با بستنی وانیلی.",
             price: 42 * R,
             tags: ["popular", "vegetarian"],
             imageUrl: UNS("photo-1606313564200-e75d5e30476c"),
           },
           {
             name: "Macarons (Box of 6)",
+            faName: "ماکارون (جعبه ۶ تایی)",
             description: "Assorted French macarons.",
+            faDescription: "ماکارون‌های فرانسوی متنوع.",
             price: 48 * R,
             tags: ["vegetarian"],
           },
@@ -481,10 +604,13 @@ const paulMenus: SeedMenu[] = [
     categories: [
       {
         name: "Hot Coffee",
+        faName: "قهوه داغ",
         items: [
           {
             name: "Caramel Cappuccino",
+            faName: "کاپوچینو کارامل",
             description: "Espresso, steamed milk, caramel drizzle.",
+            faDescription: "اسپرسو، شیر بخار و سرریز کارامل.",
             price: 26 * R,
             imageUrl: `${CDN}/372603/mo9o4yg5di61ylc1zne_Caramel%20Cappuccino.jpg`,
             tags: ["popular"],
@@ -513,28 +639,61 @@ const paulMenus: SeedMenu[] = [
               },
             ],
           },
-          { name: "Espresso", description: "Single / double shot.", price: 16 * R },
-          { name: "Café Latte", description: "Espresso with steamed milk.", price: 24 * R },
-          { name: "Flat White", description: "Double ristretto, microfoam.", price: 24 * R },
+          {
+            name: "Espresso",
+            faName: "اسپرسو",
+            description: "Single / double shot.",
+            faDescription: "شات تکی یا دوبل.",
+            price: 16 * R,
+          },
+          {
+            name: "Café Latte",
+            faName: "کافه لاته",
+            description: "Espresso with steamed milk.",
+            faDescription: "اسپرسو با شیر بخارپز.",
+            price: 24 * R,
+          },
+          {
+            name: "Flat White",
+            faName: "فلت وایت",
+            description: "Double ristretto, microfoam.",
+            faDescription: "دبل ریسترتو با میکروفوم.",
+            price: 24 * R,
+          },
         ],
       },
       {
         name: "Cold Drinks",
+        faName: "نوشیدنی سرد",
         items: [
           {
             name: "Fresh Orange Juice",
+            faName: "آب پرتقال تازه",
             description: "Freshly squeezed.",
+            faDescription: "تازه‌فشرده‌شده.",
             price: 28 * R,
             tags: ["vegan"],
           },
-          { name: "Iced Latte", description: "Espresso over ice & milk.", price: 26 * R },
+          {
+            name: "Iced Latte",
+            faName: "آیس لاته",
+            description: "Espresso over ice & milk.",
+            faDescription: "اسپرسو روی یخ و شیر.",
+            price: 26 * R,
+          },
           {
             name: "Lemonade Mint",
+            faName: "لیموناد نعناع",
             description: "Fresh lemon, mint & soda.",
+            faDescription: "لیمو تازه، نعناع و سودا.",
             price: 24 * R,
             tags: ["vegan"],
           },
-          { name: "Still / Sparkling Water", price: 12 * R },
+          {
+            name: "Still / Sparkling Water",
+            faName: "آب معدنی",
+            price: 12 * R,
+          },
         ],
       },
     ],
@@ -545,18 +704,23 @@ const paulMenus: SeedMenu[] = [
     categories: [
       {
         name: "Sharing Boxes",
+        faName: "جعبه‌های اشتراکی",
         items: [
           {
             name: "Le Petit Box",
+            faName: "جعبه کوچک",
             description:
               "Assorted mini sandwiches, viennoiseries & macarons. Serves 2-3.",
+            faDescription: "ساندویچ‌های مینی متنوع، وینیازری و ماکارون. برای ۲ تا ۳ نفر.",
             price: 145 * R,
             tags: ["popular"],
           },
           {
             name: "Le Grand Box",
+            faName: "جعبه بزرگ",
             description:
               "Sandwiches, quiches, salads, pastries & juices. Serves 4-6.",
+            faDescription: "ساندویچ، کیش، سالاد، شیرینی و آبمیوه. برای ۴ تا ۶ نفر.",
             price: 280 * R,
             tags: ["chef-special"],
           },
@@ -623,6 +787,11 @@ async function seedVendor(opts: {
       const createdCat = await db.category.create({
         data: { menuId: createdMenu.id, name: cat.name, sortOrder: c },
       });
+      if (cat.faName) {
+        await db.categoryTranslation.create({
+          data: { categoryId: createdCat.id, locale: "fa", name: cat.faName },
+        });
+      }
       for (let i = 0; i < cat.items.length; i++) {
         const it = cat.items[i];
         const createdItem = await db.menuItem.create({
@@ -636,27 +805,53 @@ async function seedVendor(opts: {
             tags: it.tags ?? [],
             calories: it.calories,
             sortOrder: i,
-            modifierGroups: it.modifierGroups
-              ? {
-                  create: it.modifierGroups.map((g, gi) => ({
-                    name: g.name,
-                    required: g.required ?? false,
-                    minSelect: g.minSelect ?? 0,
-                    maxSelect: g.maxSelect ?? 1,
-                    sortOrder: gi,
-                    options: {
-                      create: g.options.map((o, oi) => ({
-                        name: o.name,
-                        priceDelta: BigInt(o.priceDelta ?? 0),
-                        isDefault: o.isDefault ?? false,
-                        sortOrder: oi,
-                      })),
-                    },
-                  })),
-                }
-              : undefined,
           },
         });
+        if (it.faName) {
+          await db.menuItemTranslation.create({
+            data: {
+              menuItemId: createdItem.id,
+              locale: "fa",
+              name: it.faName,
+              description: it.faDescription,
+            },
+          });
+        }
+        for (let gi = 0; gi < (it.modifierGroups ?? []).length; gi++) {
+          const g = it.modifierGroups![gi];
+          const createdGroup = await db.modifierGroup.create({
+            data: {
+              itemId: createdItem.id,
+              name: g.name,
+              required: g.required ?? false,
+              minSelect: g.minSelect ?? 0,
+              maxSelect: g.maxSelect ?? 1,
+              sortOrder: gi,
+            },
+          });
+          if (g.faName) {
+            await db.modifierGroupTranslation.create({
+              data: { modifierGroupId: createdGroup.id, locale: "fa", name: g.faName },
+            });
+          }
+          for (let oi = 0; oi < g.options.length; oi++) {
+            const o = g.options[oi];
+            const createdOption = await db.modifierOption.create({
+              data: {
+                groupId: createdGroup.id,
+                name: o.name,
+                priceDelta: BigInt(o.priceDelta ?? 0),
+                isDefault: o.isDefault ?? false,
+                sortOrder: oi,
+              },
+            });
+            if (o.faName) {
+              await db.modifierOptionTranslation.create({
+                data: { modifierOptionId: createdOption.id, locale: "fa", name: o.faName },
+              });
+            }
+          }
+        }
         createdItems.push({
           id: createdItem.id,
           price: it.price,
@@ -681,7 +876,12 @@ async function seedVendor(opts: {
         status: t <= 3 ? "occupied" : "available",
       },
     });
-    tables.push(table);
+    const tableToken = await signSeedTableToken(vendor.id, table.id);
+    const tokenizedTable = await db.diningTable.update({
+      where: { id: table.id },
+      data: { tableToken },
+    });
+    tables.push(tokenizedTable);
   }
 
   return { vendor, items: createdItems, tables };
@@ -791,12 +991,19 @@ async function seedOrders(
 
 async function main() {
   console.log("🌱 Seeding…");
+  await db.auditLog.deleteMany();
+  await db.opsQueueEntry.deleteMany();
+  await db.walletTransaction.deleteMany();
+  await db.platformWallet.deleteMany();
   await db.review.deleteMany();
   await db.payment.deleteMany();
   await db.orderItem.deleteMany();
   await db.order.deleteMany();
+  await db.modifierOptionTranslation.deleteMany();
   await db.modifierOption.deleteMany();
+  await db.modifierGroupTranslation.deleteMany();
   await db.modifierGroup.deleteMany();
+  await db.menuItemTranslation.deleteMany();
   await db.menuItem.deleteMany();
   await db.category.deleteMany();
   await db.menu.deleteMany();
@@ -845,7 +1052,7 @@ async function main() {
 
   const generatedCredentials: { email: string; password: string }[] = [];
   for (const staff of demoStaff) {
-    const password = randomStaffPassword();
+    const password = SEED_STAFF_PASSWORD_OVERRIDE ?? randomStaffPassword();
     await db.staffUser.create({
       data: {
         email: staff.email,
@@ -861,9 +1068,16 @@ async function main() {
   console.log("✅ Seed complete.");
   console.log("   Customer: /qr/ir/paul-ir");
   console.log("   Admin:    /admin/login");
-  console.log("   Generated staff credentials (shown once — copy them now):");
+  console.log(
+    SEED_STAFF_PASSWORD_OVERRIDE
+      ? "   Staff credentials (SEED_STAFF_PASSWORD override):"
+      : "   Generated staff credentials (shown once — copy them now):"
+  );
   for (const { email, password } of generatedCredentials) {
     console.log(`     ${email}  ${password}`);
+  }
+  for (const { email } of demoStaff) {
+    console.log(`     ${email}`);
   }
 }
 

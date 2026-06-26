@@ -11,10 +11,24 @@
  * PaymentProvider, (2) a new case below, (3) re-verified API contract per §6.1
  * of the PRD (field names, result codes, ceilings — must be checked against
  * live docs before adding).
+ *
+ * The simulated adapter is a module-level singleton so gateway sessions
+ * (stored in-memory) persist across HTTP requests within the same Node.js
+ * process (development and test only). Without this, the verify() call in the
+ * payment callback would hit a fresh instance with no sessions.
  */
 
 import type { PaymentProvider } from "./provider";
 import { SimulatedPaymentAdapter } from "./adapters/simulated";
+
+let _simulatedInstance: SimulatedPaymentAdapter | null = null;
+
+function simulatedProvider(): SimulatedPaymentAdapter {
+  if (!_simulatedInstance) {
+    _simulatedInstance = new SimulatedPaymentAdapter();
+  }
+  return _simulatedInstance;
+}
 
 export function getPaymentProvider(): PaymentProvider {
   const providerKey = process.env.PAYMENT_PROVIDER?.toLowerCase() ?? "simulated";
@@ -22,7 +36,7 @@ export function getPaymentProvider(): PaymentProvider {
   switch (providerKey) {
     case "simulated":
     case "sandbox":
-      return new SimulatedPaymentAdapter();
+      return simulatedProvider();
 
     default:
       throw new Error(
@@ -31,4 +45,9 @@ export function getPaymentProvider(): PaymentProvider {
           `Live facilitator adapters are added under issue #5.`
       );
   }
+}
+
+/** Test / dev helper: discard the singleton so each test starts with a fresh adapter. */
+export function resetPaymentProviderForTesting(): void {
+  _simulatedInstance = null;
 }

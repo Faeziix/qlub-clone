@@ -42,7 +42,8 @@ interface SimulatedSession {
   refNumber?: string;
 }
 
-const SIMULATED_GATEWAY_BASE_URL = "https://sandbox.shaparak.test/pay";
+const SIMULATED_GATEWAY_FALLBACK_BASE = "https://sandbox.shaparak.test/pay";
+const DEV_GATEWAY_PATH = "/dev/payment-sim";
 const VALID_IBAN_PREFIX = "IR";
 const VALID_IBAN_MIN_LENGTH = 26;
 
@@ -62,7 +63,21 @@ export class SimulatedPaymentAdapter implements PaymentProvider {
   }
 
   redirectUrl(ref: string): string {
-    return `${SIMULATED_GATEWAY_BASE_URL}/${ref}`;
+    const session = this.sessions.get(ref);
+    if (session?.callbackUrl) {
+      try {
+        const origin = new URL(session.callbackUrl).origin;
+        return `${origin}${DEV_GATEWAY_PATH}/${ref}`;
+      } catch {
+        // fall through to the external sandbox URL
+      }
+    }
+    return `${SIMULATED_GATEWAY_FALLBACK_BASE}/${ref}`;
+  }
+
+  /** Returns the gateway callback URL stored for this session (dev only). */
+  getCallbackUrl(ref: string): string | undefined {
+    return this.sessions.get(ref)?.callbackUrl;
   }
 
   async verify(ref: string): Promise<PaymentVerifyResult> {
@@ -132,5 +147,14 @@ export class SimulatedPaymentAdapter implements PaymentProvider {
    */
   getSessionForTest(ref: string): SimulatedSession | undefined {
     return this.sessions.get(ref);
+  }
+
+  /** Returns safe session display info for the dev gateway UI (no PII). */
+  getSessionSummary(
+    ref: string
+  ): { amount: bigint; orderId: string; status: string } | undefined {
+    const s = this.sessions.get(ref);
+    if (!s) return undefined;
+    return { amount: s.amount, orderId: s.orderId, status: s.status };
   }
 }

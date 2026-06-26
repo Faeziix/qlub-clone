@@ -76,3 +76,14 @@ export function formatRialAsTomanPersian(rial: bigint): string {
 export function formatTomanAmountPersian(toman: bigint): string {
   return formatTomanValue(toman);
 }
+
+export function formatRialAsTomanLatin(rial: bigint): string {
+  const toman = rialToToman(rial);
+  if (toman === 0n) return "0 T";
+  const isExactThousands = toman % 1_000n === 0n;
+  const isAboveHezarThreshold = toman >= 10_000n;
+  if (isAboveHezarThreshold && isExactThousands) {
+    return `${(toman / 1_000n).toLocaleString("en")}K T`;
+  }
+  return `${toman.toLocaleString("en")} T`;
+}

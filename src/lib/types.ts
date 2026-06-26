@@ -42,6 +42,28 @@ export type OrderStatus =
   | "paid"
   | "cancelled";
 
+export interface CustomerOrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  lineTotal: string;
+  modifiers: { optionName: string }[];
+}
+
+export interface CustomerOrderSnapshot {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  subtotal: string;
+  serviceCharge: string;
+  tax: string;
+  total: string;
+  amountPaid: string;
+  tipAmount: string;
+  tableLabel: string | null;
+  items: CustomerOrderItem[];
+}
+
 export type PaymentMethod = "ipg" | "cash";
 
 export type SplitType = "full" | "even" | "items" | "custom";

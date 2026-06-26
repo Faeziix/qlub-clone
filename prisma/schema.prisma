@@ -116,15 +116,27 @@ model ModifierGroup {
 }
 
 model ModifierOption {
-  id         String        @id @default(cuid())
-  groupId    String
-  name       String
-  priceDelta BigInt        @default(0)
-  isDefault  Boolean       @default(false)
-  sortOrder  Int           @default(0)
-  group      ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  id                        String                      @id @default(cuid())
+  groupId                   String
+  name                      String
+  priceDelta                BigInt                      @default(0)
+  isDefault                 Boolean                     @default(false)
+  sortOrder                 Int                         @default(0)
+  group                     ModifierGroup               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  ModifierOptionTranslation ModifierOptionTranslation[]
 
   @@index([groupId])
+}
+
+model ModifierOptionTranslation {
+  id               String         @id @default(cuid())
+  modifierOptionId String
+  locale           String
+  name             String
+  modifierOption   ModifierOption @relation(fields: [modifierOptionId], references: [id], onDelete: Cascade)
+
+  @@unique([modifierOptionId, locale])
+  @@index([modifierOptionId])
 }
 
 model DiningTable {

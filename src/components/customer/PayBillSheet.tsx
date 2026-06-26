@@ -38,9 +38,20 @@ export function PayBillSheet({
     onClose();
   }
 
+  function canonicalizeOrderNumber(raw: string): string {
+    const asciiDigits = normalizeDigits(raw.trim()).toUpperCase();
+    const withoutPrefix = asciiDigits.startsWith("Q-")
+      ? asciiDigits.slice(2)
+      : asciiDigits;
+    if (/^\d+$/.test(withoutPrefix)) {
+      return `Q-${withoutPrefix.padStart(6, "0")}`;
+    }
+    return asciiDigits;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const normalized = normalizeDigits(rawInput.trim());
+    const normalized = canonicalizeOrderNumber(rawInput);
     if (!normalized) return;
 
     setLoading(true);
@@ -51,7 +62,7 @@ export function PayBillSheet({
         "/api/orders/lookup",
         { params: { vendor: vendorSlug, order: normalized } }
       );
-      router.push(`/qr/${country}/${vendorSlug}/pay?order=${data.id}`);
+      router.push(`/qr/${country}/${vendorSlug}/pay?order=${data.id}&lang=${lang}`);
       handleClose();
     } catch {
       setErrorMsg(t("orderNotFound"));
@@ -84,7 +95,7 @@ export function PayBillSheet({
             <input
               id="order-number-input"
               type="text"
-              inputMode="numeric"
+              inputMode="text"
               value={rawInput}
               onChange={(e) => {
                 setRawInput(e.target.value);

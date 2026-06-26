@@ -368,7 +368,7 @@ function VenueHero({
       <div className="relative -mt-14 rounded-t-3xl bg-surface px-5 pb-6 pt-16 text-center shadow-float">
         <div className="absolute inset-x-0 -top-7 mx-auto flex h-16 w-16 items-center justify-center">
           {vendor.logoUrl ? (
-            <div className="h-16 w-16 overflow-hidden rounded-2xl border-4 border-surface bg-surface shadow-card">
+            <div className="relative h-16 w-16 overflow-hidden rounded-2xl border-4 border-surface bg-surface shadow-card">
               <Image
                 src={vendor.logoUrl}
                 alt=""

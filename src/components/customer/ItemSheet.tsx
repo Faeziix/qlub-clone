@@ -9,9 +9,9 @@ import { cva } from "class-variance-authority";
 import type { ItemWithModifiers } from "@/lib/queries";
 import type { SelectedModifier } from "@/lib/types";
 import { useCart } from "@/lib/store/cart";
-import { makeT, localizedName, localizedDescription } from "@/lib/i18n";
+import { makeT, localizedName, localizedDescription, type I18nMap } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsTomanPersian, latinDigitsToPersian } from "@/lib/toman-formatter";
 import { formatRialAsToman } from "@/lib/money";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -122,20 +122,23 @@ function ModifierGroupSection({
   lang: string;
 }) {
   const single = group.maxSelect <= 1;
+  const groupName = localizedName(group as { name: string; i18n?: I18nMap }, lang);
 
   function modifierHint(): string {
     if (single) return t("chooseOne");
     if (group.minSelect > 0 && group.minSelect === group.maxSelect) {
-      return `${t("chooseUpTo")} ${group.maxSelect}`;
+      const count = lang === "fa" ? latinDigitsToPersian(String(group.maxSelect)) : String(group.maxSelect);
+      return `${t("chooseExactly")} ${count}`;
     }
-    return `${t("chooseUpTo")} ${group.maxSelect}`;
+    const count = lang === "fa" ? latinDigitsToPersian(String(group.maxSelect)) : String(group.maxSelect);
+    return `${t("chooseUpTo")} ${count}`;
   }
 
   return (
     <div className="mt-6">
       <div className="flex items-start justify-between gap-2 px-5">
         <div>
-          <h3 className="font-bold leading-snug">{group.name}</h3>
+          <h3 className="font-bold leading-snug">{groupName}</h3>
           <p className="mt-0.5 text-sm text-muted">{modifierHint()}</p>
         </div>
         <span
@@ -153,6 +156,7 @@ function ModifierGroupSection({
       <div className="mt-3 space-y-2 px-5">
         {group.options.map((option) => {
           const checked = selected.includes(option.id);
+          const optionName = localizedName(option as { name: string; i18n?: I18nMap }, lang);
           return (
             <button
               key={option.id}
@@ -165,7 +169,7 @@ function ModifierGroupSection({
             >
               <ModifierIndicator checked={checked} single={single} />
               <span className="flex-1 text-sm font-medium leading-snug">
-                {option.name}
+                {optionName}
               </span>
               {option.priceDelta > 0 && (
                 <span className="shrink-0 text-sm font-semibold text-muted tabular-nums">
@@ -233,9 +237,9 @@ export function ItemSheet({
         const opt = group.options.find((o) => o.id === optId)!;
         return {
           groupId: group.id,
-          groupName: group.name,
+          groupName: localizedName(group as { name: string; i18n?: I18nMap }, lang),
           optionId: opt.id,
-          optionName: opt.name,
+          optionName: localizedName(opt as { name: string; i18n?: I18nMap }, lang),
           priceDelta: BigInt(opt.priceDelta),
         };
       })
@@ -285,7 +289,10 @@ export function ItemSheet({
               aria-hidden
               className="absolute inset-x-0 top-2.5 z-10 flex justify-center"
             >
-              <div className="h-1.5 w-10 rounded-full bg-white/60" />
+              <div className={cn(
+                "h-1.5 w-10 rounded-full",
+                item.imageUrl ? "bg-white/60" : "bg-ink/20"
+              )} />
             </div>
 
             <Dialog.Close
@@ -355,7 +362,7 @@ export function ItemSheet({
                       charsLeft < 20 ? "text-warning" : "text-muted"
                     )}
                   >
-                    {charsLeft}
+                    {lang === "fa" ? latinDigitsToPersian(String(charsLeft)) : charsLeft}
                   </span>
                 </div>
                 <textarea
@@ -379,6 +386,7 @@ export function ItemSheet({
                   size="lg"
                   decreaseLabel={t("decreaseQty")}
                   increaseLabel={t("increaseQty")}
+                  displayValue={lang === "fa" ? latinDigitsToPersian(String(qty)) : undefined}
                 />
                 <Button
                   fullWidth

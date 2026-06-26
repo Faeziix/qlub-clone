@@ -31,10 +31,11 @@ interface SeedItem {
   calories?: number;
   modifierGroups?: {
     name: string;
+    faName?: string;
     minSelect?: number;
     maxSelect?: number;
     required?: boolean;
-    options: { name: string; priceDelta?: number; isDefault?: boolean }[];
+    options: { name: string; faName?: string; priceDelta?: number; isDefault?: boolean }[];
   }[];
 }
 interface SeedCategory {
@@ -52,51 +53,55 @@ const R = 10_000;
 
 const hotBeverage = {
   name: "Choose your hot beverage",
+  faName: "نوشیدنی گرم را انتخاب کنید",
   required: true,
   minSelect: 1,
   maxSelect: 1,
   options: [
-    { name: "Espresso", isDefault: true },
-    { name: "Cappuccino" },
-    { name: "Café Latte" },
-    { name: "English Breakfast Tea" },
-    { name: "Hot Chocolate", priceDelta: 4 * R },
+    { name: "Espresso", faName: "اسپرسو", isDefault: true },
+    { name: "Cappuccino", faName: "کاپوچینو" },
+    { name: "Café Latte", faName: "کافه لاته" },
+    { name: "English Breakfast Tea", faName: "چای صبحانه انگلیسی" },
+    { name: "Hot Chocolate", faName: "شکلات داغ", priceDelta: 4 * R },
   ],
 };
 const viennoiserie = {
   name: "Choose your viennoiserie",
+  faName: "شیرینی وینیازری را انتخاب کنید",
   required: true,
   minSelect: 1,
   maxSelect: 1,
   options: [
-    { name: "Butter Croissant", isDefault: true },
-    { name: "Pain au Chocolat" },
-    { name: "Pain aux Raisins" },
-    { name: "Almond Croissant", priceDelta: 5 * R },
+    { name: "Butter Croissant", faName: "کروسان کره‌ای", isDefault: true },
+    { name: "Pain au Chocolat", faName: "پن او شکلا" },
+    { name: "Pain aux Raisins", faName: "پن او کشمش" },
+    { name: "Almond Croissant", faName: "کروسان بادامی", priceDelta: 5 * R },
   ],
 };
 const eggStyle = {
   name: "How would you like your eggs?",
+  faName: "تخم‌مرغ را چطور می‌خواهید؟",
   required: true,
   minSelect: 1,
   maxSelect: 1,
   options: [
-    { name: "Sunny side up", isDefault: true },
-    { name: "Scrambled" },
-    { name: "Poached" },
-    { name: "Omelette" },
+    { name: "Sunny side up", faName: "نیمرو", isDefault: true },
+    { name: "Scrambled", faName: "تخم‌مرغ هم‌زده" },
+    { name: "Poached", faName: "تخم‌مرغ آب‌پز سبک" },
+    { name: "Omelette", faName: "املت" },
   ],
 };
 const extras = {
   name: "Add extras",
+  faName: "افزودنی‌ها",
   minSelect: 0,
   maxSelect: 5,
   options: [
-    { name: "Smoked Salmon", priceDelta: 18 * R },
-    { name: "Avocado", priceDelta: 12 * R },
-    { name: "Turkey Bacon", priceDelta: 10 * R },
-    { name: "Extra Egg", priceDelta: 6 * R },
-    { name: "Sautéed Mushrooms", priceDelta: 8 * R },
+    { name: "Smoked Salmon", faName: "سالمون دودی", priceDelta: 18 * R },
+    { name: "Avocado", faName: "آووکادو", priceDelta: 12 * R },
+    { name: "Turkey Bacon", faName: "بیکن بوقلمون", priceDelta: 10 * R },
+    { name: "Extra Egg", faName: "تخم‌مرغ اضافه", priceDelta: 6 * R },
+    { name: "Sautéed Mushrooms", faName: "قارچ سوته", priceDelta: 8 * R },
   ],
 };
 
@@ -769,25 +774,6 @@ async function seedVendor(opts: {
             tags: it.tags ?? [],
             calories: it.calories,
             sortOrder: i,
-            modifierGroups: it.modifierGroups
-              ? {
-                  create: it.modifierGroups.map((g, gi) => ({
-                    name: g.name,
-                    required: g.required ?? false,
-                    minSelect: g.minSelect ?? 0,
-                    maxSelect: g.maxSelect ?? 1,
-                    sortOrder: gi,
-                    options: {
-                      create: g.options.map((o, oi) => ({
-                        name: o.name,
-                        priceDelta: BigInt(o.priceDelta ?? 0),
-                        isDefault: o.isDefault ?? false,
-                        sortOrder: oi,
-                      })),
-                    },
-                  })),
-                }
-              : undefined,
           },
         });
         if (it.faName) {
@@ -799,6 +785,41 @@ async function seedVendor(opts: {
               description: it.faDescription,
             },
           });
+        }
+        for (let gi = 0; gi < (it.modifierGroups ?? []).length; gi++) {
+          const g = it.modifierGroups![gi];
+          const createdGroup = await db.modifierGroup.create({
+            data: {
+              itemId: createdItem.id,
+              name: g.name,
+              required: g.required ?? false,
+              minSelect: g.minSelect ?? 0,
+              maxSelect: g.maxSelect ?? 1,
+              sortOrder: gi,
+            },
+          });
+          if (g.faName) {
+            await db.modifierGroupTranslation.create({
+              data: { modifierGroupId: createdGroup.id, locale: "fa", name: g.faName },
+            });
+          }
+          for (let oi = 0; oi < g.options.length; oi++) {
+            const o = g.options[oi];
+            const createdOption = await db.modifierOption.create({
+              data: {
+                groupId: createdGroup.id,
+                name: o.name,
+                priceDelta: BigInt(o.priceDelta ?? 0),
+                isDefault: o.isDefault ?? false,
+                sortOrder: oi,
+              },
+            });
+            if (o.faName) {
+              await db.modifierOptionTranslation.create({
+                data: { modifierOptionId: createdOption.id, locale: "fa", name: o.faName },
+              });
+            }
+          }
         }
         createdItems.push({
           id: createdItem.id,

@@ -117,6 +117,10 @@ const en: Dict = {
   categoryNav: "Menu categories",
   close: "Close",
   chooseOne: "Choose 1",
+  chooseExactly: "Choose exactly",
+  kcal: "kcal",
+  decreaseQty: "Decrease quantity",
+  increaseQty: "Increase quantity",
 };
 
 const fa: Dict = {
@@ -204,6 +208,10 @@ const fa: Dict = {
   categoryNav: "دسته‌بندی‌های منو",
   close: "بستن",
   chooseOne: "یکی انتخاب کنید",
+  chooseExactly: "دقیقاً انتخاب کنید",
+  kcal: "کالری",
+  decreaseQty: "کاهش تعداد",
+  increaseQty: "افزایش تعداد",
 };
 
 const dicts: Record<string, Dict> = { fa, en };

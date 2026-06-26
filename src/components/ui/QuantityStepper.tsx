@@ -10,6 +10,7 @@ export function QuantityStepper({
   size = "md",
   decreaseLabel = "Decrease",
   increaseLabel = "Increase",
+  displayValue,
 }: {
   value: number;
   onChange: (v: number) => void;
@@ -18,6 +19,7 @@ export function QuantityStepper({
   size?: "sm" | "md" | "lg";
   decreaseLabel?: string;
   increaseLabel?: string;
+  displayValue?: string;
 }) {
   const btn =
     size === "sm"
@@ -45,7 +47,7 @@ export function QuantityStepper({
           size === "sm" ? "text-sm" : "text-base"
         )}
       >
-        {value}
+        {displayValue ?? value}
       </span>
       <button
         type="button"

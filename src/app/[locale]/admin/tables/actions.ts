@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { recordAuditEvent } from "@/lib/audit";
+import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
 
 import { TableStatus } from "@prisma/client";
 
@@ -25,6 +26,7 @@ function assertVendorOwnership(
 
 async function requireOwnedTable(tableId: string) {
   const session = await requireRole("manager");
+  await checkAdminActionLimit(session.id);
   const table = await db.diningTable.findUnique({
     where: { id: tableId },
     select: { id: true, vendorId: true },
@@ -39,6 +41,7 @@ export async function createTable(
   input: { code: string; label: string; seats: number; area: string }
 ) {
   const session = await requireRole("manager");
+  await checkAdminActionLimit(session.id);
   assertVendorOwnership(session.vendorId, vendorId);
 
   const code = input.code.trim();

@@ -6,6 +6,7 @@ import { requireRole, assertRole } from "@/lib/rbac";
 import { revalidateSession } from "@/lib/auth";
 import { recordAuditEvent } from "@/lib/audit";
 import { redirect } from "next/navigation";
+import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
 
 export type VendorSettingsInput = {
   name: string;
@@ -45,6 +46,7 @@ export async function updateVendorSettings(
   if (!liveSession) redirect("/admin/login");
 
   assertRole(liveSession, "owner");
+  await checkAdminActionLimit(liveSession.id);
 
   if (liveSession.vendorId && liveSession.vendorId !== vendorId) {
     throw new Error("Forbidden: cannot modify another vendor's settings.");

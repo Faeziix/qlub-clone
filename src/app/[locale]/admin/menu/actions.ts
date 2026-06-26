@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { parseRialFromInput } from "@/lib/money";
 import { recordAuditEvent } from "@/lib/audit";
+import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
 
 interface TranslationInput {
   locale: string;
@@ -14,6 +15,7 @@ interface TranslationInput {
 
 async function assertVendorAccess(vendorId: string) {
   const session = await requireRole("manager");
+  await checkAdminActionLimit(session.id);
   if (session.vendorId && session.vendorId !== vendorId) {
     throw new Error("Forbidden: item belongs to another vendor.");
   }

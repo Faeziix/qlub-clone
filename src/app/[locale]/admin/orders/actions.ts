@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { recordAuditEvent } from "@/lib/audit";
+import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
 
 const ALLOWED_STATUSES = [
   "open",
@@ -20,6 +21,7 @@ type OrderStatus = (typeof ALLOWED_STATUSES)[number];
 /** Find an order, asserting it belongs to the current session's vendor scope. */
 async function scopedOrder(orderId: string) {
   const session = await requireRole("staff");
+  await checkAdminActionLimit(session.id);
   const order = await db.order.findUnique({
     where: { id: orderId },
     select: { id: true, vendorId: true, tableId: true, status: true },

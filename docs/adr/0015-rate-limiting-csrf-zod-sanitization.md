@@ -60,10 +60,20 @@ Three named limiters with tuned windows:
 | Limiter | Key pattern | Window | Max requests |
 |---|---|---|---|
 | `publicApi` | `orders:<ip>`, `payments:<ip>`, `reviews:<ip>` | 60 s | 60 |
-| `adminAction` | (reserved for future admin mutation guard) | 60 s | 120 |
+| `adminAction` | `admin:<userId>` | 60 s | 120 |
 | `login` | `login:<email>` | 5 min | 5 |
 
-### 3. Login lockout (`src/app/[locale]/admin/actions.ts`)
+### 3. Admin action rate limiting (`src/lib/admin-rate-limit.ts`)
+
+Every authenticated admin mutation (menu, orders, tables, settings) calls
+`checkAdminActionLimit(session.id)` immediately after role verification.  This
+function calls `getLimiter("adminAction").check("admin:<userId>")` and throws
+`"Too many requests"` if the limit is exceeded, preventing the DB write.  The
+check is placed inside each file's shared auth helper (`assertVendorAccess`,
+`scopedOrder`, `requireOwnedTable`) so it cannot be accidentally bypassed when
+new public exports are added to those files.
+
+### 4. Login lockout (`src/app/[locale]/admin/actions.ts`)
 
 Before password verification, `login` calls `loginLimiter.check("login:<email>")`.
 If the account key is exhausted, it returns `{ errorKey: "tooManyAttempts" }`
@@ -71,7 +81,7 @@ without revealing whether the account exists. On successful login the counter is
 reset via `loginLimiter.reset(...)` so a legitimate user who previously failed
 is not permanently locked.
 
-### 4. Public POST route hardening
+### 5. Public POST route hardening
 
 Each of `/api/orders`, `/api/payments`, `/api/reviews` now:
 
@@ -86,14 +96,14 @@ Each of `/api/orders`, `/api/payments`, `/api/reviews` now:
 5. **Returns generic errors** — all `catch` blocks return `"Bad request"` with
    no internal detail exposed.
 
-### 5. `sanitizeFreeText` (`src/lib/sanitize.ts`)
+### 6. `sanitizeFreeText` (`src/lib/sanitize.ts`)
 
 Strips `<script>…</script>` blocks, all remaining HTML tags, and
 `javascript:` protocol strings; trims and truncates to `maxLength` (default
 2000). Operates server-side before persistence. React's JSX escaping is the
 defence-in-depth layer at render time.
 
-### 6. `checkOrigin` (`src/lib/csrf.ts`)
+### 7. `checkOrigin` (`src/lib/csrf.ts`)
 
 Compares the `Origin` request header against the request host plus
 `NEXT_PUBLIC_APP_URL`. Rules:
@@ -104,6 +114,72 @@ Compares the `Origin` request header against the request host plus
 - Otherwise → rejected.
 
 Localhost origins are always allowed for local development.
+
+---
+
+## Trust boundaries and known caveats
+
+### `x-forwarded-for` IP extraction (public API rate limiting)
+
+Public routes extract the client IP from
+`x-forwarded-for[0]` (the first entry in the comma-separated list).  This
+header is client-controlled on a raw TCP connection and can be spoofed by
+anyone who can reach the origin directly.
+
+**On Vercel (production):** Vercel's edge layer appends the true client IP as
+the last entry in `x-forwarded-for` and also populates `x-real-ip`.  The
+`x-forwarded-for[0]` value originates from whatever the client sent and is
+therefore untrusted.  A determined attacker who can route directly to the
+origin function could rotate this value to bypass the rate limit.  Mitigation
+options in order of preference:
+
+1. Read the platform-trusted `x-real-ip` header instead of `x-forwarded-for[0]`
+   (Vercel sets this reliably; Cloudflare uses `cf-connecting-ip`).
+2. Use Vercel's Edge Middleware to enforce rate limits before the function is
+   reached, where the platform IP is authoritative.
+
+This is a **known acceptable risk** for the current deployment phase: the
+in-memory fallback and Redis adapter both operate correctly; a bypass reduces
+effective rate limiting to a per-window annoyance rather than a security break
+because the downstream DB is still protected by RBAC and server-authoritative
+pricing.  The approach is documented here so it is not overlooked before GA.
+
+### `InMemoryRateLimiter` — unbounded `Map`
+
+`InMemoryRateLimiter.store` is a `Map` with no eviction of expired entries.
+Keys are only overwritten on the next hit for the same key after the window
+expires.  Under a sustained stream of unique IP addresses the map grows without
+bound, consuming process memory.  This is acceptable for the **dev/fallback
+adapter** because:
+
+- A production deployment with more than one app instance MUST set `REDIS_URL`
+  and will use `RedisRateLimiter`.
+- Single-instance dev traffic volumes are small enough that this does not
+  matter in practice.
+
+A periodic sweep of expired entries could be added if needed; for now the
+constraint is documented and production relies on the Redis adapter.
+
+### `getLimiter` — concurrent first-call race
+
+`getLimiter` checks and updates the `cache` Map synchronously, but
+`buildRateLimiter` is an async function.  Two concurrent first-calls for the
+same limiter name could each call `buildRateLimiter`, creating two Redis
+clients (one orphaned).  The impact is a single extra TCP connection per race;
+subsequent calls use the cached instance.  Caching the in-flight `Promise`
+would eliminate the race entirely but adds complexity not warranted by the
+current traffic profile.
+
+### CSRF — `SameSite` cookie dependency
+
+`checkOrigin` allows requests with **no `Origin` header** (server-to-server,
+`curl`, Postman).  For browser state-changing routes this means CSRF protection
+relies on the browser always sending `Origin` **and** on the admin session
+cookie being `SameSite: lax` (or `strict`).  The admin cookie is set with
+`SameSite: lax` in `src/lib/auth.ts`; this must remain in place for the CSRF
+defence to hold.  Removing `SameSite` from the cookie would make CSRF possible
+via cross-origin form submissions (which do not trigger `preflight` and
+therefore do not send `Origin`).
 
 ---
 
@@ -124,10 +200,12 @@ function correctly but will not share rate-limit state across restarts.
 ## Consequences
 
 - All three public POST routes are rate-limited and origin-checked.
+- All admin mutations (menu, orders, tables, settings) are rate-limited per authenticated user id.
 - Login is locked after 5 failed attempts per email per 5-minute window.
 - Free-text fields are sanitized before reaching the database.
 - All public route error responses are generic; no internal detail is surfaced.
 - The app builds and runs without Redis — `REDIS_URL` is optional for dev.
+- Trust boundaries for `x-forwarded-for` and `SameSite` cookie dependency are documented above.
 
 ---
 

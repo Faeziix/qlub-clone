@@ -115,6 +115,8 @@ const en: Dict = {
   selectMenuToContinue: "Choose a menu to continue",
   noMenusAvailable: "No menus available right now.",
   categoryNav: "Menu categories",
+  close: "Close",
+  chooseOne: "Choose 1",
 };
 
 const fa: Dict = {
@@ -200,6 +202,8 @@ const fa: Dict = {
   selectMenuToContinue: "یک منو برای ادامه انتخاب کنید",
   noMenusAvailable: "در حال حاضر منویی در دسترس نیست.",
   categoryNav: "دسته‌بندی‌های منو",
+  close: "بستن",
+  chooseOne: "یکی انتخاب کنید",
 };
 
 const dicts: Record<string, Dict> = { fa, en };

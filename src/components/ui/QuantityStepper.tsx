@@ -15,14 +15,16 @@ export function QuantityStepper({
   onChange: (v: number) => void;
   min?: number;
   max?: number;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
   decreaseLabel?: string;
   increaseLabel?: string;
 }) {
   const btn =
     size === "sm"
       ? "h-7 w-7"
-      : "h-9 w-9";
+      : size === "lg"
+        ? "h-11 w-11"
+        : "h-9 w-9";
   return (
     <div className="inline-flex items-center gap-1 rounded-full bg-surface-2 p-1">
       <button
@@ -35,11 +37,11 @@ export function QuantityStepper({
         )}
         aria-label={decreaseLabel}
       >
-        <Minus size={size === "sm" ? 14 : 16} />
+        <Minus size={size === "sm" ? 14 : size === "lg" ? 18 : 16} />
       </button>
       <span
         className={cn(
-          "min-w-7 text-center font-bold tabular-nums",
+          "min-w-8 text-center font-bold tabular-nums",
           size === "sm" ? "text-sm" : "text-base"
         )}
       >
@@ -55,7 +57,7 @@ export function QuantityStepper({
         )}
         aria-label={increaseLabel}
       >
-        <Plus size={size === "sm" ? 14 : 16} />
+        <Plus size={size === "sm" ? 14 : size === "lg" ? 18 : 16} />
       </button>
     </div>
   );

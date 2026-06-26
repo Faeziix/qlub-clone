@@ -137,6 +137,31 @@ Renders a rial `bigint` as Toman with `data-money` attribute and tabular numeral
 // renders: ۱۵ هزار تومان
 ```
 
+### QuantityStepper (`src/components/ui/QuantityStepper.tsx`)
+
+Inline `−` / `+` stepper for integer quantities. Three size variants:
+
+| Size | Button | Use case |
+|------|--------|----------|
+| `sm` | 28×28 px | Cart sidebar line items |
+| `md` | 36×36 px | Compact contexts |
+| `lg` | 44×44 px | Item detail sheet footer (meets 44 px touch target rule) |
+
+### ItemSheet (`src/components/customer/ItemSheet.tsx`)
+
+Full-height bottom-sheet for item selection — modifiers, quantity, and instructions. Key design rules:
+
+- **Hero image bleeds to top edge**: the component bypasses `Sheet` and constructs its own Radix `Dialog.Content` so the `h-64` image spans the full rounded-t-3xl top without a header gap.
+- **Floating controls overlay image**: drag handle (`bg-white/60`, `w-10`) and close button (`h-11 w-11` = 44 px) are `absolute` inside the dialog, z-indexed above the image.
+- **All touch targets ≥ 44 px**: modifier option rows are `min-h-[52px]`; close button and stepper buttons are 44 px.
+- **Modifier visual language**:
+  - Single-select (`maxSelect ≤ 1`): circle indicator (radio).
+  - Multi-select: rounded-square indicator (checkbox).
+  - Checked state: `border-brand bg-brand-soft` with `Check` icon.
+- **Instructions character cap**: `INSTRUCTIONS_MAX = 160` chars with live `charsLeft` counter, warming to `text-warning` below 20.
+- **Footer layout**: non-scrollable, `bg-surface/95 backdrop-blur-sm`, `safe-bottom`. `QuantityStepper size="lg"` + full-width Button with label and live total on opposite ends (`justify-between`).
+- **Server-authoritative total**: `lineTotal = (unitPriceRial + sum(modifier.priceDelta)) × qty` — computed from BigInt item price, never from client strings.
+
 ### PersianDate (`src/components/ui/PersianDate.tsx`)
 
 Renders a `Date` as Jalali string in a `<time>` element.

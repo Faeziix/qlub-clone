@@ -12,15 +12,14 @@ export const dynamic = "force-dynamic";
 
 /**
  * Validates the signed table token (`tt` search param) against the actual
- * vendor and table row. Returns the verified table code, or null when:
- *   - no token was provided (legacy QR or direct link without a token)
- *   - the token is expired, malformed, or signed by a different key
- *   - the token's vendorId/tableId do not match the vendor slug + table code
- *     in the URL (cross-vendor or tampered token)
+ * vendor and table row. The table context is honored ONLY when a valid signed
+ * token is present — a bare, guessable `?table=2` (no token, or a tampered /
+ * foreign / expired one) resolves to null so table identity cannot be forged
+ * by URL-guessing. Each table's QR therefore carries an unguessable signed
+ * token unique to that table.
  *
- * A null result is not treated as a hard 404 — it degrades gracefully to
- * an unauthenticated browse-only state. Hard blocks on invalid tokens will
- * be added in the auth/OTP phase once guest identity is wired.
+ * A null result is not a hard 404 — it degrades gracefully to a browse-only
+ * state (the customer can still see the menu, just without a bound table).
  */
 async function resolveVerifiedTableCode(
   vendorId: string,
@@ -32,7 +31,7 @@ async function resolveVerifiedTableCode(
   }
 
   if (!tableToken) {
-    return { tableCode, tokenValid: false };
+    return { tableCode: null, tokenValid: false };
   }
 
   const claims = await verifyTableToken(tableToken);

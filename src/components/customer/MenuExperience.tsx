@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Globe,
@@ -52,6 +53,7 @@ export function MenuExperience({
   const [lang, setLang] = React.useState(initialLang);
   const t = makeT(lang);
   const dir = dirFor(lang);
+  const router = useRouter();
 
   const menus = vendor.menus;
   const [activeMenu, setActiveMenu] = React.useState(0);
@@ -63,6 +65,8 @@ export function MenuExperience({
   const [cartOpen, setCartOpen] = React.useState(false);
   const [langOpen, setLangOpen] = React.useState(false);
   const [payBillOpen, setPayBillOpen] = React.useState(false);
+  const [payBillNotice, setPayBillNotice] = React.useState<string | null>(null);
+  const [resolvingTableBill, setResolvingTableBill] = React.useState(false);
   const [myOrderOpen, setMyOrderOpen] = React.useState(false);
   const [activeCat, setActiveCat] = React.useState(0);
   const [isPending, startMenuTransition] = React.useTransition();
@@ -77,20 +81,20 @@ export function MenuExperience({
     cart.init(vendor.slug, tableCode);
     setHydrated(true);
 
-    const stored = activeOrderStore.getActiveOrder(vendor.slug);
+    const stored = activeOrderStore.getActiveOrder(vendor.slug, tableCode);
     if (stored) {
       axios
         .get<CustomerOrderSnapshot>(`/api/orders/${stored.orderId}`)
         .then(({ data }) => {
           const isTerminal = data.status === "paid" || data.status === "cancelled";
           if (isTerminal) {
-            activeOrderStore.clearActiveOrder(vendor.slug);
+            activeOrderStore.clearActiveOrder(vendor.slug, tableCode);
           } else {
             setActiveOrderSnapshot(data);
           }
         })
         .catch(() => {
-          activeOrderStore.clearActiveOrder(vendor.slug);
+          activeOrderStore.clearActiveOrder(vendor.slug, tableCode);
         });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -100,7 +104,7 @@ export function MenuExperience({
   const subtotal = hydrated ? cart.subtotal() : 0n;
 
   const activeOrderEntry = hydrated
-    ? activeOrderStore.getActiveOrder(vendor.slug)
+    ? activeOrderStore.getActiveOrder(vendor.slug, tableCode)
     : null;
 
   const menu = menus[activeMenu];
@@ -158,6 +162,27 @@ export function MenuExperience({
     });
   }
 
+  async function handlePayBill() {
+    if (!tableCode) {
+      setPayBillNotice(null);
+      setPayBillOpen(true);
+      return;
+    }
+
+    setResolvingTableBill(true);
+    try {
+      const { data } = await axios.get<{ id: string }>("/api/orders/active", {
+        params: { vendor: vendor.slug, table: tableCode },
+      });
+      router.push(`/qr/${vendor.country}/${vendor.slug}/pay?order=${data.id}&lang=${lang}`);
+    } catch {
+      setPayBillNotice(t("noOpenBillAtTable"));
+      setPayBillOpen(true);
+    } finally {
+      setResolvingTableBill(false);
+    }
+  }
+
   function handleOrderPlaced(orderId: string) {
     activeOrderStore.setActiveOrder(vendor.slug, orderId, tableCode);
     axios
@@ -171,7 +196,7 @@ export function MenuExperience({
   }
 
   function handleOrderStatusCleared() {
-    activeOrderStore.clearActiveOrder(vendor.slug);
+    activeOrderStore.clearActiveOrder(vendor.slug, tableCode);
     setActiveOrderSnapshot(null);
     setMyOrderOpen(false);
   }
@@ -195,7 +220,8 @@ export function MenuExperience({
               t={t}
               menus={menus}
               onViewMenu={handleViewMenu}
-              onPayBill={() => setPayBillOpen(true)}
+              onPayBill={handlePayBill}
+              payBillLoading={resolvingTableBill}
               activeOrderNumber={activeOrderSnapshot?.orderNumber ?? null}
               onViewMyOrder={() => setMyOrderOpen(true)}
             />
@@ -227,10 +253,14 @@ export function MenuExperience({
 
         <PayBillSheet
           open={payBillOpen}
-          onClose={() => setPayBillOpen(false)}
+          onClose={() => {
+            setPayBillOpen(false);
+            setPayBillNotice(null);
+          }}
           vendorSlug={vendor.slug}
           country={vendor.country}
           lang={lang}
+          notice={payBillNotice}
         />
 
         {activeOrderSnapshot && (
@@ -614,6 +644,7 @@ function MainEntryPoints({
   menus,
   onViewMenu,
   onPayBill,
+  payBillLoading,
   activeOrderNumber,
   onViewMyOrder,
 }: {
@@ -621,6 +652,7 @@ function MainEntryPoints({
   menus: VendorWithMenus["menus"];
   onViewMenu: () => void;
   onPayBill: () => void;
+  payBillLoading: boolean;
   activeOrderNumber: string | null;
   onViewMyOrder: () => void;
 }) {
@@ -668,6 +700,7 @@ function MainEntryPoints({
         size="lg"
         fullWidth
         onClick={onPayBill}
+        loading={payBillLoading}
         className="justify-start gap-4 ps-5"
       >
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-cta-fg/20">

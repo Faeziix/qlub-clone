@@ -16,6 +16,7 @@ interface PayBillSheetProps {
   vendorSlug: string;
   country: string;
   lang: string;
+  notice?: string | null;
 }
 
 export function PayBillSheet({
@@ -24,6 +25,7 @@ export function PayBillSheet({
   vendorSlug,
   country,
   lang,
+  notice,
 }: PayBillSheetProps) {
   const t = makeT(lang);
   const dir = dirFor(lang);
@@ -80,6 +82,11 @@ export function PayBillSheet({
       closeLabel={t("back")}
     >
       <div className="px-5 pb-8 pt-2" dir={dir}>
+        {notice && (
+          <p className="mb-4 rounded-xl bg-cta-soft px-4 py-3 text-sm text-cta">
+            {notice}
+          </p>
+        )}
         <div className="mb-6 flex flex-col items-center gap-3 text-center">
           <div className="grid h-14 w-14 place-items-center rounded-2xl bg-cta-soft text-cta">
             <Receipt size={28} aria-hidden />

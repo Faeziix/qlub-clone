@@ -7,6 +7,10 @@ interface ActiveOrderEntry {
   tableCode: string | null;
 }
 
+function activeOrderKey(vendorSlug: string, tableCode: string | null): string {
+  return tableCode ? `${vendorSlug}::${tableCode}` : vendorSlug;
+}
+
 interface ActiveOrderState {
   activeOrders: Record<string, ActiveOrderEntry>;
   setActiveOrder: (
@@ -14,8 +18,11 @@ interface ActiveOrderState {
     orderId: string,
     tableCode: string | null
   ) => void;
-  clearActiveOrder: (vendorSlug: string) => void;
-  getActiveOrder: (vendorSlug: string) => ActiveOrderEntry | null;
+  clearActiveOrder: (vendorSlug: string, tableCode: string | null) => void;
+  getActiveOrder: (
+    vendorSlug: string,
+    tableCode: string | null
+  ) => ActiveOrderEntry | null;
 }
 
 export const useActiveOrder = create<ActiveOrderState>()(
@@ -27,18 +34,19 @@ export const useActiveOrder = create<ActiveOrderState>()(
         set((s) => ({
           activeOrders: {
             ...s.activeOrders,
-            [vendorSlug]: { orderId, tableCode },
+            [activeOrderKey(vendorSlug, tableCode)]: { orderId, tableCode },
           },
         })),
 
-      clearActiveOrder: (vendorSlug) =>
+      clearActiveOrder: (vendorSlug, tableCode) =>
         set((s) => {
           const next = { ...s.activeOrders };
-          delete next[vendorSlug];
+          delete next[activeOrderKey(vendorSlug, tableCode)];
           return { activeOrders: next };
         }),
 
-      getActiveOrder: (vendorSlug) => get().activeOrders[vendorSlug] ?? null,
+      getActiveOrder: (vendorSlug, tableCode) =>
+        get().activeOrders[activeOrderKey(vendorSlug, tableCode)] ?? null,
     }),
     {
       name: "qlub-active-orders",

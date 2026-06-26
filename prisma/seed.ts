@@ -5,7 +5,8 @@
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { randomInt, randomBytes } from "node:crypto";
+import { randomInt } from "node:crypto";
+import { SignJWT } from "jose";
 
 const db = new PrismaClient();
 
@@ -13,9 +14,28 @@ function randomTablePasscode() {
   return String(randomInt(0, 10000)).padStart(4, "0");
 }
 
-function randomStaffPassword() {
-  return randomBytes(18).toString("base64url");
+const TABLE_TOKEN_ALGORITHM = "HS256";
+const TABLE_TOKEN_SUBJECT = "table-access";
+const TABLE_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 365;
+
+function tableSigningKey() {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error("AUTH_SECRET is required to sign seeded table tokens.");
+  }
+  return new TextEncoder().encode(secret);
 }
+
+async function signSeedTableToken(vendorId: string, tableId: string) {
+  return new SignJWT({ vendorId, tableId })
+    .setProtectedHeader({ alg: TABLE_TOKEN_ALGORITHM })
+    .setSubject(TABLE_TOKEN_SUBJECT)
+    .setIssuedAt()
+    .setExpirationTime(`${TABLE_TOKEN_TTL_SECONDS}s`)
+    .sign(tableSigningKey());
+}
+
+const SEED_STAFF_PASSWORD = process.env.SEED_STAFF_PASSWORD || "password123";
 
 const CDN = "https://cdn-customerapp.qlub.io/digital_menu/menu";
 const UNS = (id: string) => `https://images.unsplash.com/${id}?w=600&q=80&auto=format&fit=crop`;
@@ -849,7 +869,12 @@ async function seedVendor(opts: {
         status: t <= 3 ? "occupied" : "available",
       },
     });
-    tables.push(table);
+    const tableToken = await signSeedTableToken(vendor.id, table.id);
+    const tokenizedTable = await db.diningTable.update({
+      where: { id: table.id },
+      data: { tableToken },
+    });
+    tables.push(tokenizedTable);
   }
 
   return { vendor, items: createdItems, tables };
@@ -1018,27 +1043,24 @@ async function main() {
     { email: "owner@olive-bistro-ir.example.com", name: "سارا محمدی", role: "owner", vendorId: bistro.vendor.id },
   ];
 
-  const generatedCredentials: { email: string; password: string }[] = [];
   for (const staff of demoStaff) {
-    const password = randomStaffPassword();
     await db.staffUser.create({
       data: {
         email: staff.email,
         name: staff.name,
         role: staff.role,
         vendorId: staff.vendorId,
-        passwordHash: await bcrypt.hash(password, 10),
+        passwordHash: await bcrypt.hash(SEED_STAFF_PASSWORD, 10),
       },
     });
-    generatedCredentials.push({ email: staff.email, password });
   }
 
   console.log("✅ Seed complete.");
   console.log("   Customer: /qr/ir/paul-ir");
   console.log("   Admin:    /admin/login");
-  console.log("   Generated staff credentials (shown once — copy them now):");
-  for (const { email, password } of generatedCredentials) {
-    console.log(`     ${email}  ${password}`);
+  console.log(`   Staff password (all accounts): ${SEED_STAFF_PASSWORD}`);
+  for (const { email } of demoStaff) {
+    console.log(`     ${email}`);
   }
 }
 

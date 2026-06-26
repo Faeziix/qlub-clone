@@ -59,7 +59,7 @@ import {
   createTable,
   updateTableStatus,
   deleteTable,
-} from "@/app/admin/tables/actions";
+} from "@/app/[locale]/admin/tables/actions";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

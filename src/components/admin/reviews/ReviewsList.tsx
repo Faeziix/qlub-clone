@@ -18,14 +18,18 @@ export type ReviewRow = {
   orderNumber: string | null;
 };
 
-const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "5", label: "5" },
-  { key: "4", label: "4" },
-  { key: "3", label: "3" },
-  { key: "2", label: "2" },
-  { key: "1", label: "1" },
-] as const;
+export type ReviewsTranslations = {
+  allRatings: string;
+  noReviews: string;
+  noFilteredReviews: string;
+  anonymous: string;
+  order: string;
+  food: string;
+  service: string;
+  ambience: string;
+};
+
+type FilterKey = "all" | "5" | "4" | "3" | "2" | "1";
 
 function SubRating({ label, value }: { label: string; value: number }) {
   return (
@@ -46,8 +50,23 @@ function SubRating({ label, value }: { label: string; value: number }) {
   );
 }
 
-export function ReviewsList({ reviews }: { reviews: ReviewRow[] }) {
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all");
+export function ReviewsList({
+  reviews,
+  t,
+}: {
+  reviews: ReviewRow[];
+  t: ReviewsTranslations;
+}) {
+  const [filter, setFilter] = useState<FilterKey>("all");
+
+  const FILTERS = useMemo(() => [
+    { key: "all" as FilterKey, label: t.allRatings },
+    { key: "5" as FilterKey, label: "5" },
+    { key: "4" as FilterKey, label: "4" },
+    { key: "3" as FilterKey, label: "3" },
+    { key: "2" as FilterKey, label: "2" },
+    { key: "1" as FilterKey, label: "1" },
+  ], [t]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: reviews.length };
@@ -71,7 +90,7 @@ export function ReviewsList({ reviews }: { reviews: ReviewRow[] }) {
             <button
               key={f.key}
               type="button"
-              onClick={() => setFilter(f.key)}
+              onClick={() => setFilter(f.key as FilterKey)}
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
                 active
@@ -104,13 +123,13 @@ export function ReviewsList({ reviews }: { reviews: ReviewRow[] }) {
       {filtered.length === 0 ? (
         <EmptyRow>
           {reviews.length === 0
-            ? "No reviews yet. Guest feedback will appear here after diners rate their visit."
-            : `No ${filter}-star reviews yet.`}
+            ? t.noReviews
+            : t.noFilteredReviews.replace("{star}", filter)}
         </EmptyRow>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {filtered.map((r) => {
-            const name = r.guestName?.trim() || "Anonymous";
+            const name = r.guestName?.trim() || t.anonymous;
             return (
               <div
                 key={r.id}
@@ -145,20 +164,20 @@ export function ReviewsList({ reviews }: { reviews: ReviewRow[] }) {
                 {(r.foodRating || r.serviceRating || r.ambienceRating) && (
                   <div className="flex flex-wrap gap-x-6 gap-y-1.5 rounded-xl bg-surface-2 px-3 py-2.5">
                     {r.foodRating ? (
-                      <SubRating label="Food" value={r.foodRating} />
+                      <SubRating label={t.food} value={r.foodRating} />
                     ) : null}
                     {r.serviceRating ? (
-                      <SubRating label="Service" value={r.serviceRating} />
+                      <SubRating label={t.service} value={r.serviceRating} />
                     ) : null}
                     {r.ambienceRating ? (
-                      <SubRating label="Ambience" value={r.ambienceRating} />
+                      <SubRating label={t.ambience} value={r.ambienceRating} />
                     ) : null}
                   </div>
                 )}
 
                 {r.orderNumber && (
                   <div className="flex items-center justify-between border-t border-line pt-3">
-                    <span className="text-xs text-muted">Order</span>
+                    <span className="text-xs text-muted">{t.order}</span>
                     <span className="rounded-lg bg-surface-2 px-2 py-1 text-xs font-bold tabular-nums text-ink">
                       #{r.orderNumber}
                     </span>

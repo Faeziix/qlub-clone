@@ -5,7 +5,7 @@ import Image from "next/image";
 import type { ItemWithModifiers } from "@/lib/queries";
 import type { SelectedModifier } from "@/lib/types";
 import { useCart } from "@/lib/store/cart";
-import { makeT } from "@/lib/i18n";
+import { makeT, localizedName, localizedDescription } from "@/lib/i18n";
 import { cn, formatAmount } from "@/lib/utils";
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
@@ -33,6 +33,8 @@ export function ItemSheet({
   const [qty, setQty] = React.useState(1);
   const [notes, setNotes] = React.useState("");
   const tags = Array.isArray(item.tags) ? item.tags : [];
+  const name = localizedName(item, lang);
+  const description = localizedDescription(item, lang);
 
   // selected option ids per group
   const [selected, setSelected] = React.useState<Record<string, string[]>>(
@@ -85,7 +87,7 @@ export function ItemSheet({
   function add() {
     addLine({
       itemId: item.id,
-      name: item.name,
+      name,
       imageUrl: item.imageUrl,
       unitPrice: unitPriceRial,
       quantity: qty,
@@ -103,7 +105,7 @@ export function ItemSheet({
             <div className="relative -mt-2 mb-4 h-56 w-full overflow-hidden bg-surface-2">
               <Image
                 src={item.imageUrl}
-                alt={item.name}
+                alt={name}
                 fill
                 className="object-cover"
                 unoptimized
@@ -112,7 +114,7 @@ export function ItemSheet({
           )}
           <div className="px-5">
             <div className="flex items-start justify-between gap-3">
-              <h2 className="text-2xl font-extrabold">{item.name}</h2>
+              <h2 className="text-2xl font-extrabold">{name}</h2>
               <span className="shrink-0 pt-1 font-bold text-brand">
                 {currency} {formatAmount(item.price)}
               </span>
@@ -124,13 +126,13 @@ export function ItemSheet({
                 ))}
               </div>
             )}
-            {item.description && (
+            {description && (
               <p className="mt-3 text-[15px] leading-relaxed text-muted">
-                {item.description}
+                {description}
               </p>
             )}
             {item.calories != null && (
-              <p className="mt-2 text-sm text-muted">{item.calories} kcal</p>
+              <p className="mt-2 text-sm text-muted">{item.calories} {t("kcal")}</p>
             )}
 
             {/* Modifier groups */}
@@ -161,7 +163,7 @@ export function ItemSheet({
                           key={o.id}
                           onClick={() => toggle(g, o.id)}
                           className={cn(
-                            "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors",
+                            "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-start transition-colors",
                             checked
                               ? "border-brand bg-brand-soft"
                               : "border-line bg-surface"
@@ -201,7 +203,7 @@ export function ItemSheet({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
-                placeholder="e.g. no onions, allergy info…"
+                placeholder={t("specialPlaceholder")}
                 className="mt-2 w-full resize-none rounded-xl border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
               />
             </div>
@@ -211,7 +213,13 @@ export function ItemSheet({
         {/* Footer add bar */}
         <div className="shrink-0 border-t border-line bg-surface p-4 safe-bottom">
           <div className="flex items-center gap-3">
-            <QuantityStepper value={qty} onChange={setQty} min={1} />
+            <QuantityStepper
+                      value={qty}
+                      onChange={setQty}
+                      min={1}
+                      decreaseLabel={t("decreaseQty")}
+                      increaseLabel={t("increaseQty")}
+                    />
             <Button
               fullWidth
               size="lg"
@@ -223,7 +231,7 @@ export function ItemSheet({
           </div>
           {missingRequired && (
             <p className="mt-2 text-center text-xs text-danger">
-              Please complete the required choices.
+              {t("completeRequired")}
             </p>
           )}
         </div>

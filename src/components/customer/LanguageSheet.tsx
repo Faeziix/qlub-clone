@@ -32,7 +32,7 @@ export function LanguageSheet({
               key={l.code}
               onClick={() => onChange(l.code)}
               className={cn(
-                "flex w-full items-center justify-between border-b border-line px-2 py-4 text-left last:border-0"
+                "flex w-full items-center justify-between border-b border-line px-2 py-4 text-start last:border-0"
               )}
             >
               <span

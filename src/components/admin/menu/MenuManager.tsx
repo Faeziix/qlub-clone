@@ -12,6 +12,7 @@ import {
   Loader2,
   SlidersHorizontal,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { DietBadge } from "@/components/ui/Badge";
@@ -24,9 +25,15 @@ import {
   updateItem,
   createItem,
   deleteItem,
-} from "@/app/admin/menu/actions";
+} from "@/app/[locale]/admin/menu/actions";
 
 /* ---------- Serializable types shared with the server page ---------- */
+
+export interface MenuItemTranslationNode {
+  locale: string;
+  name: string;
+  description: string | null;
+}
 
 export interface MenuItemNode {
   id: string;
@@ -39,6 +46,7 @@ export interface MenuItemNode {
   tags: string[];
   modifierGroupCount: number;
   modifierOptionCount: number;
+  translations: MenuItemTranslationNode[];
 }
 
 export interface CategoryNode {
@@ -61,6 +69,7 @@ interface MenuManagerProps {
 }
 
 export function MenuManager({ menus, vendorId }: MenuManagerProps) {
+  const t = useTranslations("admin.menu");
   const [activeMenuId, setActiveMenuId] = React.useState<string>(
     menus[0]?.id ?? ""
   );
@@ -73,11 +82,10 @@ export function MenuManager({ menus, vendorId }: MenuManagerProps) {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px_1fr]">
-      {/* Menu list (left) */}
       <aside className="lg:sticky lg:top-4 lg:self-start">
         <div className="rounded-2xl border border-line bg-surface p-2 shadow-card">
           <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">
-            Menus
+            {t("menus")}
           </p>
           <ul className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
             {menus.map((m) => {
@@ -91,7 +99,7 @@ export function MenuManager({ menus, vendorId }: MenuManagerProps) {
                   <button
                     onClick={() => setActiveMenuId(m.id)}
                     className={cn(
-                      "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition-colors",
+                      "flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-start text-sm font-semibold transition-colors",
                       isActive
                         ? "bg-brand text-brand-fg"
                         : "text-ink hover:bg-surface-2"
@@ -108,7 +116,7 @@ export function MenuManager({ menus, vendorId }: MenuManagerProps) {
                               : "bg-surface-2 text-muted"
                           )}
                         >
-                          OFF
+                          {t("inactive")}
                         </span>
                       )}
                     </span>
@@ -130,10 +138,9 @@ export function MenuManager({ menus, vendorId }: MenuManagerProps) {
         </div>
       </aside>
 
-      {/* Categories + items (right) */}
       <div className="min-w-0 space-y-6">
         {!activeMenu || activeMenu.categories.length === 0 ? (
-          <EmptyRow>This menu has no categories yet.</EmptyRow>
+          <EmptyRow>{t("noItems")}</EmptyRow>
         ) : (
           activeMenu.categories.map((category) => (
             <section
@@ -153,13 +160,13 @@ export function MenuManager({ menus, vendorId }: MenuManagerProps) {
                   onClick={() => setCreateForCategory(category)}
                 >
                   <Plus size={16} />
-                  Add item
+                  {t("addItem")}
                 </Button>
               </header>
 
               {category.items.length === 0 ? (
                 <div className="px-5 py-8 text-center text-sm text-muted">
-                  No items in this category.
+                  {t("noItems")}
                 </div>
               ) : (
                 <ul className="divide-y divide-line">
@@ -177,13 +184,8 @@ export function MenuManager({ menus, vendorId }: MenuManagerProps) {
         )}
       </div>
 
-      {/* Edit sheet */}
-      <EditItemSheet
-        item={editItem}
-        onClose={() => setEditItem(null)}
-      />
+      <EditItemSheet item={editItem} onClose={() => setEditItem(null)} />
 
-      {/* Create sheet */}
       <CreateItemSheet
         category={createForCategory}
         vendorId={vendorId}
@@ -202,6 +204,7 @@ function ItemRow({
   item: MenuItemNode;
   onEdit: () => void;
 }) {
+  const t = useTranslations("admin.menu");
   const [isPending, startTransition] = React.useTransition();
   const tags = item.tags;
 
@@ -249,7 +252,6 @@ function ItemRow({
         isPending && "pointer-events-none opacity-50"
       )}
     >
-      {/* Thumb */}
       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line bg-surface-2">
         {item.imageUrl ? (
           <Image
@@ -267,12 +269,11 @@ function ItemRow({
         )}
       </div>
 
-      {/* Name + meta */}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="truncate font-semibold">{item.name}</p>
-          {tags.map((t) => (
-            <DietBadge key={t} tag={t} />
+          {tags.map((tag) => (
+            <DietBadge key={tag} tag={tag} />
           ))}
         </div>
         {item.description && (
@@ -285,19 +286,16 @@ function ItemRow({
             {item.modifierGroupCount > 0 && (
               <span className="inline-flex items-center gap-1">
                 <SlidersHorizontal size={12} />
-                {item.modifierGroupCount} group
-                {item.modifierGroupCount === 1 ? "" : "s"} ·{" "}
-                {item.modifierOptionCount} option
-                {item.modifierOptionCount === 1 ? "" : "s"}
+                {item.modifierGroupCount} {t("modifierGroups")} ·{" "}
+                {item.modifierOptionCount} {t("options")}
               </span>
             )}
-            {item.calories != null && <span>{item.calories} kcal</span>}
+            {item.calories != null && <span>{item.calories} {"kcal"}</span>}
           </div>
         )}
       </div>
 
-      {/* Price (inline editable) */}
-      <div className="w-28 shrink-0 text-right">
+      <div className="w-28 shrink-0 text-end">
         {editingPrice ? (
           <div className="flex items-center justify-end gap-1">
             <input
@@ -315,33 +313,31 @@ function ItemRow({
                 }
               }}
               onBlur={commitPrice}
-              className="w-20 rounded-lg border border-line bg-surface px-2 py-1 text-right text-sm font-semibold tabular-nums outline-none focus:border-brand"
+              className="w-20 rounded-lg border border-line bg-surface px-2 py-1 text-end text-sm font-semibold tabular-nums outline-none focus:border-brand"
             />
           </div>
         ) : (
           <button
             onClick={() => setEditingPrice(true)}
             className="rounded-lg px-2 py-1 text-sm font-bold tabular-nums hover:bg-surface-2"
-            title="Edit price (toman)"
+            title={t("price")}
           >
             {formatMoney(BigInt(item.priceRialStr))}
           </button>
         )}
       </div>
 
-      {/* Availability toggle */}
       <Toggle
         checked={item.available}
         onChange={onToggle}
-        label={item.available ? "Available" : "Hidden"}
+        label={item.available ? t("available") : t("inactive")}
       />
 
-      {/* Actions */}
       <div className="flex shrink-0 items-center gap-1">
         <button
           onClick={onEdit}
           className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-ink"
-          title="Edit item"
+          title={t("editItem")}
         >
           <Pencil size={16} />
         </button>
@@ -350,7 +346,7 @@ function ItemRow({
             <button
               onClick={onConfirmDelete}
               className="grid h-9 w-9 place-items-center rounded-lg bg-danger/10 text-danger hover:bg-danger/20"
-              title="Confirm delete"
+              title={t("confirmDelete")}
             >
               {isPending ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -361,7 +357,7 @@ function ItemRow({
             <button
               onClick={() => setConfirmDelete(false)}
               className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-ink"
-              title="Cancel"
+              title={t("cancel")}
             >
               <X size={16} />
             </button>
@@ -370,7 +366,7 @@ function ItemRow({
           <button
             onClick={() => setConfirmDelete(true)}
             className="grid h-9 w-9 place-items-center rounded-lg text-muted hover:bg-danger/10 hover:text-danger"
-            title="Delete item"
+            title={t("deleteItem")}
           >
             <Trash2 size={16} />
           </button>
@@ -422,17 +418,24 @@ function EditItemSheet({
   item: MenuItemNode | null;
   onClose: () => void;
 }) {
+  const t = useTranslations("admin.menu");
   const [isPending, startTransition] = React.useTransition();
-  const [name, setName] = React.useState("");
-  const [description, setDescription] = React.useState("");
+  const [nameFa, setNameFa] = React.useState("");
+  const [nameEn, setNameEn] = React.useState("");
+  const [descFa, setDescFa] = React.useState("");
+  const [descEn, setDescEn] = React.useState("");
   const [price, setPrice] = React.useState("");
   const [available, setAvailable] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (item) {
-      setName(item.name);
-      setDescription(item.description);
+      const faT = item.translations.find((tx) => tx.locale === "fa");
+      const enT = item.translations.find((tx) => tx.locale === "en");
+      setNameFa(faT?.name ?? item.name);
+      setNameEn(enT?.name ?? "");
+      setDescFa(faT?.description ?? item.description);
+      setDescEn(enT?.description ?? "");
       setPrice(formatRialAsToman(BigInt(item.priceRialStr)));
       setAvailable(item.available);
       setError(null);
@@ -442,43 +445,69 @@ function EditItemSheet({
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!item) return;
-    if (!name.trim()) {
-      setError("Name is required.");
+    const primaryName = nameFa.trim() || nameEn.trim();
+    if (!primaryName) {
+      setError(t("name") + " " + t("namePlaceholder"));
       return;
     }
     setError(null);
     startTransition(async () => {
       await updateItem(item.id, {
-        name: name.trim(),
-        description: description.trim(),
+        name: primaryName,
+        description: descFa.trim(),
         tomanInput: price.trim(),
         available,
+        translations: [
+          { locale: "fa", name: nameFa.trim(), description: descFa.trim() },
+          { locale: "en", name: nameEn.trim(), description: descEn.trim() },
+        ],
       });
       onClose();
     });
   }
 
   return (
-    <Sheet open={!!item} onClose={onClose} title="Edit item" height="tall">
+    <Sheet open={!!item} onClose={onClose} title={t("editItem")} height="tall">
       <form onSubmit={onSubmit} className="space-y-4 px-5 pb-6 pt-2">
-        <Field label="Name">
+        <Field label={t("nameFa")}>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={nameFa}
+            onChange={(e) => setNameFa(e.target.value)}
             className={inputClass}
-            placeholder="Item name"
+            placeholder={t("nameFaPlaceholder")}
+            dir="rtl"
           />
         </Field>
-        <Field label="Description">
+        <Field label={t("nameEn")}>
+          <input
+            value={nameEn}
+            onChange={(e) => setNameEn(e.target.value)}
+            className={inputClass}
+            placeholder={t("nameEnPlaceholder")}
+            dir="ltr"
+          />
+        </Field>
+        <Field label={t("descriptionFa")}>
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
+            value={descFa}
+            onChange={(e) => setDescFa(e.target.value)}
+            rows={2}
             className={cn(inputClass, "resize-none")}
-            placeholder="Short description shown to guests"
+            placeholder={t("descriptionFaPlaceholder")}
+            dir="rtl"
           />
         </Field>
-        <Field label="Price (toman)">
+        <Field label={t("descriptionEn")}>
+          <textarea
+            value={descEn}
+            onChange={(e) => setDescEn(e.target.value)}
+            rows={2}
+            className={cn(inputClass, "resize-none")}
+            placeholder={t("descriptionEnPlaceholder")}
+            dir="ltr"
+          />
+        </Field>
+        <Field label={t("price")}>
           <input
             type="number"
             min={0}
@@ -490,15 +519,13 @@ function EditItemSheet({
         </Field>
         <div className="flex items-center justify-between rounded-xl border border-line px-4 py-3">
           <div>
-            <p className="text-sm font-semibold">Available</p>
-            <p className="text-xs text-muted">
-              Hidden items don&apos;t show on the guest menu.
-            </p>
+            <p className="text-sm font-semibold">{t("available")}</p>
+            <p className="text-xs text-muted">{t("availableHint")}</p>
           </div>
           <Toggle
             checked={available}
             onChange={() => setAvailable((v) => !v)}
-            label="Toggle availability"
+            label={t("available")}
           />
         </div>
 
@@ -512,10 +539,10 @@ function EditItemSheet({
             onClick={onClose}
             disabled={isPending}
           >
-            Cancel
+            {t("cancel")}
           </Button>
           <Button type="submit" fullWidth loading={isPending}>
-            Save changes
+            {t("saveChanges")}
           </Button>
         </div>
       </form>
@@ -534,16 +561,21 @@ function CreateItemSheet({
   vendorId: string;
   onClose: () => void;
 }) {
+  const t = useTranslations("admin.menu");
   const [isPending, startTransition] = React.useTransition();
-  const [name, setName] = React.useState("");
-  const [description, setDescription] = React.useState("");
+  const [nameFa, setNameFa] = React.useState("");
+  const [nameEn, setNameEn] = React.useState("");
+  const [descFa, setDescFa] = React.useState("");
+  const [descEn, setDescEn] = React.useState("");
   const [price, setPrice] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (category) {
-      setName("");
-      setDescription("");
+      setNameFa("");
+      setNameEn("");
+      setDescFa("");
+      setDescEn("");
       setPrice("");
       setError(null);
     }
@@ -552,16 +584,21 @@ function CreateItemSheet({
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!category) return;
-    if (!name.trim()) {
-      setError("Name is required.");
+    const primaryName = nameFa.trim() || nameEn.trim();
+    if (!primaryName) {
+      setError(t("namePlaceholder"));
       return;
     }
     setError(null);
     startTransition(async () => {
       await createItem(category.id, vendorId, {
-        name: name.trim(),
-        description: description.trim(),
+        name: primaryName,
+        description: descFa.trim(),
         tomanInput: price.trim(),
+        translations: [
+          { locale: "fa", name: nameFa.trim(), description: descFa.trim() },
+          { locale: "en", name: nameEn.trim(), description: descEn.trim() },
+        ],
       });
       onClose();
     });
@@ -571,29 +608,50 @@ function CreateItemSheet({
     <Sheet
       open={!!category}
       onClose={onClose}
-      title={category ? `Add item to ${category.name}` : "Add item"}
+      title={category ? t("addToCategory", { category: category.name }) : t("addItem")}
       height="tall"
     >
       <form onSubmit={onSubmit} className="space-y-4 px-5 pb-6 pt-2">
-        <Field label="Name">
+        <Field label={t("nameFa")}>
           <input
             autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={nameFa}
+            onChange={(e) => setNameFa(e.target.value)}
             className={inputClass}
-            placeholder="e.g. Margherita Pizza"
+            placeholder={t("nameFaPlaceholder")}
+            dir="rtl"
           />
         </Field>
-        <Field label="Description">
+        <Field label={t("nameEn")}>
+          <input
+            value={nameEn}
+            onChange={(e) => setNameEn(e.target.value)}
+            className={inputClass}
+            placeholder={t("nameEnPlaceholder")}
+            dir="ltr"
+          />
+        </Field>
+        <Field label={t("descriptionFa")}>
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
+            value={descFa}
+            onChange={(e) => setDescFa(e.target.value)}
+            rows={2}
             className={cn(inputClass, "resize-none")}
-            placeholder="Short description shown to guests"
+            placeholder={t("descriptionFaPlaceholder")}
+            dir="rtl"
           />
         </Field>
-        <Field label="Price (toman)">
+        <Field label={t("descriptionEn")}>
+          <textarea
+            value={descEn}
+            onChange={(e) => setDescEn(e.target.value)}
+            rows={2}
+            className={cn(inputClass, "resize-none")}
+            placeholder={t("descriptionEnPlaceholder")}
+            dir="ltr"
+          />
+        </Field>
+        <Field label={t("price")}>
           <input
             type="number"
             min={0}
@@ -601,7 +659,7 @@ function CreateItemSheet({
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className={cn(inputClass, "tabular-nums")}
-            placeholder="0"
+            placeholder={t("pricePlaceholder")}
           />
         </Field>
 
@@ -615,10 +673,10 @@ function CreateItemSheet({
             onClick={onClose}
             disabled={isPending}
           >
-            Cancel
+            {t("cancel")}
           </Button>
           <Button type="submit" fullWidth loading={isPending}>
-            Create item
+            {t("create")}
           </Button>
         </div>
       </form>

@@ -8,12 +8,16 @@ export function QuantityStepper({
   min = 1,
   max = 99,
   size = "md",
+  decreaseLabel = "Decrease",
+  increaseLabel = "Increase",
 }: {
   value: number;
   onChange: (v: number) => void;
   min?: number;
   max?: number;
   size?: "sm" | "md";
+  decreaseLabel?: string;
+  increaseLabel?: string;
 }) {
   const btn =
     size === "sm"
@@ -29,7 +33,7 @@ export function QuantityStepper({
           "grid place-items-center rounded-full bg-surface text-ink shadow-card disabled:opacity-40",
           btn
         )}
-        aria-label="Decrease"
+        aria-label={decreaseLabel}
       >
         <Minus size={size === "sm" ? 14 : 16} />
       </button>
@@ -49,7 +53,7 @@ export function QuantityStepper({
           "grid place-items-center rounded-full bg-brand text-brand-fg shadow-card disabled:opacity-40",
           btn
         )}
-        aria-label="Increase"
+        aria-label={increaseLabel}
       >
         <Plus size={size === "sm" ? 14 : 16} />
       </button>

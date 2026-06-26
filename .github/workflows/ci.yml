@@ -35,6 +35,9 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      - name: i18n key completeness check
+        run: bun run check:i18n
+
   test:
     name: Tests
     runs-on: ubuntu-latest

@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Search, Globe, ChevronLeft, ShoppingBag } from "lucide-react";
 import type { VendorWithMenus, ItemWithModifiers } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
-import { makeT, dirFor } from "@/lib/i18n";
+import { makeT, dirFor, localizedName, localizedDescription } from "@/lib/i18n";
 import { cn, formatAmount } from "@/lib/utils";
 import { DietBadge } from "@/components/ui/Badge";
 import { ItemSheet } from "./ItemSheet";
@@ -14,17 +14,14 @@ import { LanguageSheet } from "./LanguageSheet";
 
 export function MenuExperience({
   vendor,
-  initialTheme,
   initialLang,
   tableCode,
 }: {
   vendor: VendorWithMenus;
-  initialTheme: string;
   initialLang: string;
   tableCode: string | null;
 }) {
   const [lang, setLang] = React.useState(initialLang);
-  const [theme] = React.useState(initialTheme);
   const t = makeT(lang);
   const dir = dirFor(lang);
 
@@ -47,20 +44,6 @@ export function MenuExperience({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply theme + direction at the document root for full-page theming.
-  React.useEffect(() => {
-    const root = document.documentElement;
-    root.classList.remove(
-      "theme-darkgold",
-      "theme-classic",
-      "theme-emerald",
-      "theme-rose",
-      "theme-midnight"
-    );
-    root.classList.add(`theme-${theme}`);
-    root.setAttribute("dir", dir);
-  }, [theme, dir]);
-
   const count = hydrated ? cart.count() : 0;
   const subtotal = hydrated ? cart.subtotal() : 0;
 
@@ -75,12 +58,12 @@ export function MenuExperience({
         ...c,
         items: c.items.filter(
           (i) =>
-            i.name.toLowerCase().includes(q) ||
-            i.description?.toLowerCase().includes(q)
+            localizedName(i, lang).toLowerCase().includes(q) ||
+            localizedDescription(i, lang)?.toLowerCase().includes(q)
         ),
       }))
       .filter((c) => c.items.length > 0);
-  }, [categories, query]);
+  }, [categories, query, lang]);
 
   // ── Landing screen: hero + menu picker (qlub "Select a menu") ──
   if (!entered) {
@@ -101,14 +84,14 @@ export function MenuExperience({
               )}
               <button
                 onClick={() => setLangOpen(true)}
-                className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-sm font-semibold shadow-card backdrop-blur"
+                className="absolute start-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-surface/90 px-3 py-1.5 text-sm font-semibold shadow-card backdrop-blur"
               >
                 <Globe size={16} /> {lang.toUpperCase()}
               </button>
             </div>
             <div className="relative -mt-12 rounded-t-3xl bg-surface px-5 pb-6 pt-14 text-center shadow-float">
               {vendor.logoUrl && (
-                <div className="absolute left-1/2 -top-12 h-24 w-24 -translate-x-1/2 overflow-hidden rounded-2xl border-4 border-surface bg-surface shadow-card">
+                <div className="absolute inset-x-0 -top-12 mx-auto h-24 w-24 overflow-hidden rounded-2xl border-4 border-surface bg-surface shadow-card">
                   <Image
                     src={vendor.logoUrl}
                     alt=""
@@ -140,7 +123,7 @@ export function MenuExperience({
                     setActiveCat(0);
                     setEntered(true);
                   }}
-                  className="group overflow-hidden rounded-2xl bg-surface text-left shadow-card transition-transform active:scale-95"
+                  className="group overflow-hidden rounded-2xl bg-surface text-start shadow-card transition-transform active:scale-95"
                 >
                   <div className="relative aspect-[4/3] w-full overflow-hidden bg-surface-2">
                     {m.imageUrl && (
@@ -189,7 +172,7 @@ export function MenuExperience({
             <button
               onClick={() => setEntered(false)}
               className="grid h-9 w-9 place-items-center rounded-full bg-surface-2"
-              aria-label="Back"
+              aria-label={t("back")}
             >
               <ChevronLeft size={20} />
             </button>
@@ -197,7 +180,7 @@ export function MenuExperience({
             <button
               onClick={() => setLangOpen(true)}
               className="grid h-9 w-9 place-items-center rounded-full bg-surface-2"
-              aria-label="Language"
+              aria-label={t("language")}
             >
               <Globe size={18} />
             </button>
@@ -267,13 +250,16 @@ export function MenuExperience({
         <main className="px-4">
           {filtered.map((cat) => (
             <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-44 pt-5">
-              <h2 className="mb-3 text-xl font-extrabold">{cat.name}</h2>
+              <h2 className="mb-3 text-xl font-extrabold">
+                {localizedName(cat, lang)}
+              </h2>
               <div className="space-y-3">
                 {cat.items.map((item) => (
                   <ItemRow
                     key={item.id}
                     item={item}
                     currency={vendor.currency}
+                    lang={lang}
                     onClick={() => setActiveItem(item)}
                   />
                 ))}
@@ -282,7 +268,7 @@ export function MenuExperience({
           ))}
           {filtered.length === 0 && (
             <p className="py-16 text-center text-muted">
-              No items match “{query}”.
+              {t("noSearchResults").replace("{query}", query)}
             </p>
           )}
           <Footer t={t} />
@@ -347,28 +333,32 @@ export function MenuExperience({
 function ItemRow({
   item,
   currency,
+  lang,
   onClick,
 }: {
   item: ItemWithModifiers;
   currency: string;
+  lang: string;
   onClick: () => void;
 }) {
   const tags = Array.isArray(item.tags) ? item.tags : [];
+  const name = localizedName(item, lang);
+  const description = localizedDescription(item, lang);
   return (
     <button
       onClick={onClick}
-      className="flex w-full gap-3 rounded-2xl bg-surface p-3 text-left shadow-card transition-transform active:scale-[0.98]"
+      className="flex w-full gap-3 rounded-2xl bg-surface p-3 text-start shadow-card transition-transform active:scale-[0.98]"
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <h3 className="font-bold">{item.name}</h3>
+          <h3 className="font-bold">{name}</h3>
           {tags.slice(0, 2).map((tag) => (
             <DietBadge key={tag} tag={tag} />
           ))}
         </div>
-        {item.description && (
+        {description && (
           <p className="mt-1 line-clamp-2 text-sm text-muted">
-            {item.description}
+            {description}
           </p>
         )}
         <p className="mt-2 font-bold text-brand">
@@ -379,7 +369,7 @@ function ItemRow({
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-2">
           <Image
             src={item.imageUrl}
-            alt={item.name}
+            alt={name}
             fill
             className="object-cover"
             unoptimized
@@ -393,7 +383,7 @@ function ItemRow({
 function Footer({ t }: { t: (k: string) => string }) {
   return (
     <footer className="py-8 text-center">
-      <p className="text-2xl font-black tracking-tight text-muted/40">qlub_</p>
+      <p className="text-2xl font-black tracking-tight text-muted/40">{"qlub_"}</p>
       <p className="mt-1 text-xs text-muted">
         {t("termsPrefix")}{" "}
         <span className="underline">{t("terms")}</span>

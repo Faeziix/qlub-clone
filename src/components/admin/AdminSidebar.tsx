@@ -14,17 +14,18 @@ import {
   Menu as MenuIcon,
   X,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { cn, initials } from "@/lib/utils";
-import { logout } from "@/app/admin/actions";
+import { logout } from "@/app/[locale]/admin/actions";
 
-const nav = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/orders", label: "Orders", icon: ReceiptText },
-  { href: "/admin/menu", label: "Menu", icon: UtensilsCrossed },
-  { href: "/admin/tables", label: "Tables & QR", icon: QrCode },
-  { href: "/admin/reviews", label: "Reviews", icon: Star },
-  { href: "/admin/settings", label: "Settings", icon: Settings },
-];
+const NAV_ITEMS = [
+  { href: "/admin", key: "dashboard", icon: LayoutDashboard },
+  { href: "/admin/orders", key: "orders", icon: ReceiptText },
+  { href: "/admin/menu", key: "menu", icon: UtensilsCrossed },
+  { href: "/admin/tables", key: "tables", icon: QrCode },
+  { href: "/admin/reviews", key: "reviews", icon: Star },
+  { href: "/admin/settings", key: "settings", icon: Settings },
+] as const;
 
 export function AdminSidebar({
   user,
@@ -35,17 +36,19 @@ export function AdminSidebar({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const t = useTranslations("admin.nav");
+  const tCommon = useTranslations("admin.common");
 
   return (
     <>
-      {/* Mobile top bar */}
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
         <span className="text-lg font-black">
-          qlub<span className="text-brand">_</span>
+          {"qlub"}<span className="text-brand">{"_"}</span>
         </span>
         <button
           onClick={() => setOpen(true)}
           className="grid h-9 w-9 place-items-center rounded-lg bg-surface-2"
+          aria-label={tCommon("openMenu")}
         >
           <MenuIcon size={20} />
         </button>
@@ -60,29 +63,28 @@ export function AdminSidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-line bg-surface transition-transform lg:translate-x-0",
-          open ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-line bg-surface transition-transform lg:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full"
         )}
       >
         <div className="flex items-center justify-between px-5 py-5">
           <div>
             <span className="text-xl font-black">
-              qlub<span className="text-brand">_</span>
+              {"qlub"}<span className="text-brand">{"_"}</span>
             </span>
-            <p className="mt-0.5 text-xs font-medium text-muted">
-              {vendorName}
-            </p>
+            <p className="mt-0.5 text-xs font-medium text-muted">{vendorName}</p>
           </div>
           <button
             onClick={() => setOpen(false)}
             className="grid h-8 w-8 place-items-center rounded-lg bg-surface-2 lg:hidden"
+            aria-label={tCommon("closeMenu")}
           >
             <X size={18} />
           </button>
         </div>
 
         <nav className="flex-1 space-y-1 px-3">
-          {nav.map((item) => {
+          {NAV_ITEMS.map((item) => {
             const active =
               item.href === "/admin"
                 ? pathname === "/admin"
@@ -101,7 +103,7 @@ export function AdminSidebar({
                 )}
               >
                 <Icon size={18} />
-                {item.label}
+                {t(item.key)}
               </Link>
             );
           })}
@@ -114,15 +116,13 @@ export function AdminSidebar({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{user.name}</p>
-              <p className="truncate text-xs capitalize text-muted">
-                {user.role}
-              </p>
+              <p className="truncate text-xs capitalize text-muted">{user.role}</p>
             </div>
             <form action={logout}>
               <button
                 type="submit"
                 className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-2 hover:text-danger"
-                aria-label="Sign out"
+                aria-label={tCommon("signOut")}
               >
                 <LogOut size={16} />
               </button>

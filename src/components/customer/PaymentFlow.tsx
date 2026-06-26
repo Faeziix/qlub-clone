@@ -6,11 +6,13 @@ import {
   Check,
   ChevronLeft,
   CreditCard,
+  Loader2,
   Users,
   ReceiptText,
   Sparkles,
   PartyPopper,
 } from "lucide-react";
+import axios from "axios";
 import type { SplitType } from "@/lib/types";
 import { makeT, dirFor } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -96,6 +98,12 @@ export function PaymentFlow({
   const [paymentId, setPaymentId] = React.useState<string | null>(null);
   const [processing, setProcessing] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [pendingGatewayUrl, setPendingGatewayUrl] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!pendingGatewayUrl) return;
+    window.location.href = pendingGatewayUrl;
+  }, [pendingGatewayUrl]);
 
   let baseAmountRial: bigint;
   if (split === "even") {
@@ -132,30 +140,42 @@ export function PaymentFlow({
     setProcessing(true);
     setError(null);
     try {
-      await new Promise((r) => setTimeout(r, 1200));
-      const res = await fetch("/api/payments", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          orderId: order.id,
-          amount: bigintToJson(baseAmountRial),
-          tipAmount: bigintToJson(tipRial),
-          method,
-          splitType: split,
-          splitMeta:
-            split === "even"
-              ? { parts, partIndex }
-              : split === "items"
-                ? { items: selectedItems }
-                : undefined,
-        }),
+      const { data } = await axios.post<{
+        ok: boolean;
+        error?: string;
+        payment?: { id: string };
+        gatewayRedirectUrl?: string;
+      }>("/api/payments", {
+        orderId: order.id,
+        amount: bigintToJson(baseAmountRial),
+        tipAmount: bigintToJson(tipRial),
+        method,
+        splitType: split,
+        splitMeta:
+          split === "even"
+            ? { parts, partIndex }
+            : split === "items"
+              ? { items: selectedItems }
+              : undefined,
       });
-      const data = await res.json();
+
       if (!data.ok) throw new Error(data.error ?? t("paymentFailed"));
+
+      if (method === "ipg" && data.gatewayRedirectUrl) {
+        setPendingGatewayUrl(data.gatewayRedirectUrl);
+        return;
+      }
+
       if (data.payment?.id) setPaymentId(data.payment.id);
       setStep("success");
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("paymentFailed"));
+      const msg =
+        axios.isAxiosError(e) && e.response?.data?.error
+          ? (e.response.data.error as string)
+          : e instanceof Error
+            ? e.message
+            : t("paymentFailed");
+      setError(msg);
     } finally {
       setProcessing(false);
     }
@@ -480,9 +500,16 @@ export function PaymentFlow({
             </span>
           </div>
           <Button fullWidth size="lg" loading={processing} onClick={pay}>
-            {processing
-              ? t("processing")
-              : `${t("payNow")} · ${displayPrice(payTotalRial, lang)}`}
+            {processing && method === "ipg" ? (
+              <span className="flex items-center gap-2">
+                <Loader2 size={16} className="animate-spin" />
+                {t("ipgRedirecting")}
+              </span>
+            ) : processing ? (
+              t("processing")
+            ) : (
+              `${t("payNow")} · ${displayPrice(payTotalRial, lang)}`
+            )}
           </Button>
         </div>
       </div>

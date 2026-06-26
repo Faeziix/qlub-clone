@@ -117,21 +117,21 @@ export async function GET(req: Request) {
 }
 
 function successRedirect(req: Request, orderId: string): NextResponse {
-  const url = new URL(req.url);
-  return NextResponse.redirect(`${url.origin}/payment/success?orderId=${orderId}`);
+  const { origin } = new URL(req.url);
+  return NextResponse.redirect(`${origin}/payment/success?orderId=${orderId}`);
 }
 
 function failureRedirect(req: Request, orderId: string): NextResponse {
-  const url = new URL(req.url);
-  return NextResponse.redirect(`${url.origin}/payment/failed?orderId=${orderId}`);
+  const { origin } = new URL(req.url);
+  return NextResponse.redirect(`${origin}/payment/failed?orderId=${orderId}`);
 }
 
 function pendingRedirect(req: Request, orderId: string): NextResponse {
-  const url = new URL(req.url);
-  return NextResponse.redirect(`${url.origin}/payment/pending?orderId=${orderId}`);
+  const { origin } = new URL(req.url);
+  return NextResponse.redirect(`${origin}/payment/pending?orderId=${orderId}`);
 }
 
 function badCallbackRedirect(req: Request, reason: string): NextResponse {
-  const url = new URL(req.url);
-  return NextResponse.redirect(`${url.origin}/payment/failed?reason=${reason}`);
+  const { origin } = new URL(req.url);
+  return NextResponse.redirect(`${origin}/payment/failed?reason=${encodeURIComponent(reason)}`);
 }

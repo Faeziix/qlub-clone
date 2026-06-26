@@ -146,6 +146,13 @@ const en: Dict = {
   confirmNewOrder: "Start a new order",
   confirmNewOrderHint: "This will create a separate order. Your current order #{orderNumber} will remain open for payment.",
   continueAdding: "Continue adding",
+  ipgRedirecting: "Redirecting to payment gateway…",
+  paymentPending: "Processing payment…",
+  paymentPendingBody: "Please wait while we confirm your payment with the bank.",
+  paymentSuccessBody: "Your transaction was confirmed successfully.",
+  paymentFailedBody: "Your payment was not completed. You can try again.",
+  tryAgain: "Try again",
+  viewReceipt: "View receipt",
 };
 
 const fa: Dict = {
@@ -262,6 +269,13 @@ const fa: Dict = {
   confirmNewOrder: "شروع سفارش جدید",
   confirmNewOrderHint: "این یک سفارش جداگانه ایجاد می‌کند. سفارش #{orderNumber} شما برای پرداخت باز می‌ماند.",
   continueAdding: "ادامه افزودن",
+  ipgRedirecting: "در حال انتقال به درگاه پرداخت…",
+  paymentPending: "در حال پردازش پرداخت…",
+  paymentPendingBody: "لطفاً صبر کنید. در حال تأیید پرداخت با بانک هستیم.",
+  paymentSuccessBody: "تراکنش شما با موفقیت تأیید شد.",
+  paymentFailedBody: "پرداخت شما تکمیل نشد. می‌توانید دوباره تلاش کنید.",
+  tryAgain: "تلاش دوباره",
+  viewReceipt: "مشاهده رسید",
 };
 
 const dicts: Record<string, Dict> = { fa, en };

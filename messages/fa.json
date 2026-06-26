@@ -71,7 +71,7 @@
     "paymentSuccess": "پرداخت موفق",
     "required": "اجباری",
     "optional": "اختیاری",
-    "chooseUpTo": "حداکثر انتخاب کنید",
+    "chooseUpTo": "حداکثر {count} مورد را انتخاب کنید",
     "special": "توضیحات ویژه",
     "qty": "تعداد",
     "changeLanguage": "تغییر زبان",

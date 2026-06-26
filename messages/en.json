@@ -71,7 +71,7 @@
     "paymentSuccess": "Payment successful",
     "required": "Required",
     "optional": "Optional",
-    "chooseUpTo": "Choose up to",
+    "chooseUpTo": "Choose up to {count}",
     "special": "Special instructions",
     "qty": "Quantity",
     "changeLanguage": "Change language",

@@ -955,12 +955,19 @@ async function seedOrders(
 
 async function main() {
   console.log("🌱 Seeding…");
+  await db.auditLog.deleteMany();
+  await db.opsQueueEntry.deleteMany();
+  await db.walletTransaction.deleteMany();
+  await db.platformWallet.deleteMany();
   await db.review.deleteMany();
   await db.payment.deleteMany();
   await db.orderItem.deleteMany();
   await db.order.deleteMany();
+  await db.modifierOptionTranslation.deleteMany();
   await db.modifierOption.deleteMany();
+  await db.modifierGroupTranslation.deleteMany();
   await db.modifierGroup.deleteMany();
+  await db.menuItemTranslation.deleteMany();
   await db.menuItem.deleteMany();
   await db.category.deleteMany();
   await db.menu.deleteMany();

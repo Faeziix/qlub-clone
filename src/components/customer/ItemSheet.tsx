@@ -126,12 +126,14 @@ function ModifierGroupSection({
 
   function modifierHint(): string {
     if (single) return t("chooseOne");
+    const count =
+      lang === "fa"
+        ? latinDigitsToPersian(String(group.maxSelect))
+        : String(group.maxSelect);
     if (group.minSelect > 0 && group.minSelect === group.maxSelect) {
-      const count = lang === "fa" ? latinDigitsToPersian(String(group.maxSelect)) : String(group.maxSelect);
-      return `${t("chooseExactly")} ${count}`;
+      return t("chooseExactly").replace("{count}", count);
     }
-    const count = lang === "fa" ? latinDigitsToPersian(String(group.maxSelect)) : String(group.maxSelect);
-    return `${t("chooseUpTo")} ${count}`;
+    return t("chooseUpTo").replace("{count}", count);
   }
 
   return (
@@ -333,7 +335,10 @@ export function ItemSheet({
 
                 {item.calories != null && (
                   <p className="mt-2 text-sm text-muted">
-                    {item.calories} {t("kcal")}
+                    {lang === "fa"
+                      ? latinDigitsToPersian(String(item.calories))
+                      : item.calories}{" "}
+                    {t("kcal")}
                   </p>
                 )}
               </div>

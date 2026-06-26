@@ -2,7 +2,6 @@ import "server-only";
 import { db } from "./db";
 import { bigintToNumber } from "./money";
 import {
-  aggregateRevenueStats,
   computePeriodDelta,
   buildTehranWindowBounds,
 } from "./dashboard-analytics";
@@ -158,47 +157,91 @@ export async function getOrder(orderId: string) {
   };
 }
 
+/**
+ * Aggregates revenue, tips, and distinct-order count for a set of succeeded
+ * payments entirely in the database via Prisma aggregate + groupBy. No JS loop
+ * touches the monetary sums; the database engine does the arithmetic.
+ *
+ * Returns plain bigint values so callers can use money.ts helpers on them.
+ */
+async function sqlAggregatePayments(
+  vendorFilter: { vendorId?: string },
+  from: Date,
+  to: Date
+): Promise<{ revenueRial: bigint; tipsRial: bigint; distinctOrderCount: number }> {
+  const where = {
+    ...vendorFilter,
+    status: "succeeded" as const,
+    createdAt: { gte: from, lt: to },
+  };
+
+  const [sums, distinctOrders] = await Promise.all([
+    db.payment.aggregate({
+      where,
+      _sum: { amount: true, tipAmount: true },
+    }),
+    db.payment.groupBy({
+      by: ["orderId"],
+      where,
+    }),
+  ]);
+
+  const revenueRial = sums._sum.amount ?? 0n;
+  const tipsRial = sums._sum.tipAmount ?? 0n;
+  const distinctOrderCount = distinctOrders.length;
+
+  return { revenueRial, tipsRial, distinctOrderCount };
+}
+
 /** Admin: dashboard metrics for a vendor (or all, for superadmin). */
 export async function getDashboardStats(vendorId: string | null) {
-  const where = vendorId ? { vendorId } : {};
-  const WINDOW_DAYS = 30;
+  const vendorFilter = vendorId ? { vendorId } : {};
+  const STATS_WINDOW_DAYS = 30;
+  const CHART_WINDOW_DAYS = 14;
   const now = new Date();
   const { windowStart, prevWindowStart, prevWindowEnd } = buildTehranWindowBounds(
-    WINDOW_DAYS,
+    STATS_WINDOW_DAYS,
     now
   );
+  const chartWindowStart = buildTehranWindowBounds(CHART_WINDOW_DAYS, now).windowStart;
 
-  const succeededWhere = { ...where, status: "succeeded" as const };
+  const [
+    orders,
+    currentAgg,
+    prevAgg,
+    chartPayments,
+    reviews,
+    items,
+    tables,
+  ] = await Promise.all([
+    db.order.findMany({
+      where: { ...vendorFilter, createdAt: { gte: windowStart } },
+      orderBy: { createdAt: "desc" },
+    }),
+    sqlAggregatePayments(vendorFilter, windowStart, now),
+    sqlAggregatePayments(vendorFilter, prevWindowStart, prevWindowEnd),
+    db.payment.findMany({
+      where: {
+        ...vendorFilter,
+        status: "succeeded",
+        createdAt: { gte: chartWindowStart },
+      },
+      select: { orderId: true, amount: true, tipAmount: true, total: true, createdAt: true },
+    }),
+    db.review.findMany({ where: vendorFilter, orderBy: { createdAt: "desc" } }),
+    db.menuItem.count({ where: vendorFilter }),
+    db.diningTable.count({ where: vendorFilter }),
+  ]);
 
-  const [orders, currentPayments, prevPayments, reviews, items, tables] =
-    await Promise.all([
-      db.order.findMany({
-        where: { ...where, createdAt: { gte: windowStart } },
-        orderBy: { createdAt: "desc" },
-      }),
-      db.payment.findMany({
-        where: { ...succeededWhere, createdAt: { gte: windowStart } },
-        select: { orderId: true, amount: true, tipAmount: true, total: true, createdAt: true },
-      }),
-      db.payment.findMany({
-        where: {
-          ...succeededWhere,
-          createdAt: { gte: prevWindowStart, lt: prevWindowEnd },
-        },
-        select: { orderId: true, amount: true, tipAmount: true, total: true, createdAt: true },
-      }),
-      db.review.findMany({ where, orderBy: { createdAt: "desc" } }),
-      db.menuItem.count({ where }),
-      db.diningTable.count({ where }),
-    ]);
+  const avgOrderRial =
+    currentAgg.distinctOrderCount > 0
+      ? currentAgg.revenueRial / BigInt(currentAgg.distinctOrderCount)
+      : 0n;
 
-  const currentStats = aggregateRevenueStats(currentPayments);
-  const prevStats = aggregateRevenueStats(prevPayments);
-
-  const revenueDelta = computePeriodDelta(currentStats.revenueRial, prevStats.revenueRial);
+  const revenueDelta = computePeriodDelta(currentAgg.revenueRial, prevAgg.revenueRial);
   const orderCountDelta = computePeriodDelta(
-    BigInt(currentStats.distinctOrderCount),
-    BigInt(prevStats.distinctOrderCount)
+    BigInt(currentAgg.distinctOrderCount),
+    BigInt(prevAgg.distinctOrderCount)
   );
 
   const avgRating = reviews.length
@@ -206,11 +249,11 @@ export async function getDashboardStats(vendorId: string | null) {
     : 0;
 
   return {
-    revenue: bigintToNumber(currentStats.revenueRial),
-    tips: bigintToNumber(currentStats.tipsRial),
+    revenue: bigintToNumber(currentAgg.revenueRial),
+    tips: bigintToNumber(currentAgg.tipsRial),
     orderCount: orders.length,
-    paidCount: currentPayments.length,
-    avgOrder: bigintToNumber(currentStats.avgOrderRial),
+    paidCount: currentAgg.distinctOrderCount,
+    avgOrder: bigintToNumber(avgOrderRial),
     revenueDelta,
     orderCountDelta,
     avgRating,
@@ -218,7 +261,7 @@ export async function getDashboardStats(vendorId: string | null) {
     itemCount: items,
     tableCount: tables,
     orders,
-    payments: currentPayments,
+    payments: chartPayments,
     reviews,
   };
 }

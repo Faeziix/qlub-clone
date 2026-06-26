@@ -148,7 +148,7 @@
       "guest": "Guest",
       "status": "Status",
       "time": "Time",
-      "perPaidBill": "per paid bill",
+      "perOrder": "per distinct order",
       "staffTips": "staff tips",
       "live": "live",
       "paid": "paid",

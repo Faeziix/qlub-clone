@@ -98,7 +98,7 @@ export default async function DashboardPage() {
           label={t("avgOrder")}
           value={formatMoney(stats.avgOrder || 0)}
           icon={<TrendingUp size={18} />}
-          hint={t("perPaidBill")}
+          hint={t("perOrder")}
         />
         <StatCard
           label={t("tips")}

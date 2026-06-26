@@ -52,6 +52,16 @@ export async function updateVendorSettings(
     throw new Error("Forbidden: cannot modify another vendor's settings.");
   }
 
+  if (liveSession.role !== "superadmin") {
+    const vendorCheck = await db.vendor.findUnique({
+      where: { id: vendorId },
+      select: { active: true },
+    });
+    if (!vendorCheck?.active) {
+      throw new Error("VendorSuspended: this tenant is currently suspended.");
+    }
+  }
+
   const name = data.name.trim();
   if (!name) {
     return { ok: false, messageKey: "nameRequired" };

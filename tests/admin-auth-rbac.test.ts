@@ -196,7 +196,9 @@ describe("updateOrderStatus — RBAC", () => {
       vendorId: "vendor-a",
       tableId: null,
     });
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", active: true });
     mockDb.order.update.mockResolvedValue({});
+    mockDb.auditLog.create.mockResolvedValue({});
   });
 
   it("allows staff to update order status (their permitted action)", async () => {
@@ -220,12 +222,30 @@ describe("updateOrderStatus — RBAC", () => {
       "REDIRECT:/admin/login"
     );
   });
+
+  it("refuses owner of a suspended vendor from updating order status", async () => {
+    mockGetSession.mockResolvedValue(ownerSession);
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", active: false });
+    await expect(updateOrderStatus("order-1", "preparing")).rejects.toThrow(
+      /VendorSuspended/
+    );
+    expect(mockDb.order.update).not.toHaveBeenCalled();
+  });
+
+  it("allows superadmin to manage orders on a suspended vendor", async () => {
+    mockGetSession.mockResolvedValue(superadminSession);
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", active: false });
+    await expect(
+      updateOrderStatus("order-1", "cancelled")
+    ).resolves.not.toThrow();
+    expect(mockDb.order.update).toHaveBeenCalledOnce();
+  });
 });
 
 describe("updateVendorSettings — RBAC: staff cannot reach owner capabilities", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", name: "Old" });
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", name: "Old", active: true });
     mockDb.vendor.update.mockResolvedValue({});
     mockDb.auditLog.create.mockResolvedValue({});
   });
@@ -312,5 +332,28 @@ describe("updateVendorSettings — RBAC: staff cannot reach owner capabilities",
       tipPresets: [5, 10, 15],
     });
     expect(result.ok).toBe(true);
+  });
+
+  it("refuses owner of a suspended vendor from updating settings", async () => {
+    mockGetSession.mockResolvedValue(ownerSession);
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", name: "Old", active: false });
+    await expect(
+      updateVendorSettings("vendor-a", {
+        name: "Malicious Update",
+        description: "",
+        address: "",
+        phone: "",
+        email: "",
+        theme: "darkgold",
+        logoUrl: "",
+        coverUrl: "",
+        serviceChargePct: 50,
+        taxPct: 50,
+        taxInclusive: false,
+        tippingEnabled: false,
+        tipPresets: [0, 0, 0],
+      })
+    ).rejects.toThrow(/VendorSuspended/);
+    expect(mockDb.vendor.update).not.toHaveBeenCalled();
   });
 });

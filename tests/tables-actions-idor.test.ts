@@ -157,6 +157,7 @@ describe("tables actions — authorised happy-path", () => {
     vi.clearAllMocks();
     mockGetSession.mockResolvedValue(sessionVendorA);
     mockDb.diningTable.findUnique.mockResolvedValue(tableOwnedByVendorA);
+    mockDb.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, active: true });
     mockDb.diningTable.create.mockResolvedValue({ id: "new-table" });
     mockDb.diningTable.update.mockResolvedValue(tableOwnedByVendorA);
     mockDb.diningTable.delete.mockResolvedValue(tableOwnedByVendorA);
@@ -195,5 +196,46 @@ describe("tables actions — authorised happy-path", () => {
       })
     ).resolves.not.toThrow();
     expect(mockDb.diningTable.create).toHaveBeenCalledOnce();
+  });
+});
+
+describe("tables actions — suspended-vendor refusal", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue(sessionVendorA);
+    mockDb.diningTable.findUnique.mockResolvedValue(tableOwnedByVendorA);
+    mockDb.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, active: false });
+    mockDb.auditLog.create.mockResolvedValue({ id: "audit-2" });
+  });
+
+  it("createTable throws VendorSuspended for an owner of a suspended vendor", async () => {
+    await expect(
+      createTable(VENDOR_A_ID, { code: "T99", label: "New Table", seats: 2, area: "Main" })
+    ).rejects.toThrow(/VendorSuspended/);
+    expect(mockDb.diningTable.create).not.toHaveBeenCalled();
+  });
+
+  it("updateTableStatus throws VendorSuspended for an owner of a suspended vendor", async () => {
+    await expect(updateTableStatus(TABLE_A_ID, "occupied")).rejects.toThrow(
+      /VendorSuspended/
+    );
+    expect(mockDb.diningTable.update).not.toHaveBeenCalled();
+  });
+
+  it("deleteTable throws VendorSuspended for an owner of a suspended vendor", async () => {
+    await expect(deleteTable(TABLE_A_ID)).rejects.toThrow(/VendorSuspended/);
+    expect(mockDb.diningTable.delete).not.toHaveBeenCalled();
+  });
+
+  it("superadmin bypasses the suspended-vendor guard on tables", async () => {
+    mockGetSession.mockResolvedValue({
+      ...sessionVendorA,
+      role: "superadmin",
+      vendorId: null,
+    });
+    mockDb.diningTable.create.mockResolvedValue({ id: "new-table" });
+    await expect(
+      createTable(VENDOR_A_ID, { code: "T99", label: "Admin Table", seats: 2, area: "Main" })
+    ).resolves.not.toThrow();
   });
 });

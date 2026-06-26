@@ -74,7 +74,7 @@ export default async function VendorMenuPage({
   if (!suspendedCheck) notFound();
 
   if (!suspendedCheck.active) {
-    return <SuspendedTenantPage />;
+    return <SuspendedTenantPage locale={locale} />;
   }
 
   const vendor = await getVendorBySlugActive(slug);

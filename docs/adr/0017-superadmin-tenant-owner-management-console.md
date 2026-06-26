@@ -38,9 +38,11 @@ Tenant suspension is a boolean `active` flag on `Vendor`. When `active = false`:
 - The customer QR ordering route (`/qr/[country]/[vendor]`) returns a `SuspendedTenantPage` (not a 404 or 500)
 - `createOrderFromCart` throws `"Vendor is suspended"` — guards the order creation API
 - `createReview` throws `"Vendor is suspended"` — guards the review API
-- Admin mutations are unaffected (superadmin can still manage a suspended tenant)
+- **Admin mutations are refused for vendor-scoped roles** (owner/manager/staff) — every tenant-scoped admin action (menu, orders, settings, tables) checks `vendor.active` and throws `VendorSuspended` if the tenant is suspended. Superadmin bypasses this guard to allow administrative remediation.
 
 The `getVendorBySlugActive` function in `src/lib/queries-active.ts` wraps `getVendorBySlug` with the active check, returning null for suspended vendors. The QR page calls this instead of the original `getVendorBySlug`.
+
+The `assertVendorAccess`/`requireOwnedTable`/`scopedOrder` helpers in each admin action module also enforce `vendor.active`, so suspension is checked at the mutation layer, not just the customer route.
 
 ### 4. Owner provisioning via `provisionOwner` action
 
@@ -79,10 +81,19 @@ All superadmin UI components use RTL layout (`dir="rtl"`) consistent with the re
 
 The `AdminSidebar` receives `user.role` and conditionally renders the superadmin nav section (with a divider) only for `role === 'superadmin'`. Non-superadmins never see the link.
 
+### 9. Edge-guard for superadmin paths in middleware
+
+`src/middleware.ts` now decodes the JWT at the edge for `/admin/superadmin/*` paths and redirects non-superadmin sessions to `/admin`. This is in addition to (not a replacement for) the server-side `assertRole('superadmin')` in every action. Defense in depth: the edge stops unauthorized clients before they reach RSC rendering; the action layer enforces it for server mutations.
+
+### 10. `SuspendedTenantPage` derives `dir` from locale
+
+`SuspendedTenantPage` accepts a `locale` prop and derives `dir` from the locale list, rather than hardcoding `dir="rtl"`. This ensures English-locale customers of a suspended vendor see LTR layout.
+
 ## Alternatives Considered
 
 - **Separate `/superadmin` route outside `/admin`**: Rejected. The admin layout already provides auth and sidebar; reusing it avoids duplicate layout code.
 - **Hiding via middleware only**: Rejected. The action layer itself must enforce `assertRole('superadmin')` regardless of whether the UI is visible (defense in depth).
+- **Middleware JWT role check only (no server-side assertRole)**: Rejected. JWT claims can be stale; server-side `revalidateSession` + `assertRole` is the only source of truth for fresh roles.
 
 ## Consequences
 

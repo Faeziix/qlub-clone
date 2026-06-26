@@ -19,6 +19,15 @@ async function assertVendorAccess(vendorId: string) {
   if (session.vendorId && session.vendorId !== vendorId) {
     throw new Error("Forbidden: item belongs to another vendor.");
   }
+  if (session.role !== "superadmin") {
+    const vendor = await db.vendor.findUnique({
+      where: { id: vendorId },
+      select: { active: true },
+    });
+    if (!vendor?.active) {
+      throw new Error("VendorSuspended: this tenant is currently suspended.");
+    }
+  }
   return session;
 }
 

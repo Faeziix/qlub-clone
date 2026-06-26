@@ -21,6 +21,17 @@ function assertVendorOwnership(
   }
 }
 
+async function assertVendorActive(vendorId: string, role: string) {
+  if (role === "superadmin") return;
+  const vendor = await db.vendor.findUnique({
+    where: { id: vendorId },
+    select: { active: true },
+  });
+  if (!vendor?.active) {
+    throw new Error("VendorSuspended: this tenant is currently suspended.");
+  }
+}
+
 async function requireOwnedTable(tableId: string) {
   const session = await requireRole("manager");
   await checkAdminActionLimit(session.id);
@@ -30,6 +41,7 @@ async function requireOwnedTable(tableId: string) {
   });
   if (!table) throw new Error("Table not found.");
   assertVendorOwnership(session.vendorId, table.vendorId);
+  await assertVendorActive(table.vendorId, session.role);
   return { table, session };
 }
 
@@ -40,6 +52,7 @@ export async function createTable(
   const session = await requireRole("manager");
   await checkAdminActionLimit(session.id);
   assertVendorOwnership(session.vendorId, vendorId);
+  await assertVendorActive(vendorId, session.role);
 
   const code = input.code.trim();
   const label = input.label.trim();

@@ -16,6 +16,29 @@ export type SuperadminActionState = {
   data?: Record<string, unknown>;
 };
 
+export type TenantRow = {
+  id: string;
+  slug: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  active: boolean;
+  eNamadStatus: string;
+  createdAt: Date;
+  _count: { staff: number; orders: number };
+};
+
+export type PlatformStaffRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  active: boolean;
+  vendorId: string | null;
+  createdAt: Date;
+  vendor: { name: string; slug: string } | null;
+};
+
 // ── Zod schemas ───────────────────────────────────────────────────────────────
 
 const CreateTenantSchema = z.object({
@@ -212,7 +235,7 @@ export async function provisionOwner(
 
 export async function listTenants(
   input: z.input<typeof ListTenantsSchema>
-): Promise<Array<Record<string, unknown>>> {
+): Promise<TenantRow[]> {
   await requireSuperadmin();
 
   const parsed = ListTenantsSchema.safeParse(input);
@@ -245,14 +268,14 @@ export async function listTenants(
     },
   });
 
-  return vendors as Array<Record<string, unknown>>;
+  return vendors as TenantRow[];
 }
 
 // ── Platform-wide staff management ───────────────────────────────────────────
 
 export async function listPlatformStaff(
   input: z.input<typeof ListStaffSchema>
-): Promise<Array<Record<string, unknown>>> {
+): Promise<PlatformStaffRow[]> {
   await requireSuperadmin();
 
   const parsed = ListStaffSchema.safeParse(input);
@@ -284,7 +307,7 @@ export async function listPlatformStaff(
     },
   });
 
-  return staff as Array<Record<string, unknown>>;
+  return staff as PlatformStaffRow[];
 }
 
 export async function changeStaffRole(
@@ -295,7 +318,10 @@ export async function changeStaffRole(
 
   const roleResult = StaffRoleSchema.safeParse(newRole);
   if (!roleResult.success) {
-    return { ok: false, messageKey: "cannotPromoteToSuperadmin" };
+    if (newRole === "superadmin") {
+      return { ok: false, messageKey: "cannotPromoteToSuperadmin" };
+    }
+    return { ok: false, messageKey: "invalidRole" };
   }
 
   const target = await db.staffUser.findUnique({ where: { id: staffId } });

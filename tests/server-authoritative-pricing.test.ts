@@ -39,6 +39,9 @@ const { mockDb } = vi.hoisted(() => {
       findFirst: vi.fn(),
       update: vi.fn(),
     },
+    review: {
+      create: vi.fn(),
+    },
   };
   return { mockDb };
 });
@@ -50,6 +53,7 @@ import {
   createOrderFromCart,
   recordPayment,
   initiatePaymentLeg,
+  createReview,
 } from "@/lib/orders";
 import { computeBill } from "@/lib/pricing";
 
@@ -1184,5 +1188,51 @@ describe("Split leg reservation with TTL", () => {
         splitType: "custom",
       })
     ).rejects.toThrow(/already fully paid|exceeds remaining/i);
+  });
+});
+
+// ── Suspended-tenant refusal ───────────────────────────────────────────────────
+
+describe("createOrderFromCart — suspended vendor refusal", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("throws when the vendor is suspended (active=false)", async () => {
+    mockDb.vendor.findUnique.mockResolvedValue({ ...stubVendor, active: false });
+    mockDb.diningTable.findFirst.mockResolvedValue(null);
+
+    await expect(
+      createOrderFromCart({
+        vendorSlug: "test-cafe",
+        lines: [
+          {
+            lineId: "l1",
+            itemId: "item1",
+            name: "کباب",
+            unitPrice: 200_000n,
+            quantity: 1,
+            modifiers: [],
+          },
+        ],
+      })
+    ).rejects.toThrow(/suspended/i);
+
+    expect(mockDb.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("createReview — suspended vendor refusal", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("throws when the vendor is suspended (active=false)", async () => {
+    mockDb.vendor.findUnique.mockResolvedValue({ ...stubVendor, active: false });
+
+    await expect(
+      createReview({
+        vendorSlug: "test-cafe",
+        paymentId: "pay-1",
+        rating: 5,
+        comment: "خیلی خوب",
+      })
+    ).rejects.toThrow(/suspended/i);
   });
 });

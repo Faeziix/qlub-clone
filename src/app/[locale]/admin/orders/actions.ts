@@ -30,6 +30,15 @@ async function scopedOrder(orderId: string) {
   if (session.vendorId && order.vendorId !== session.vendorId) {
     throw new Error("Not authorized for this order.");
   }
+  if (session.role !== "superadmin") {
+    const vendor = await db.vendor.findUnique({
+      where: { id: order.vendorId },
+      select: { active: true },
+    });
+    if (!vendor?.active) {
+      throw new Error("VendorSuspended: this tenant is currently suspended.");
+    }
+  }
   return { order, session };
 }
 

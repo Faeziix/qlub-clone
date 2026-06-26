@@ -125,6 +125,7 @@ describe("menu/actions — admin action rate limiting", () => {
       name: "Kebab",
       price: BigInt(100_000),
     });
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", active: true });
     mockDb.menuItem.update.mockResolvedValue({});
     mockDb.auditLog.create.mockResolvedValue({});
     allowAdminAction();
@@ -170,6 +171,7 @@ describe("orders/actions — admin action rate limiting", () => {
       tableId: null,
       status: "placed",
     });
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", active: true });
     mockDb.order.update.mockResolvedValue({});
     mockDb.auditLog.create.mockResolvedValue({});
     allowAdminAction();
@@ -211,6 +213,7 @@ describe("tables/actions — admin action rate limiting", () => {
       id: "table-1",
       vendorId: "vendor-a",
     });
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", active: true });
     mockDb.diningTable.update.mockResolvedValue({});
     mockDb.diningTable.delete.mockResolvedValue({});
     mockDb.diningTable.create.mockResolvedValue({ id: "table-2" });
@@ -266,7 +269,7 @@ describe("settings/actions — admin action rate limiting", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", name: "Old" });
+    mockDb.vendor.findUnique.mockResolvedValue({ id: "vendor-a", name: "Old", active: true });
     mockDb.vendor.update.mockResolvedValue({});
     mockDb.auditLog.create.mockResolvedValue({});
     allowAdminAction();

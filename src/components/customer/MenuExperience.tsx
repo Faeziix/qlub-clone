@@ -8,6 +8,7 @@ import { useCart } from "@/lib/store/cart";
 import { makeT, dirFor, localizedName, localizedDescription } from "@/lib/i18n";
 import { cn, formatAmount } from "@/lib/utils";
 import { DietBadge } from "@/components/ui/Badge";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ItemSheet } from "./ItemSheet";
 import { CartSheet } from "./CartSheet";
 import { LanguageSheet } from "./LanguageSheet";
@@ -68,8 +69,8 @@ export function MenuExperience({
   // ── Landing screen: hero + menu picker (qlub "Select a menu") ──
   if (!entered) {
     return (
-      <div dir={dir} className="min-h-screen bg-bg">
-        <div className="mx-auto max-w-app">
+      <div dir={dir} className="min-h-screen bg-bg md:bg-surface-2">
+        <div className="mx-auto max-w-app min-h-screen bg-bg md:shadow-float">
           <div className="relative">
             <div className="relative h-60 w-full overflow-hidden">
               {vendor.coverUrl && (
@@ -164,8 +165,8 @@ export function MenuExperience({
 
   // ── Menu browsing screen ──
   return (
-    <div dir={dir} className="min-h-screen bg-bg pb-28">
-      <div className="mx-auto max-w-app">
+    <div dir={dir} className="min-h-screen bg-bg md:bg-surface-2">
+      <div className="mx-auto max-w-app min-h-screen bg-bg pb-28 md:shadow-float">
         {/* Sticky header */}
         <header className="sticky top-0 z-30 bg-surface/95 backdrop-blur border-b border-line">
           <div className="flex items-center gap-2 px-4 py-3">
@@ -239,7 +240,7 @@ export function MenuExperience({
                       : "bg-surface-2 text-ink"
                   )}
                 >
-                  {c.name}
+                  {localizedName(c, lang)}
                 </button>
               ))}
             </div>
@@ -267,9 +268,11 @@ export function MenuExperience({
             </section>
           ))}
           {filtered.length === 0 && (
-            <p className="py-16 text-center text-muted">
-              {t("noSearchResults").replace("{query}", query)}
-            </p>
+            <EmptyState
+              icon={<Search size={28} />}
+              title={t("noSearchResults").replace("{query}", query)}
+              className="py-16"
+            />
           )}
           <Footer t={t} />
         </main>

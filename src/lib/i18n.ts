@@ -103,6 +103,9 @@ const en: Dict = {
   yourName: "Your name (optional)",
   specialPlaceholder: "e.g. no onions, allergy info…",
   completeRequired: "Please complete the required choices.",
+  back: "Back",
+  language: "Language",
+  noSearchResults: 'No items match "{query}".',
 };
 
 const fa: Dict = {
@@ -176,6 +179,9 @@ const fa: Dict = {
   yourName: "نام شما (اختیاری)",
   specialPlaceholder: "مثلاً: بدون پیاز، توضیح آلرژی…",
   completeRequired: "لطفاً گزینه‌های اجباری را انتخاب کنید.",
+  back: "بازگشت",
+  language: "زبان",
+  noSearchResults: 'هیچ آیتمی با "{query}" مطابقت ندارد.',
 };
 
 const dicts: Record<string, Dict> = { fa, en };

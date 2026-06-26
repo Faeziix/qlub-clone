@@ -6,7 +6,16 @@ import { Trash2, ShoppingBag, AlertTriangle } from "lucide-react";
 import type { VendorWithMenus } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
 import { makeT } from "@/lib/i18n";
-import { formatAmount } from "@/lib/utils";
+import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsToman } from "@/lib/money";
+
+function displayPrice(rialAmount: bigint | number, locale: string): string {
+  const rial =
+    typeof rialAmount === "bigint" ? rialAmount : BigInt(Math.round(rialAmount));
+  return locale === "fa"
+    ? formatRialAsTomanPersian(rial)
+    : `${formatRialAsToman(rial)} Toman`;
+}
 import { computeBill, lineTotal } from "@/lib/pricing";
 import { bigintToJson } from "@/lib/money";
 import axios from "axios";
@@ -173,7 +182,7 @@ export function CartSheet({
                       increaseLabel={t("increaseQty")}
                     />
                     <span className="font-bold">
-                      {vendor.currency} {formatAmount(lineTotal(l))}
+                      {displayPrice(lineTotal(l), lang)}
                     </span>
                   </div>
                 </div>
@@ -181,26 +190,26 @@ export function CartSheet({
             </div>
 
             <div className="mt-5 space-y-2 rounded-2xl bg-surface-2 p-4 text-sm">
-              <Row label={t("subtotal")} value={bill.subtotal} c={vendor.currency} />
+              <Row label={t("subtotal")} value={bill.subtotal} lang={lang} />
               {bill.serviceCharge > 0n && (
                 <Row
                   label={`${t("serviceCharge")} (${vendor.serviceChargePct}%)`}
                   value={bill.serviceCharge}
-                  c={vendor.currency}
+                  lang={lang}
                 />
               )}
               {bill.tax > 0n && (
                 <Row
                   label={`${t("tax")} ${vendor.taxInclusive ? "(incl.)" : ""}`}
                   value={bill.tax}
-                  c={vendor.currency}
+                  lang={lang}
                 />
               )}
               <div className="my-1 border-t border-line" />
               <div className="flex items-center justify-between text-base font-extrabold">
                 <span>{t("total")}</span>
                 <span>
-                  {vendor.currency} {formatAmount(bill.total)}
+                  {displayPrice(bill.total, lang)}
                 </span>
               </div>
             </div>
@@ -216,7 +225,7 @@ export function CartSheet({
               loading={placing}
               onClick={placeOrder}
             >
-              {t("placeOrder")} · {vendor.currency} {formatAmount(bill.total)}
+              {t("placeOrder")} · {displayPrice(bill.total, lang)}
             </Button>
           </div>
         </div>
@@ -228,17 +237,17 @@ export function CartSheet({
 function Row({
   label,
   value,
-  c,
+  lang,
 }: {
   label: string;
   value: bigint;
-  c: string;
+  lang: string;
 }) {
   return (
     <div className="flex items-center justify-between text-muted">
       <span>{label}</span>
       <span className="font-semibold text-ink">
-        {c} {formatAmount(value)}
+        {displayPrice(value, lang)}
       </span>
     </div>
   );

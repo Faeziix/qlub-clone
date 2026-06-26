@@ -44,7 +44,6 @@ export default async function PayPage({
         vendorSlug={vendor.slug}
         vendorName={vendor.name}
         country={country}
-        currency={order.currency}
         tippingEnabled={vendor.tippingEnabled}
         tipPresets={vendor.tipPresets}
         order={{

@@ -6,7 +6,17 @@ import { Search, Globe, ChevronLeft, ShoppingBag } from "lucide-react";
 import type { VendorWithMenus, ItemWithModifiers } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
 import { makeT, dirFor, localizedName, localizedDescription } from "@/lib/i18n";
-import { cn, formatAmount } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsToman } from "@/lib/money";
+
+function displayPrice(rialAmount: bigint | number, locale: string): string {
+  const rial =
+    typeof rialAmount === "bigint" ? rialAmount : BigInt(Math.round(rialAmount));
+  return locale === "fa"
+    ? formatRialAsTomanPersian(rial)
+    : `${formatRialAsToman(rial)} Toman`;
+}
 import { DietBadge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ItemSheet } from "./ItemSheet";
@@ -259,7 +269,6 @@ export function MenuExperience({
                   <ItemRow
                     key={item.id}
                     item={item}
-                    currency={vendor.currency}
                     lang={lang}
                     onClick={() => setActiveItem(item)}
                   />
@@ -293,7 +302,7 @@ export function MenuExperience({
                 {t("viewOrder")}
               </span>
               <span className="flex items-center gap-2 font-bold">
-                {vendor.currency} {formatAmount(subtotal)}
+                {displayPrice(subtotal, lang)}
                 <ShoppingBag size={18} />
               </span>
             </button>
@@ -305,7 +314,6 @@ export function MenuExperience({
       {activeItem && (
         <ItemSheet
           item={activeItem}
-          currency={vendor.currency}
           lang={lang}
           open={!!activeItem}
           onClose={() => setActiveItem(null)}
@@ -335,12 +343,10 @@ export function MenuExperience({
 
 function ItemRow({
   item,
-  currency,
   lang,
   onClick,
 }: {
   item: ItemWithModifiers;
-  currency: string;
   lang: string;
   onClick: () => void;
 }) {
@@ -365,7 +371,7 @@ function ItemRow({
           </p>
         )}
         <p className="mt-2 font-bold text-brand">
-          {currency} {formatAmount(item.price)}
+          {displayPrice(item.price, lang)}
         </p>
       </div>
       {item.imageUrl && (

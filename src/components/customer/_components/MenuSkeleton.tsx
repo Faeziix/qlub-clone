@@ -54,8 +54,8 @@ export function MenuSkeleton() {
           <div className="flex gap-2 px-4 py-3">
             <SkeletonBlock className="h-9 w-20 shrink-0 rounded-full" />
             <SkeletonBlock className="h-9 w-24 shrink-0 rounded-full" />
-            <SkeletonBlock className="h-9 w-18 shrink-0 rounded-full" />
-            <SkeletonBlock className="h-9 w-22 shrink-0 rounded-full" />
+            <SkeletonBlock className="h-9 w-[72px] shrink-0 rounded-full" />
+            <SkeletonBlock className="h-9 w-[88px] shrink-0 rounded-full" />
           </div>
         </div>
 

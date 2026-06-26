@@ -13,7 +13,21 @@ import {
 } from "lucide-react";
 import type { SplitType } from "@/lib/types";
 import { makeT, dirFor } from "@/lib/i18n";
-import { cn, formatAmount } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsToman } from "@/lib/money";
+
+function displayPrice(rialAmount: bigint | number, locale: string): string {
+  const rial =
+    typeof rialAmount === "bigint" ? rialAmount : BigInt(Math.round(rialAmount));
+  return locale === "fa"
+    ? formatRialAsTomanPersian(rial)
+    : `${formatRialAsToman(rial)} Toman`;
+}
+
+function currencyInputLabel(locale: string): string {
+  return locale === "fa" ? "تومان" : "Toman";
+}
 import { evenSplit, tipFromPct } from "@/lib/pricing";
 import { bigintToJson, parseTomanInput } from "@/lib/money";
 import { Button } from "@/components/ui/Button";
@@ -52,7 +66,6 @@ export function PaymentFlow({
   vendorSlug,
   vendorName,
   country,
-  currency,
   tippingEnabled,
   tipPresets,
   order,
@@ -61,7 +74,6 @@ export function PaymentFlow({
   vendorSlug: string;
   vendorName: string;
   country: string;
-  currency: string;
   tippingEnabled: boolean;
   tipPresets: number[];
   order: OrderData;
@@ -158,7 +170,7 @@ export function PaymentFlow({
           </div>
           <h1 className="mt-5 text-2xl font-extrabold">{t("paymentSuccess")}</h1>
           <p className="mt-1 text-muted">
-            {currency} {formatAmount(payTotalRial)} · {vendorName}
+            {displayPrice(payTotalRial, lang)} · {vendorName}
           </p>
           <p className="mt-1 text-sm text-muted">
             {t("receipt")} #{order.orderNumber}
@@ -251,27 +263,27 @@ export function PaymentFlow({
                     )}
                   </span>
                   <span className="font-semibold">
-                    {formatAmount(i.lineTotal)}
+                    {displayPrice(i.lineTotal, lang)}
                   </span>
                 </div>
               ))}
             </div>
             <div className="mt-3 border-t border-line pt-3 text-sm">
-              <SummaryRow label={t("subtotal")} v={order.subtotal} c={currency} />
+              <SummaryRow label={t("subtotal")} v={order.subtotal} lang={lang} />
               {order.serviceCharge > 0 && (
                 <SummaryRow
                   label={t("serviceCharge")}
                   v={order.serviceCharge}
-                  c={currency}
+                  lang={lang}
                 />
               )}
               {order.tax > 0 && (
-                <SummaryRow label={t("tax")} v={order.tax} c={currency} />
+                <SummaryRow label={t("tax")} v={order.tax} lang={lang} />
               )}
               <div className="mt-2 flex items-center justify-between border-t border-line pt-2 text-base font-extrabold">
                 <span>{t("total")}</span>
                 <span>
-                  {currency} {formatAmount(order.total)}
+                  {displayPrice(order.total, lang)}
                 </span>
               </div>
             </div>
@@ -356,7 +368,7 @@ export function PaymentFlow({
                       {i.quantity}× {i.name}
                     </span>
                     <span className="font-semibold">
-                      {formatAmount(i.lineTotal)}
+                      {displayPrice(i.lineTotal, lang)}
                     </span>
                   </button>
                 );
@@ -366,7 +378,7 @@ export function PaymentFlow({
 
           {split === "custom" && (
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-3">
-              <span className="font-bold text-muted">{currency}</span>
+              <span className="font-bold text-muted">{currencyInputLabel(lang)}</span>
               <input
                 inputMode="numeric"
                 value={customAmount}
@@ -392,7 +404,7 @@ export function PaymentFlow({
                   active={tipPct === p}
                   onClick={() => setTipPct(p)}
                   label={`${p}%`}
-                  sub={formatAmount(tipFromPct(baseAmountRial, p))}
+                  sub={displayPrice(tipFromPct(baseAmountRial, p), lang)}
                 />
               ))}
             </div>
@@ -407,7 +419,7 @@ export function PaymentFlow({
             </button>
             {tipPct === "custom" && (
               <div className="mt-2 flex items-center gap-2 rounded-xl bg-surface-2 px-4 py-3">
-                <span className="font-bold text-muted">{currency}</span>
+                <span className="font-bold text-muted">{currencyInputLabel(lang)}</span>
                 <input
                   inputMode="numeric"
                   value={customTip}
@@ -458,11 +470,11 @@ export function PaymentFlow({
             <span className="text-muted">{t("youPay")}</span>
             <span className="text-end">
               <span className="text-lg font-extrabold">
-                {currency} {formatAmount(payTotalRial)}
+                {displayPrice(payTotalRial, lang)}
               </span>
               {tipRial > 0n && (
                 <span className="block text-xs text-muted">
-                  {t("inclTip").replace("{amount}", formatAmount(tipRial))}
+                  {t("inclTip").replace("{amount}", displayPrice(tipRial, lang))}
                 </span>
               )}
             </span>
@@ -470,7 +482,7 @@ export function PaymentFlow({
           <Button fullWidth size="lg" loading={processing} onClick={pay}>
             {processing
               ? t("processing")
-              : `${t("payNow")} · ${currency} ${formatAmount(payTotalRial)}`}
+              : `${t("payNow")} · ${displayPrice(payTotalRial, lang)}`}
           </Button>
         </div>
       </div>
@@ -663,17 +675,17 @@ function TipChip({
 function SummaryRow({
   label,
   v,
-  c,
+  lang,
 }: {
   label: string;
   v: number;
-  c: string;
+  lang: string;
 }) {
   return (
     <div className="flex items-center justify-between text-muted">
       <span>{label}</span>
       <span className="font-semibold text-ink">
-        {c} {formatAmount(v)}
+        {displayPrice(v, lang)}
       </span>
     </div>
   );

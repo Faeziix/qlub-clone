@@ -6,7 +6,17 @@ import type { ItemWithModifiers } from "@/lib/queries";
 import type { SelectedModifier } from "@/lib/types";
 import { useCart } from "@/lib/store/cart";
 import { makeT, localizedName, localizedDescription } from "@/lib/i18n";
-import { cn, formatAmount } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsToman } from "@/lib/money";
+
+function displayPrice(rialAmount: bigint | number, locale: string): string {
+  const rial =
+    typeof rialAmount === "bigint" ? rialAmount : BigInt(Math.round(rialAmount));
+  return locale === "fa"
+    ? formatRialAsTomanPersian(rial)
+    : `${formatRialAsToman(rial)} Toman`;
+}
 import { Sheet } from "@/components/ui/Sheet";
 import { Button } from "@/components/ui/Button";
 import { QuantityStepper } from "@/components/ui/QuantityStepper";
@@ -17,13 +27,11 @@ type Group = ItemWithModifiers["modifierGroups"][number];
 
 export function ItemSheet({
   item,
-  currency,
   lang,
   open,
   onClose,
 }: {
   item: ItemWithModifiers;
-  currency: string;
   lang: string;
   open: boolean;
   onClose: () => void;
@@ -116,7 +124,7 @@ export function ItemSheet({
             <div className="flex items-start justify-between gap-3">
               <h2 className="text-2xl font-extrabold">{name}</h2>
               <span className="shrink-0 pt-1 font-bold text-brand">
-                {currency} {formatAmount(item.price)}
+                {displayPrice(item.price, lang)}
               </span>
             </div>
             {tags.length > 0 && (
@@ -185,7 +193,7 @@ export function ItemSheet({
                           </span>
                           {o.priceDelta > 0 && (
                             <span className="text-sm font-semibold text-muted">
-                              +{formatAmount(o.priceDelta)}
+                              +{displayPrice(o.priceDelta, lang)}
                             </span>
                           )}
                         </button>
@@ -226,7 +234,7 @@ export function ItemSheet({
               disabled={missingRequired}
               onClick={add}
             >
-              {t("addToOrder")} · {currency} {formatAmount(lineTotalValue)}
+              {t("addToOrder")} · {displayPrice(lineTotalValue, lang)}
             </Button>
           </div>
           {missingRequired && (

@@ -29,6 +29,7 @@ interface TableRow {
   area: string;
   seats: number;
   passcode: string;
+  tableToken: string | null;
   status: string;
 }
 
@@ -75,10 +76,14 @@ function buildCustomerUrl(
   country: string,
   slug: string,
   code: string,
-  theme: string
+  theme: string,
+  tableToken: string | null
 ) {
   const base = `/qr/${country}/${slug}?table=${encodeURIComponent(code)}`;
-  return theme ? `${base}&theme=${encodeURIComponent(theme)}` : base;
+  const withTheme = theme ? `${base}&theme=${encodeURIComponent(theme)}` : base;
+  return tableToken
+    ? `${withTheme}&tt=${encodeURIComponent(tableToken)}`
+    : withTheme;
 }
 
 function CopyButton({ value, copy, copied }: { value: string; copy: string; copied: string }) {
@@ -123,9 +128,7 @@ function TableCard({
 }) {
   const [isPending, startTransition] = React.useTransition();
   const fullUrl = origin ? `${origin}${customerUrl}` : customerUrl;
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=4&data=${encodeURIComponent(
-    fullUrl
-  )}`;
+  const qrSrc = `/api/qr?size=160&data=${encodeURIComponent(fullUrl)}`;
 
   function cycleStatus() {
     const idx = STATUS_OPTIONS.indexOf(
@@ -313,7 +316,13 @@ export function TablesGrid({
               key={table.id}
               table={table}
               origin={origin}
-              customerUrl={buildCustomerUrl(country, slug, table.code, theme)}
+              customerUrl={buildCustomerUrl(
+                country,
+                slug,
+                table.code,
+                theme,
+                table.tableToken
+              )}
               t={t}
             />
           ))}

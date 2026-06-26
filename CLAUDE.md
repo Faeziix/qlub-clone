@@ -13,6 +13,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - **ADR 0001** — No committed secrets; `AUTH_SECRET` mandatory; no fallback; no backdoor scripts; hardened seed with crypto-random passwords.
 - **ADR 0002** — All table mutations require a valid admin session and vendor-scoped ownership check (IDOR fix).
 - **ADR 0003** — bun is the only package manager; Node ≥ 20 pinned via `engines` + `.nvmrc`; `eslint.ignoreDuringBuilds` removed; CI workflow enforces typecheck + lint on PRs.
+- **ADR 0014** — Edge middleware fail-closed for `/admin/*`; RBAC via `requireRole`/`assertRole`; 1-hour JWT sessions with DB re-validation on sensitive actions; all admin mutations + logins recorded in `AuditLog`.
 - **ADR 0006** — DR baseline: Neon-managed PITR/branching for Track A; restore runbook + RTO/RPO documented; Track B (domestic) DR deferred to Phase 5.
 - **ADR 0007** — Review is per-Payment (`paymentId @unique`): each split-bill payer can review once; no orderId on Review.
 - **ADR 0008** — Schema modernization: native Postgres enums, JSONB columns, Iran defaults (IRR/fa/Asia/Tehran/ir), translation tables, monotonic per-vendor orderNumber, AuditLog, sub-merchant fields.
@@ -69,8 +70,12 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ Order/payment writes were non-transactional → ✅ `createOrderFromCart`, `recordPayment`, and `initiatePaymentLeg` all use `db.$transaction`.
 - ❌ `nextVendorOrderNumber` used `db.$queryRaw` directly → ✅ Accepts a transaction client `tx` so the increment is atomic within the order creation transaction.
 - ❌ `createOrderFromCart` returned the order directly → ✅ Returns `{ order, priceChanged }` tuple; update all callers to destructure.
+- ❌ `server-only` import in utility modules (`rbac.ts`, `audit.ts`) breaks vitest because the real module is imported (not mocked) and the `server-only` package throws outside Next.js bundler → ✅ Only use `server-only` in modules that Next.js directly bundles and that are always mocked in tests (e.g., `auth.ts`, `db.ts`); omit it from domain helper utilities.
+- ❌ Using `requireSession` (no RBAC) in sensitive server actions → ✅ Replace with `requireRole(minimum)` from `src/lib/rbac.ts` to enforce role hierarchy at the action level.
 - ❌ `new TZDate(Date | number, tz)` does not work — TS overloads require `Date` or `number` separately → ✅ Use a conditional branch: `typeof date === "number" ? new TZDate(date, tz) : new TZDate(date, tz)`
 - ❌ `Intl.NumberFormat` with `style: 'currency', currency: 'IRR'` renders incorrectly for Iranian users → ✅ Use `toman-formatter.ts` exclusively; never IRR currency style.
+- ❌ Test fixtures for `createOrderFromCart` missing `active: true` on the vendor mock → ✅ Always include `active: true` in vendor stubs because `createOrderFromCart` enforces the suspension check.
+- ❌ `bun test` runs bun's native test runner (ignores vitest.config.ts aliases) → ✅ Use `bun run test` to invoke vitest via the package.json script so aliases (including `server-only` stub) apply.
 - ❌ Banking-holiday calendar must be updated annually (religious holidays shift ~10 days/year) → ✅ Update `IRANIAN_BANKING_HOLIDAYS` in `banking-holidays.ts` at each Nowruz; see `docs/i18n/banking-holiday-calendar.md`.
 
 ## Dependencies & Tooling
@@ -87,14 +92,25 @@ See `docs/adr/` for full ADRs. Key decisions:
 ## Component Registry
 
 - `src/lib/env.ts` — `requireAuthSecret`, `assertServerEnv`, `isDemoSeedingEnabled`
-- `src/lib/auth.ts` — JWT session management
+- `src/lib/auth.ts` — JWT session management, `createSession`, `getSession`, `destroySession`, `revalidateSession` (DB re-validation + fresh JWT)
+- `src/lib/rbac.ts` — RBAC: `ROLE_HIERARCHY`, `assertRole(session, minimum)`, `requireRole(minimum)` (async, redirects if no session)
+- `src/lib/audit.ts` — `recordAuditEvent(params)` — writes to `AuditLog`
 - `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip)
 - `src/lib/orders.ts` — `createOrderFromCart` (server-authoritative, returns `{order, priceChanged}`), `initiatePaymentLeg` (pending reservation with TTL), `recordPayment` (idempotent, transactional), `createReview`
 - `src/lib/toman-formatter.ts` — Persian toman display: `formatRialAsTomanPersian`, `formatTomanAmountPersian`, `latinDigitsToPersian`, `persianDigitsToLatin`, `TOMAN_HEZAR_THRESHOLD_RIAL`
 - `src/lib/digit-normalizer.ts` — Digit normalization: `normalizeDigits`, `normalizePhoneForValidation`, `isPersianDigit`, `isArabicIndicDigit`
 - `src/lib/jalali.ts` — Jalali dates in Tehran: `toTehranDate`, `getJalaliParts`, `formatJalaliDate`, `formatJalaliDateTime`, `isTehranFriday`, `isTehranThursday`, `addDaysTehran`
 - `src/lib/banking-holidays.ts` — Iranian banking holidays: `isBankingHoliday`, `isIranianWeekend`, `isOfficialHoliday`, `nextBankingDay`, `addBankingDays`, `settlementDueDate`, `IRANIAN_BANKING_HOLIDAYS`
+- `src/lib/rate-limiter.ts` — `RateLimiter` interface; `InMemoryRateLimiter` (default, dev); `RedisRateLimiter` (production, when `REDIS_URL` set); `buildRateLimiter(options)` factory
+- `src/lib/limiters.ts` — Singleton limiter instances: `getLimiter("publicApi" | "adminAction" | "login")`
+- `src/lib/sanitize.ts` — `sanitizeFreeText(input, maxLength?)` — strips script/HTML/javascript: from free-text fields
+- `src/lib/csrf.ts` — `checkOrigin(request)` — CSRF/origin check for public POST routes
+- `src/lib/table-token.ts` — `cryptoPasscode()` (crypto-secure 4-digit passcode); `signTableToken({ vendorId, tableId }, opts?)` (HMAC-SHA256 JWS); `verifyTableToken(token)` (returns payload or null)
+- `src/app/api/qr/route.ts` — `GET /api/qr?data=<url>&size=<px>` — server-side QR PNG generation via `qrcode` lib, no external service
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
+- `src/lib/queries-active.ts` — `getVendorBySlugActive` — like `getVendorBySlug` but returns null for suspended (active=false) vendors; used by all public customer routes
+- `src/app/[locale]/admin/superadmin/actions.ts` — Superadmin server actions: `createTenant`, `suspendTenant`, `reactivateTenant`, `provisionOwner`, `listTenants`, `listPlatformStaff`, `changeStaffRole`, `deactivateStaff`, `reactivateStaff`
+- `src/components/customer/SuspendedTenantPage.tsx` — RTL Farsi-first "restaurant suspended" page shown instead of 404/500 for suspended tenants
 
 ## API & Data Layer
 
@@ -119,5 +135,14 @@ See `docs/adr/` for full ADRs. Key decisions:
 - #10 — next-intl Farsi-first RTL foundation: `[locale]` segment, server-side `<html lang dir>`, middleware, fa/en only
 - #11 — Persian formatting deep modules: toman-formatter, digit-normalizer, jalali, banking-holidays
 
+**Done (M4 issues):**
+- #14 — Admin auth: edge middleware, RBAC, session hardening, audit log
+
+- #15 — Abuse controls: rate limiting (Redis + in-memory), login lockout, zod validation hardening, free-text sanitization, CSRF/origin checks, generic error responses
+
+- #16 — Self-hosted QR (`/api/qr`, `qrcode` lib, no third-party service); crypto passcodes (`crypto.getRandomValues`); signed table tokens (HMAC-SHA256 JWS embedding `vendorId`+`tableId`); guest entry validates + rejects tampered/foreign tokens
+
+- #27 — Superadmin tenant & owner management console: create/suspend/reactivate vendors, provision owner accounts, platform-wide staff management, suspension guard on customer routes
+
 **In progress / next:**
-- M3: remaining issues (design system, Vazirmatn, tokens)
+- M4 complete

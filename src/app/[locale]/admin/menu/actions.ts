@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireSession } from "@/app/[locale]/admin/actions";
+import { requireRole } from "@/lib/rbac";
 import { parseRialFromInput } from "@/lib/money";
+import { recordAuditEvent } from "@/lib/audit";
+import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
 
 interface TranslationInput {
   locale: string;
@@ -12,10 +14,21 @@ interface TranslationInput {
 }
 
 async function assertVendorAccess(vendorId: string) {
-  const session = await requireSession();
+  const session = await requireRole("manager");
+  await checkAdminActionLimit(session.id);
   if (session.vendorId && session.vendorId !== vendorId) {
     throw new Error("Forbidden: item belongs to another vendor.");
   }
+  if (session.role !== "superadmin") {
+    const vendor = await db.vendor.findUnique({
+      where: { id: vendorId },
+      select: { active: true },
+    });
+    if (!vendor?.active) {
+      throw new Error("VendorSuspended: this tenant is currently suspended.");
+    }
+  }
+  return session;
 }
 
 async function upsertItemTranslations(
@@ -43,31 +56,53 @@ async function upsertItemTranslations(
 export async function toggleItemAvailability(itemId: string, available: boolean) {
   const item = await db.menuItem.findUnique({
     where: { id: itemId },
-    select: { vendorId: true },
+    select: { vendorId: true, available: true },
   });
   if (!item) throw new Error("Item not found.");
-  await assertVendorAccess(item.vendorId);
+  const session = await assertVendorAccess(item.vendorId);
 
   await db.menuItem.update({
     where: { id: itemId },
     data: { available },
   });
+
+  await recordAuditEvent({
+    actorId: session.id,
+    vendorId: item.vendorId,
+    action: "TOGGLE_ITEM_AVAILABILITY",
+    entity: "MenuItem",
+    entityId: itemId,
+    before: { available: item.available },
+    after: { available },
+  });
+
   revalidatePath("/admin/menu");
 }
 
 export async function updateItemPrice(itemId: string, tomanInput: string) {
   const item = await db.menuItem.findUnique({
     where: { id: itemId },
-    select: { vendorId: true },
+    select: { vendorId: true, price: true },
   });
   if (!item) throw new Error("Item not found.");
-  await assertVendorAccess(item.vendorId);
+  const session = await assertVendorAccess(item.vendorId);
 
   const priceRial = parseRialFromInput(tomanInput);
   await db.menuItem.update({
     where: { id: itemId },
     data: { price: priceRial },
   });
+
+  await recordAuditEvent({
+    actorId: session.id,
+    vendorId: item.vendorId,
+    action: "UPDATE_ITEM_PRICE",
+    entity: "MenuItem",
+    entityId: itemId,
+    before: { price: String(item.price) },
+    after: { price: String(priceRial) },
+  });
+
   revalidatePath("/admin/menu");
 }
 
@@ -83,10 +118,10 @@ export async function updateItem(
 ) {
   const item = await db.menuItem.findUnique({
     where: { id: itemId },
-    select: { vendorId: true },
+    select: { vendorId: true, name: true, price: true },
   });
   if (!item) throw new Error("Item not found.");
-  await assertVendorAccess(item.vendorId);
+  const session = await assertVendorAccess(item.vendorId);
 
   const name = data.name.trim();
   if (!name) throw new Error("Name is required.");
@@ -106,6 +141,16 @@ export async function updateItem(
     await upsertItemTranslations(itemId, data.translations);
   }
 
+  await recordAuditEvent({
+    actorId: session.id,
+    vendorId: item.vendorId,
+    action: "UPDATE_MENU_ITEM",
+    entity: "MenuItem",
+    entityId: itemId,
+    before: { name: item.name, price: String(item.price) },
+    after: { name, price: String(priceRial) },
+  });
+
   revalidatePath("/admin/menu");
 }
 
@@ -119,7 +164,7 @@ export async function createItem(
     translations?: TranslationInput[];
   }
 ) {
-  await assertVendorAccess(vendorId);
+  const session = await assertVendorAccess(vendorId);
 
   const category = await db.category.findUnique({
     where: { id: categoryId },
@@ -157,16 +202,25 @@ export async function createItem(
     await upsertItemTranslations(created.id, data.translations);
   }
 
+  await recordAuditEvent({
+    actorId: session.id,
+    vendorId,
+    action: "CREATE_MENU_ITEM",
+    entity: "MenuItem",
+    entityId: created.id,
+    after: { name, price: String(priceRial) },
+  });
+
   revalidatePath("/admin/menu");
 }
 
 export async function deleteItem(itemId: string) {
   const item = await db.menuItem.findUnique({
     where: { id: itemId },
-    select: { vendorId: true },
+    select: { vendorId: true, name: true },
   });
   if (!item) throw new Error("Item not found.");
-  await assertVendorAccess(item.vendorId);
+  const session = await assertVendorAccess(item.vendorId);
 
   const groups = await db.modifierGroup.findMany({
     where: { itemId },
@@ -180,5 +234,15 @@ export async function deleteItem(itemId: string) {
     await db.modifierGroup.deleteMany({ where: { itemId } });
   }
   await db.menuItem.delete({ where: { id: itemId } });
+
+  await recordAuditEvent({
+    actorId: session.id,
+    vendorId: item.vendorId,
+    action: "DELETE_MENU_ITEM",
+    entity: "MenuItem",
+    entityId: itemId,
+    before: { name: item.name },
+  });
+
   revalidatePath("/admin/menu");
 }

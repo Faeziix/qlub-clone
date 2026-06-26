@@ -28,6 +28,10 @@
     "navGuestApp": "Guest app",
     "navDashboard": "Dashboard"
   },
+  "suspended": {
+    "title": "This restaurant is currently unavailable",
+    "body": "This restaurant has been temporarily suspended by the platform. Please try again later or contact restaurant staff."
+  },
   "customer": {
     "selectMenu": "Select a menu",
     "search": "Search",
@@ -113,7 +117,8 @@
       "menu": "Menu",
       "tables": "Tables & QR",
       "reviews": "Reviews",
-      "settings": "Settings"
+      "settings": "Settings",
+      "superadmin": "Superadmin Console"
     },
     "auth": {
       "title": "qlub_ Manager",
@@ -122,7 +127,8 @@
       "password": "Password",
       "signIn": "Sign in",
       "demoAccounts": "Demo accounts",
-      "invalidCredentials": "Invalid email or password."
+      "invalidCredentials": "Invalid email or password.",
+      "tooManyAttempts": "Too many login attempts. Please try again later."
     },
     "dashboard": {
       "pageTitle": "Dashboard",
@@ -376,6 +382,68 @@
       "close": "Close",
       "allRestaurants": "All restaurants",
       "noVendor": "—"
+    },
+    "superadmin": {
+      "pageTitle": "Superadmin Console",
+      "pageSubtitle": "Manage restaurants and user accounts across the platform.",
+      "totalTenants": "Total restaurants",
+      "totalStaff": "Total staff",
+      "suspended": "suspended",
+      "tenantManagement": "Tenant management",
+      "tenantManagementDesc": "Create, edit, suspend, and reactivate restaurants.",
+      "manageTenants": "View restaurants",
+      "staffManagement": "Staff management",
+      "staffManagementDesc": "View, search, change roles, and deactivate accounts.",
+      "manageStaff": "View staff",
+      "tenantsPageTitle": "Restaurants",
+      "tenantsPageSubtitle": "All restaurants registered on the platform.",
+      "staffPageTitle": "Platform staff",
+      "staffPageSubtitle": "All admin accounts registered on the platform.",
+      "createTenant": "Create restaurant",
+      "createTenantTitle": "Create new restaurant",
+      "tenantName": "Restaurant name",
+      "tenantSlug": "URL slug",
+      "slugHint": "Lowercase, numbers and hyphens only. e.g. pizza-palace",
+      "phone": "Phone",
+      "email": "Email",
+      "description": "Description",
+      "cancel": "Cancel",
+      "close": "Close",
+      "create": "Create",
+      "creating": "Creating…",
+      "tenant": "Restaurant",
+      "status": "Status",
+      "staff": "Staff",
+      "orders": "Orders",
+      "enamad": "eNamad",
+      "actions": "Actions",
+      "active": "Active",
+      "inactive": "Inactive",
+      "noTenants": "No restaurants registered yet.",
+      "noStaff": "No staff registered yet.",
+      "provisionOwner": "Provision owner",
+      "suspendTenant": "Suspend restaurant",
+      "reactivateTenant": "Reactivate restaurant",
+      "provisionOwnerTitle": "Provision owner account",
+      "ownerName": "Owner name",
+      "ownerEmail": "Owner email",
+      "temporaryPassword": "Temporary password",
+      "ownerProvisionedSuccess": "Owner account created successfully.",
+      "staffMember": "Staff member",
+      "restaurant": "Restaurant",
+      "role": "Role",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate",
+      "role_owner": "Owner",
+      "role_manager": "Manager",
+      "role_staff": "Staff",
+      "error_slugTaken": "This URL slug is already in use.",
+      "error_emailTaken": "This email is already registered.",
+      "error_notFound": "Item not found.",
+      "error_vendorNotFound": "Restaurant not found.",
+      "error_validationError": "The submitted data is invalid.",
+      "error_cannotPromoteToSuperadmin": "Cannot promote to superadmin.",
+      "error_cannotModifySuperadmin": "Cannot modify a superadmin account."
     }
   }
 }

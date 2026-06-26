@@ -28,6 +28,10 @@
     "navGuestApp": "اپ مهمان",
     "navDashboard": "داشبورد"
   },
+  "suspended": {
+    "title": "این رستوران در حال حاضر در دسترس نیست",
+    "body": "این رستوران موقتاً توسط پلتفرم به حالت تعلیق درآمده است. لطفاً بعداً دوباره امتحان کنید یا با کارکنان رستوران تماس بگیرید."
+  },
   "customer": {
     "selectMenu": "انتخاب منو",
     "search": "جستجو",
@@ -113,7 +117,8 @@
       "menu": "منو",
       "tables": "میزها و QR",
       "reviews": "نظرات",
-      "settings": "تنظیمات"
+      "settings": "تنظیمات",
+      "superadmin": "کنسول سوپرادمین"
     },
     "auth": {
       "title": "qlub_ مدیریت",
@@ -122,7 +127,8 @@
       "password": "رمز عبور",
       "signIn": "ورود",
       "demoAccounts": "حساب‌های نمایشی",
-      "invalidCredentials": "ایمیل یا رمز عبور نامعتبر است."
+      "invalidCredentials": "ایمیل یا رمز عبور نامعتبر است.",
+      "tooManyAttempts": "تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً بعداً دوباره امتحان کنید."
     },
     "dashboard": {
       "pageTitle": "داشبورد",
@@ -376,6 +382,68 @@
       "close": "بستن",
       "allRestaurants": "همه رستوران‌ها",
       "noVendor": "—"
+    },
+    "superadmin": {
+      "pageTitle": "کنسول سوپرادمین",
+      "pageSubtitle": "مدیریت رستوران‌ها و حساب‌های کاربری در سراسر پلتفرم.",
+      "totalTenants": "کل رستوران‌ها",
+      "totalStaff": "کل کارکنان",
+      "suspended": "تعلیق‌شده",
+      "tenantManagement": "مدیریت رستوران‌ها",
+      "tenantManagementDesc": "ایجاد، ویرایش، تعلیق و فعال‌سازی مجدد رستوران‌ها.",
+      "manageTenants": "مشاهده رستوران‌ها",
+      "staffManagement": "مدیریت کارکنان",
+      "staffManagementDesc": "مشاهده، جستجو، تغییر نقش و غیرفعال‌سازی حساب‌های کاربری.",
+      "manageStaff": "مشاهده کارکنان",
+      "tenantsPageTitle": "رستوران‌ها",
+      "tenantsPageSubtitle": "همه رستوران‌های ثبت‌شده در پلتفرم.",
+      "staffPageTitle": "کارکنان پلتفرم",
+      "staffPageSubtitle": "همه حساب‌های مدیریتی ثبت‌شده.",
+      "createTenant": "ایجاد رستوران جدید",
+      "createTenantTitle": "ایجاد رستوران جدید",
+      "tenantName": "نام رستوران",
+      "tenantSlug": "شناسه URL رستوران",
+      "slugHint": "حروف کوچک، اعداد و خط تیره. مثلاً: pizza-palace",
+      "phone": "تلفن",
+      "email": "ایمیل",
+      "description": "توضیحات",
+      "cancel": "لغو",
+      "close": "بستن",
+      "create": "ایجاد",
+      "creating": "در حال ایجاد…",
+      "tenant": "رستوران",
+      "status": "وضعیت",
+      "staff": "کارکنان",
+      "orders": "سفارش‌ها",
+      "enamad": "اینماد",
+      "actions": "عملیات",
+      "active": "فعال",
+      "inactive": "غیرفعال",
+      "noTenants": "هنوز رستورانی ثبت نشده.",
+      "noStaff": "هنوز کارمندی ثبت نشده.",
+      "provisionOwner": "ایجاد حساب مالک",
+      "suspendTenant": "تعلیق رستوران",
+      "reactivateTenant": "فعال‌سازی مجدد رستوران",
+      "provisionOwnerTitle": "ایجاد حساب مالک",
+      "ownerName": "نام مالک",
+      "ownerEmail": "ایمیل مالک",
+      "temporaryPassword": "رمز عبور موقت",
+      "ownerProvisionedSuccess": "حساب مالک با موفقیت ایجاد شد.",
+      "staffMember": "کارمند",
+      "restaurant": "رستوران",
+      "role": "نقش",
+      "deactivate": "غیرفعال",
+      "reactivate": "فعال‌سازی مجدد",
+      "role_owner": "مالک",
+      "role_manager": "مدیر",
+      "role_staff": "کارمند",
+      "error_slugTaken": "این شناسه URL قبلاً استفاده شده است.",
+      "error_emailTaken": "این ایمیل قبلاً ثبت شده است.",
+      "error_notFound": "مورد یافت نشد.",
+      "error_vendorNotFound": "رستوران یافت نشد.",
+      "error_validationError": "اطلاعات وارد‌شده نامعتبر است.",
+      "error_cannotPromoteToSuperadmin": "ارتقاء به سوپرادمین امکان‌پذیر نیست.",
+      "error_cannotModifySuperadmin": "حساب سوپرادمین قابل ویرایش نیست."
     }
   }
 }

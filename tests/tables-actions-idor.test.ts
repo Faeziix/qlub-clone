@@ -27,6 +27,9 @@ const { mockGetSession, mockDb } = vi.hoisted(() => {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
     },
+    auditLog: {
+      create: vi.fn(),
+    },
   };
   return { mockGetSession, mockDb };
 });
@@ -52,6 +55,14 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/db", () => ({ db: mockDb }));
+
+// table-token is an auth-signing utility; mock it out here because the IDOR
+// tests do not exercise signing behaviour (that is covered by table-tokens.test.ts).
+vi.mock("@/lib/table-token", () => ({
+  cryptoPasscode: () => "1234",
+  signTableToken: vi.fn().mockResolvedValue("mock-token"),
+  verifyTableToken: vi.fn().mockResolvedValue(null),
+}));
 
 // ── Import the unit under test (after mocks are registered) ─────────────────
 
@@ -146,9 +157,11 @@ describe("tables actions — authorised happy-path", () => {
     vi.clearAllMocks();
     mockGetSession.mockResolvedValue(sessionVendorA);
     mockDb.diningTable.findUnique.mockResolvedValue(tableOwnedByVendorA);
+    mockDb.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, active: true });
     mockDb.diningTable.create.mockResolvedValue({ id: "new-table" });
     mockDb.diningTable.update.mockResolvedValue(tableOwnedByVendorA);
     mockDb.diningTable.delete.mockResolvedValue(tableOwnedByVendorA);
+    mockDb.auditLog.create.mockResolvedValue({ id: "audit-1" });
   });
 
   it("createTable succeeds when the caller owns the vendor", async () => {
@@ -183,5 +196,46 @@ describe("tables actions — authorised happy-path", () => {
       })
     ).resolves.not.toThrow();
     expect(mockDb.diningTable.create).toHaveBeenCalledOnce();
+  });
+});
+
+describe("tables actions — suspended-vendor refusal", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSession.mockResolvedValue(sessionVendorA);
+    mockDb.diningTable.findUnique.mockResolvedValue(tableOwnedByVendorA);
+    mockDb.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, active: false });
+    mockDb.auditLog.create.mockResolvedValue({ id: "audit-2" });
+  });
+
+  it("createTable throws VendorSuspended for an owner of a suspended vendor", async () => {
+    await expect(
+      createTable(VENDOR_A_ID, { code: "T99", label: "New Table", seats: 2, area: "Main" })
+    ).rejects.toThrow(/VendorSuspended/);
+    expect(mockDb.diningTable.create).not.toHaveBeenCalled();
+  });
+
+  it("updateTableStatus throws VendorSuspended for an owner of a suspended vendor", async () => {
+    await expect(updateTableStatus(TABLE_A_ID, "occupied")).rejects.toThrow(
+      /VendorSuspended/
+    );
+    expect(mockDb.diningTable.update).not.toHaveBeenCalled();
+  });
+
+  it("deleteTable throws VendorSuspended for an owner of a suspended vendor", async () => {
+    await expect(deleteTable(TABLE_A_ID)).rejects.toThrow(/VendorSuspended/);
+    expect(mockDb.diningTable.delete).not.toHaveBeenCalled();
+  });
+
+  it("superadmin bypasses the suspended-vendor guard on tables", async () => {
+    mockGetSession.mockResolvedValue({
+      ...sessionVendorA,
+      role: "superadmin",
+      vendorId: null,
+    });
+    mockDb.diningTable.create.mockResolvedValue({ id: "new-table" });
+    await expect(
+      createTable(VENDOR_A_ID, { code: "T99", label: "Admin Table", seats: 2, area: "Main" })
+    ).resolves.not.toThrow();
   });
 });

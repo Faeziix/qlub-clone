@@ -134,6 +134,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/payment/reconciliation-sweep.ts` — `runReconciliationSweep` (DI-based, testable), `buildReconciliationSweepRunner`, `SWEEP_STALENESS_MINUTES`; types: `SweepablePayment`, `OpsQueueEntry`, `ReconciliationSweepInput`
 - `src/app/api/payments/callback/route.ts` — `GET /api/payments/callback` — server-side gateway callback handler; uses `transitionToVerifying` before verify for concurrent-safe first-writer-wins claim
 - `src/app/api/payments/sweep/route.ts` — `POST /api/payments/sweep` — scheduled reconciliation sweep endpoint (requires `x-sweep-secret`)
+- `src/lib/payment/wallet-service.ts` — `issueRefundAsPayout` (float-guarded ledgered payout + sets Payment.status=refunded atomically), `depositFloat` (operator pre-funds wallet), `getWalletBalance`, `getWalletLedger`, `resolveOverpaymentViaRefund` (overpay unwind delegates to issueRefundAsPayout)
 
 ## API & Data Layer
 
@@ -174,3 +175,4 @@ See `docs/adr/` for full ADRs. Key decisions:
 **Done (M6 issues):**
 - #20 — PaymentProvider interface + simulated/sandbox facilitator: `PaymentProvider` interface (request/redirectUrl/verify/inquire/refundViaPayout/onboardSubMerchant/verifyIban); `SimulatedPaymentAdapter` (in-process sessions, simulatePaid/simulateCancelled test helpers); `getPaymentProvider()` factory (PAYMENT_PROVIDER env, defaults to simulated); `/api/payments/callback` route (server-side verify, never trusts redirect params); `recordPaymentVerified`/`recordPaymentFailed`/`expirePayment` state machine transitions; ADR-0021
 - #21 — Payment state machine + idempotency + reconciliation sweep + ceiling-split: `transitionToVerifying` (pending→verifying atomic claim); `recordPaymentRefunded`; `ceiling-split.ts` (`splitIntoSubCharges`, `computeCeilingSplit`, `areCeilingSplitSubChargesFullyPaid`, `IPG_TRANSACTION_CEILING_RIAL`); `reconciliation-sweep.ts` (`runReconciliationSweep`, `buildReconciliationSweepRunner`); `/api/payments/sweep` scheduled sweep endpoint; `verifying` enum value added to `PaymentStatus`; migration 0005; 44 integration tests; ADR-0022
+- #23 — Refund-as-payout + platform-wallet ledger + overpayment unwind: `wallet-service.ts` (`issueRefundAsPayout`, `depositFloat`, `getWalletBalance`, `getWalletLedger`, `resolveOverpaymentViaRefund`); `PlatformWallet` + `WalletTransaction` models; `WalletTransactionType` enum; migration 0007; float guard blocks refunds exceeding available balance; overpayment unwind reuses the same path; `PaymentStatus=refunded` driven exclusively by payout record; 19 tests; ADR-0023

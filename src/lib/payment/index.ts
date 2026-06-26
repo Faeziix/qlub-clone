@@ -39,3 +39,17 @@ export type {
   ReconciliationSweepCallbacks,
   ReconciliationSweepInput,
 } from "./reconciliation-sweep";
+export {
+  issueRefundAsPayout,
+  depositFloat,
+  getWalletBalance,
+  getWalletLedger,
+  resolveOvepaymentViaRefund,
+} from "./wallet-service";
+export type {
+  RefundAsPayoutInput,
+  RefundResult,
+  DepositFloatInput,
+  DepositResult,
+  WalletTransactionRow,
+} from "./wallet-service";

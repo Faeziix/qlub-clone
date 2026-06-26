@@ -225,6 +225,30 @@ model Payment {
   @@index([status])
 }
 
+model PlatformWallet {
+  id           String              @id @default(cuid())
+  balanceRial  BigInt              @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  transactions WalletTransaction[]
+}
+
+model WalletTransaction {
+  id          String                  @id @default(cuid())
+  walletId    String
+  type        WalletTransactionType
+  amountRial  BigInt
+  paymentId   String?
+  payoutRef   String?
+  description String?
+  createdAt   DateTime                @default(now())
+  wallet      PlatformWallet          @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
+  @@index([paymentId])
+  @@index([createdAt])
+}
+
 model OpsQueueEntry {
   id          String   @id @default(cuid())
   paymentId   String
@@ -384,4 +408,9 @@ enum TableStatus {
   available
   occupied
   bill_requested
+}
+
+enum WalletTransactionType {
+  deposit
+  refund_payout
 }

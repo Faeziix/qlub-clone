@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
-import { hasLocale } from "next-intl";
+import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing, dirForLocale } from "@/i18n/routing";
 
@@ -47,11 +48,14 @@ export default async function LocaleLayout({ children, params }: Props) {
     notFound();
   }
 
+  setRequestLocale(locale);
   const dir = dirForLocale(locale);
 
   return (
     <html lang={locale} dir={dir} className={`${vazirmatn.variable} font-sans`}>
-      <body>{children}</body>
+      <body>
+        <NextIntlClientProvider>{children}</NextIntlClientProvider>
+      </body>
     </html>
   );
 }

@@ -54,13 +54,24 @@ Throws on unknown values to surface misconfiguration early.
 
 The gateway browser-redirects here after the diner pays or cancels. The handler:
 1. Reads `paymentId` from the URL (set by us when building `callbackUrl`)
-2. Loads the `Payment` record to retrieve `trackId` (the gateway ref)
+2. Loads the `Payment` record to retrieve `trackId` (the gateway ref) and `tipAmount`
 3. Calls `provider.verify(trackId)` — the ONLY authoritative path
-4. Transitions the payment state machine via `recordPaymentVerified` / `recordPaymentFailed`
-5. Redirects the browser to `/payment/success` or `/payment/failed`
+4. Asserts `verifyResult.amount === payment.amount + payment.tipAmount` (PRD §6.4 amount guard); treats a mismatch as a failure
+5. Calls `recordPaymentVerified(amount: payment.amount)` — credits only the bill portion into `order.amountPaid`; or `recordPaymentFailed` on error
+6. Redirects the browser to `/payment/success`, `/payment/failed`, or `/payment/pending`
 
 The gateway's callback query-string params (`status`, `amount`, `refNumber`) are explicitly
 ignored — only `provider.verify()` counts.
+
+### 4a. Tip inclusion in the IPG charge (PRD §6.4)
+
+`POST /api/payments` passes `leg.total` (= `amount + tipAmount`) to `provider.request()`
+so the gateway charges the full amount the diner owes. Only `leg.amount` (the bill portion)
+is credited into `order.amountPaid` via `recordPaymentVerified`, consistent with the cash
+path convention where tip is tracked as a separate field on the payment leg.
+
+The `mobile` field is omitted from `provider.request()` since the current request schema
+has no diner-mobile field. A future issue may add E.164 mobile collection.
 
 ### 5. Payment state machine service (`src/lib/payment/payment-service.ts`)
 
@@ -87,4 +98,4 @@ so concurrent callbacks or sweep runs cannot double-apply. The first writer wins
 | `src/lib/payment/index.ts` | Re-exports |
 | `src/lib/payment/payment-service.ts` | State machine transitions (verify/fail/expire) |
 | `src/app/api/payments/callback/route.ts` | Gateway callback handler (server-side verify) |
-| `tests/payment-provider.test.ts` | 35 tests covering all acceptance criteria |
+| `tests/payment-provider.test.ts` | 39 tests covering all acceptance criteria |

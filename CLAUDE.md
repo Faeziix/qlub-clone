@@ -78,6 +78,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ Test fixtures for `createOrderFromCart` missing `active: true` on the vendor mock → ✅ Always include `active: true` in vendor stubs because `createOrderFromCart` enforces the suspension check.
 - ❌ `bun test` runs bun's native test runner (ignores vitest.config.ts aliases) → ✅ Use `bun run test` to invoke vitest via the package.json script so aliases (including `server-only` stub) apply.
 - ❌ Banking-holiday calendar must be updated annually (religious holidays shift ~10 days/year) → ✅ Update `IRANIAN_BANKING_HOLIDAYS` in `banking-holidays.ts` at each Nowruz; see `docs/i18n/banking-holiday-calendar.md`.
+- ❌ `provider.request({ amount: leg.amount })` charges only the bill and silently undercharges tipping diners → ✅ Pass `leg.total` (= `amount + tipAmount`) to `provider.request()`; only `payment.amount` (bill portion) credits `order.amountPaid` in `recordPaymentVerified`.
+- ❌ Callback route passed `verifyResult.amount ?? payment.amount` to `recordPaymentVerified` without asserting equality with the reserved amount → ✅ Assert `verifyResult.amount === payment.amount + payment.tipAmount` before crediting; treat mismatch as payment failure.
+- ❌ `mobile: data.payerName` sent payer NAME as the gateway mobile field → ✅ Omit `mobile` from `provider.request()` until a dedicated `dinerMobile` field is added to the request schema.
 
 ## Dependencies & Tooling
 

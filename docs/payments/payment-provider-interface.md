@@ -115,11 +115,31 @@ the gateway's expected unit at the boundary using `rialForGateway` / `rialFromGa
 from `money.ts`. A wrong ×10 or ×1000 silently over/undercharges — the property-based
 tests in `tests/money.test.ts` guard this.
 
+## Tip inclusion in the IPG charge (PRD §6.4)
+
+The gateway charge **must be the full `leg.total` (= `amount + tipAmount`)** so tipping
+diners are charged the correct total via the IPG.
+
+`POST /api/payments` passes `leg.total` to `provider.request({ amount: leg.total, ... })`.
+
+`recordPaymentVerified` still receives only `leg.amount` (the bill portion) to credit
+`order.amountPaid`, consistent with the cash-path convention where tip is tracked
+separately on the payment leg.
+
+## Amount equality guard on verify
+
+After `provider.verify()` returns `succeeded`, the callback route compares
+`verifyResult.amount` against `payment.amount + payment.tipAmount` (the full reserved
+total). A mismatch means the gateway charged a different amount than was requested — this
+is treated as a payment failure to prevent over/undercharge. The simulated adapter always
+echoes the requested amount, so this guard is a no-op in tests.
+
 ## Callback route
 
 `GET /api/payments/callback` implements the verify-first contract:
 1. Reads `paymentId` from the URL query (set by us when building the `callbackUrl`).
-2. Loads `Payment.trackId` from the DB.
+2. Loads `Payment.trackId` from the DB (includes `tipAmount` for the equality guard).
 3. Calls `provider.verify(trackId)` — ignores all gateway query params.
-4. Calls `recordPaymentVerified` or `recordPaymentFailed` with the verified result.
-5. Redirects the browser to `/payment/success` or `/payment/failed`.
+4. Asserts `verifyResult.amount === payment.amount + payment.tipAmount`; fails payment if not.
+5. Calls `recordPaymentVerified(amount: payment.amount)` or `recordPaymentFailed`.
+6. Redirects the browser to `/payment/success`, `/payment/failed`, or `/payment/pending`.

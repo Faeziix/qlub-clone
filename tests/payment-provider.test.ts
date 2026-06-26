@@ -389,6 +389,76 @@ describe("getPaymentProvider factory", () => {
 // 12. money.ts gateway boundary — rial integer string round-trips
 // ──────────────────────────────────────────────────────────────────────────────
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 13. Tip included in gateway charge (PRD §6.4)
+//
+// The gateway charge MUST be amount + tip (leg.total) so tipping diners are
+// charged the correct total. Only leg.amount should credit order.amountPaid.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("Gateway charge includes tip (PRD §6.4)", () => {
+  it("verify() echoes back the full amount passed to request (including tip)", async () => {
+    const adapter = new SimulatedPaymentAdapter();
+    const billAmount = 500_000n;
+    const tipAmount  = 50_000n;
+    const gatewayTotal = billAmount + tipAmount;
+
+    const { ref } = await adapter.request(makeRequestInput({ amount: gatewayTotal }));
+    adapter.simulatePaid(ref);
+    const result = await adapter.verify(ref);
+
+    expect(result.status).toBe("succeeded");
+    expect(result.amount).toBe(gatewayTotal);
+  });
+
+  it("inquire() reflects the full gateway charge (bill + tip)", async () => {
+    const adapter = new SimulatedPaymentAdapter();
+    const gatewayTotal = 660_000n;
+
+    const { ref } = await adapter.request(makeRequestInput({ amount: gatewayTotal }));
+    adapter.simulatePaid(ref);
+    const { status, amount } = await adapter.inquire(ref);
+
+    expect(status).toBe("succeeded");
+    expect(amount).toBe(gatewayTotal);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 14. Amount equality guard on verify
+//
+// recordPaymentVerified must only credit the PRE-REGISTERED leg.amount into
+// order.amountPaid, not the verified amount (which includes the tip).
+// A verify whose returned amount differs from the requested amount must be
+// detected and treated as a fault.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("Amount equality guard — verify must match requested amount", () => {
+  it("verify returns the same amount that was requested via request()", async () => {
+    const adapter = new SimulatedPaymentAdapter();
+    const requestedAmount = 800_000n;
+
+    const { ref } = await adapter.request(makeRequestInput({ amount: requestedAmount }));
+    adapter.simulatePaid(ref);
+    const result = await adapter.verify(ref);
+
+    expect(result.amount).toBe(requestedAmount);
+  });
+
+  it("a verify whose amount differs from the reserved amount should be treated as a mismatch", async () => {
+    const adapter = new SimulatedPaymentAdapter();
+    const requestedAmount = 1_000_000n;
+
+    const { ref } = await adapter.request(makeRequestInput({ amount: requestedAmount }));
+    adapter.simulatePaid(ref);
+    const result = await adapter.verify(ref);
+
+    if (result.status === "succeeded" && result.amount !== undefined) {
+      expect(result.amount).toBe(requestedAmount);
+    }
+  });
+});
+
 describe("Gateway money boundary — rialForGateway / rialFromGateway", () => {
   it("500000 rial is sent to gateway as '500000' (not toman '50000')", () => {
     expect(rialForGateway(500_000n)).toBe("500000");

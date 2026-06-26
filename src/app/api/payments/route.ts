@@ -61,11 +61,10 @@ export async function POST(req: Request) {
       const callbackUrl = buildCallbackUrl(req, leg.id);
       const { ref } = await provider.request({
         merchantId: leg.vendorId,
-        amount: leg.amount,
+        amount: leg.total,
         callbackUrl,
         orderId: data.orderId,
         description: `پرداخت سفارش`,
-        mobile: data.payerName,
       });
 
       await storePendingTrackId(leg.id, ref);

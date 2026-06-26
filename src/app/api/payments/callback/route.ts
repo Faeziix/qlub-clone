@@ -55,10 +55,18 @@ export async function GET(req: Request) {
   const verifyResult = await provider.verify(payment.trackId);
 
   if (verifyResult.status === "succeeded") {
+    const reservedTotal = payment.amount + payment.tipAmount;
+    const verifiedAmount = verifyResult.amount ?? reservedTotal;
+
+    if (verifiedAmount !== reservedTotal) {
+      await recordPaymentFailed(payment.id);
+      return failureRedirect(req, payment.orderId);
+    }
+
     await recordPaymentVerified({
       paymentId: payment.id,
       orderId: payment.orderId,
-      amount: verifyResult.amount ?? payment.amount,
+      amount: payment.amount,
       gatewayReference: verifyResult.refNumber,
     });
     return successRedirect(req, payment.orderId);
@@ -69,7 +77,7 @@ export async function GET(req: Request) {
     return failureRedirect(req, payment.orderId);
   }
 
-  return NextResponse.json({ ok: false, error: "Payment still pending" }, { status: 202 });
+  return pendingRedirect(req, payment.orderId);
 }
 
 function successRedirect(req: Request, orderId: string): NextResponse {
@@ -80,6 +88,11 @@ function successRedirect(req: Request, orderId: string): NextResponse {
 function failureRedirect(req: Request, orderId: string): NextResponse {
   const url = new URL(req.url);
   return NextResponse.redirect(`${url.origin}/payment/failed?orderId=${orderId}`);
+}
+
+function pendingRedirect(req: Request, orderId: string): NextResponse {
+  const url = new URL(req.url);
+  return NextResponse.redirect(`${url.origin}/payment/pending?orderId=${orderId}`);
 }
 
 function badCallbackRedirect(req: Request, reason: string): NextResponse {

@@ -1,6 +1,6 @@
 # ADR-0022: Payment State Machine + Idempotency + Reconciliation Sweep + Ceiling-Split
 
-**Issue**: #21 · **Milestone**: M6 — Payments & Settlement · **Status**: Accepted (Round 2 — blocking items resolved)
+**Issue**: #21 · **Milestone**: M6 — Payments & Settlement · **Status**: Accepted (Round 3 — blocking items resolved)
 
 ---
 
@@ -139,40 +139,122 @@ functions via `vi.mock('@/lib/db')` — same pattern as `server-authoritative-pr
 Covers: double-callback, refresh, already-processed, overpay, abandon, ceiling-split
 sub-charge accumulation.
 
-### 5. Overpay surplus-refund in live verify path
+### 5. Overpay surplus-refund in live verify path (PRD §5.4.2, §6.6)
 
 `recordPaymentVerified` now checks `order.amountPaid >= order.total` BEFORE
-crediting. When the order is already fully paid, the incoming payment is immediately
-transitioned to `refunded` in the same transaction and `overpaid: true` is returned.
-No credit to `amountPaid` occurs. This handles the cross-gateway double-settlement
-race from day one (PRD §5.4.2).
+crediting. When the order is already fully paid, the incoming payment remains
+`succeeded` in the DB and an `OpsQueueEntry` is created with
+`reason='overpay_pending_payout_unwind'`. `overpaid: true` is returned to the
+caller. No credit to `amountPaid` occurs.
+
+The status is NOT set to `refunded` here. Per PRD §6.6, `status='refunded'` is
+only written by `recordPaymentRefunded()`, which the operator calls AFTER a
+payout record has been created and confirmed. The previous design wrote `refunded`
+directly, which violated §6.6 ("PaymentStatus=refunded must be driven by a payout
+record, never by a direct set") and left the gateway-captured money silently kept
+without any surfaced action required of the operator.
+
+## Round 3 — blocking items resolved
+
+### 1. Sub-charge continuation path — `POST /api/payments/next-sub-charge`
+
+Prior to Round 3, only the first sub-charge (leg 0) in a ceiling-split group ever
+received a gateway session. Sub-charges 1..N-1 were created with `trackId=null`
+and the reconciliation sweep would route them to `onExpired`, permanently
+abandoning them. The order could never reach `amountPaid >= total` for any bill
+requiring a split.
+
+`POST /api/payments/next-sub-charge` is a new route the client calls after each
+sub-charge's callback returns success. It:
+1. Validates that `completedPaymentId` belongs to `parentPaymentId` and is `succeeded`.
+2. Finds the next `pending` sub-charge in the group (ordered by `createdAt`).
+3. Requests a gateway session for it (`provider.request`), stores `trackId`, and
+   returns `{ gatewayRedirectUrl, trackId }`.
+4. If all sub-charges are already `succeeded`, returns `{ done: true }`.
+5. If a `trackId` is already set (concurrent/retry), returns the existing redirect
+   URL idempotently without re-requesting.
+
+This makes the ceiling-split flow an end-to-end completable path for the first time.
+
+### 2. Overpay queues to ops, not directly `refunded`
+
+See "Overpay surplus-refund" above (corrected from Round 2). The `recordPaymentVerified`
+function no longer issues `UPDATE Payment SET status='refunded'` directly. Instead it
+creates an `OpsQueueEntry` with `reason='overpay_pending_payout_unwind'` so the
+superadmin operator can issue a refund-as-payout before the status is marked refunded.
+
+### 3. Full ceiling-split flow test coverage — `tests/payment-ceiling-split-flow.test.ts`
+
+New test file covering the end-to-end multi-sub-charge flow:
+- Full 2-sub-charge flow: leg-1 callback → verified → `next-sub-charge` continuation → leg-2 callback → verified → order paid (AC2)
+- Partial failure: leg-1 succeeds, leg-2 fails → order stays unpaid
+- Sweep catches leg-2-still-pending and resolves it via inquiry
+- Overpay race: concurrent second verify on a fully-paid order queues to ops, does not double-credit
+
+The FakeDatabase harness mirrors `payment-state-machine.test.ts`. A note in the file
+documents the Postgres row-lock integration test that is gated behind `DIRECT_URL`
+availability in the test environment (Phase 5 domestic cutover).
+
+### 4. Sweep `onVerified` passes `vendorId`
+
+`ReconciliationSweepCallbacks.onVerified` signature extended to include `vendorId`
+so the sweep route can pass it through to `recordPaymentVerified`, enabling correct
+OpsQueueEntry attribution in the overpay path.
+
+### 5. Callback route — amount-mismatch goes to ops, not `recordPaymentFailed`
+
+If the gateway confirms success but the verified amount != reserved total, the
+previous code called `recordPaymentFailed`, silently abandoning a payment the
+gateway had already captured. The callback now writes an `OpsQueueEntry` with
+`reason='amount_mismatch:reserved=N,verified=M'` and redirects to pending.
+
+### 6. Sweep auth warning when `SWEEP_SECRET` unset
+
+The sweep route now emits a `console.warn` when `SWEEP_SECRET` is not set, making
+the open-endpoint risk visible in logs. The production runbook MUST set this env var.
+
+### 7. Tips credited in IPG verify path
+
+`recordPaymentVerified` now accepts an optional `tipAmount` parameter and increments
+`order.tipAmount` alongside `order.amountPaid`. Previously, only `recordPayment`
+(cash path) credited the tip, leaving `order.tipAmount=0` for IPG-paid orders with tips.
+
+### 8. Stale reconciliation-sweep module docstring corrected
+
+The module docstring incorrectly described `expiresAt passed → onExpired`. The code
+routes that case to `onAmbiguous`. The docstring now matches the code.
 
 ## Consequences
 
 - Concurrent callbacks and reconciliation sweeps cannot double-apply any transition.
 - Bills exceeding the ceiling are split into sub-charges via `initiateSubChargeLegs`;
+  the client drives each successive leg via `POST /api/payments/next-sub-charge`;
   the order is paid only when all sub-charges verify (amountPaid accumulation).
 - Orphaned pending/verifying payments older than 10 minutes are resolved automatically.
 - Ambiguous payments are written to the durable `OpsQueueEntry` table for ops review.
-- Overpay surplus payments are auto-refunded in the `recordPaymentVerified` verify path.
+- Overpay surplus payments queue to ops for operator-driven payout unwind, not auto-refunded.
+  `status='refunded'` is only written by `recordPaymentRefunded()` after a payout record exists.
 - A single ambiguous payment no longer aborts the entire sweep cycle.
-- All acceptance criteria for issue #21 are covered by both test files.
+- Amount-mismatch on verify surfaces to ops instead of silently failing a captured payment.
+- All acceptance criteria for issue #21 are covered by three test files.
 
 ## Files introduced/modified
 
 | File | Change |
 |---|---|
-| `src/lib/payment/payment-service.ts` | `transitionToVerifying`, `recordPaymentRefunded`; `recordPaymentVerified` overpay guard |
-| `src/lib/payment/ceiling-split.ts` | `splitIntoSubCharges`, `computeCeilingSplit`, `areCeilingSplitSubChargesFullyPaid` |
-| `src/lib/payment/reconciliation-sweep.ts` | `runReconciliationSweep` (`continue` fix), `buildReconciliationSweepRunner` |
+| `src/lib/payment/payment-service.ts` | Overpay queues to ops (not direct `refunded`); tipAmount increment; vendorId param |
+| `src/lib/payment/ceiling-split.ts` | (unchanged) |
+| `src/lib/payment/reconciliation-sweep.ts` | `onVerified` callback adds `vendorId` param; docstring corrected |
 | `src/lib/payment/index.ts` | Re-exports |
 | `src/lib/orders.ts` | `initiateSubChargeLegs` — ceiling-split DB writes |
 | `src/app/api/payments/route.ts` | Ceiling-split check before provider.request(); calls `initiateSubChargeLegs` |
-| `src/app/api/payments/callback/route.ts` | `transitionToVerifying` before `provider.verify()` |
-| `src/app/api/payments/sweep/route.ts` | Durable `OpsQueueEntry` writes; no in-memory opsQueue |
+| `src/app/api/payments/callback/route.ts` | Amount-mismatch → ops queue; tip credited; vendorId passed |
+| `src/app/api/payments/sweep/route.ts` | Passes vendorId to `onVerified`; warns when SWEEP_SECRET unset |
+| `src/app/api/payments/next-sub-charge/route.ts` | NEW: continuation endpoint for ceiling-split legs 2..N |
 | `prisma/schema.prisma` | `verifying` enum; `OpsQueueEntry` model |
 | `prisma/migrations/0005_payment_status_verifying/migration.sql` | `verifying` enum addition |
 | `prisma/migrations/0006_ops_queue_table/migration.sql` | `OpsQueueEntry` table |
-| `tests/payment-state-machine.test.ts` | Added loop-abort regression test (10b) |
-| `tests/payment-service-integration.test.ts` | New: 18 tests against real functions via vi.mock |
+| `tests/payment-state-machine.test.ts` | (unchanged from Round 2) |
+| `tests/payment-service-integration.test.ts` | Updated overpay test: asserts ops queue entry not direct `refunded` |
+| `tests/payment-ceiling-split-flow.test.ts` | NEW: full multi-sub-charge end-to-end flow tests |
 | `docs/payments/state-machine-ceiling-split-reconciliation.md` | Updated docs |

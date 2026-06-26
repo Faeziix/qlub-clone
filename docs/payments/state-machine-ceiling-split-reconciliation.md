@@ -38,15 +38,20 @@ Even if A and B call `recordPaymentVerified` concurrently, the
 `WHERE status IN ('pending','verifying')` guard on that function means only the
 first writer applies the credit.
 
-### Overpay — surplus-refund (PRD §5.4.2)
+### Overpay — ops queue surface (PRD §5.4.2, §6.6)
 
 `recordPaymentVerified` detects when `order.amountPaid >= order.total` BEFORE
 crediting the incoming payment. In that case, the order is already fully paid by
-a prior leg. The surplus payment is immediately transitioned to `refunded` status
-and is NOT credited to `order.amountPaid`. This handles the cross-gateway
-double-settlement race from day one.
+a prior leg. The surplus payment is left as `succeeded` (the gateway already
+captured the money) and an `OpsQueueEntry` is written with
+`reason='overpay_pending_payout_unwind'` so the superadmin can issue a
+refund-as-payout.
 
-Return value is now `{ fullyPaid, idempotent, overpaid }`. Callers must check
+Per PRD §6.6: `status='refunded'` is NEVER written here. It is only set by
+`recordPaymentRefunded()` which the operator calls AFTER a payout record is
+created and confirmed.
+
+Return value is `{ fullyPaid, idempotent, overpaid }`. Callers must check
 `overpaid` and surface it for payout unwind.
 
 ---
@@ -88,9 +93,21 @@ accumulation enforces it.
 
 When `computeCeilingSplit` returns `requiresSplit=true`, the payment initiation
 endpoint calls `initiateSubChargeLegs` which creates one `Payment` row per chunk
-within a single transaction. The first sub-charge is sent to the gateway immediately;
-remaining sub-charges are returned in `remainingSubCharges` for the client to
-process sequentially after each prior sub-charge succeeds.
+within a single transaction. The first sub-charge is sent to the gateway immediately.
+
+### `POST /api/payments/next-sub-charge` — sub-charge continuation (legs 2..N)
+
+After the diner completes each sub-charge on the gateway and the callback confirms
+success, the client calls this endpoint with `{ parentPaymentId, completedPaymentId }`.
+The server:
+1. Validates the completed sub-charge is `succeeded`
+2. Finds the next `pending` sub-charge in the group
+3. Calls `provider.request()` for it, stores `trackId`, and returns `gatewayRedirectUrl`
+4. Is idempotent: if `trackId` is already set, returns the existing redirect URL
+5. Returns `{ done: true }` when all sub-charges have succeeded
+
+This is the only path that can complete a ceiling-split order — without it, sub-charges
+2..N remain `pending` indefinitely and the sweep routes them to `onExpired`.
 
 ---
 
@@ -153,10 +170,12 @@ minutes ago and is still in `pending` or `verifying` status.
 | `src/lib/payment/reconciliation-sweep.ts` | Sweep logic + types (pure, no DB) |
 | `src/lib/orders.ts` | `initiateSubChargeLegs` — creates ceiling-split Payment rows |
 | `src/app/api/payments/route.ts` | Wires ceiling-split into payment initiation |
-| `src/app/api/payments/callback/route.ts` | Callback handler with `transitionToVerifying` |
+| `src/app/api/payments/callback/route.ts` | Callback handler; amount-mismatch → ops queue |
 | `src/app/api/payments/sweep/route.ts` | Scheduled sweep endpoint (durable ops queue) |
+| `src/app/api/payments/next-sub-charge/route.ts` | Ceiling-split continuation: legs 2..N |
 | `prisma/schema.prisma` | `OpsQueueEntry` model |
 | `prisma/migrations/0005_payment_status_verifying/` | `verifying` enum addition |
 | `prisma/migrations/0006_ops_queue_table/` | `OpsQueueEntry` table |
 | `tests/payment-state-machine.test.ts` | State machine + sweep + ceiling-split (fake DB) |
 | `tests/payment-service-integration.test.ts` | Real function tests via vi.mock (AC1, AC4) |
+| `tests/payment-ceiling-split-flow.test.ts` | Full multi-sub-charge end-to-end flow (AC2) |

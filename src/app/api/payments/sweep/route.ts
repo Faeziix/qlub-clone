@@ -41,6 +41,12 @@ const SWEEP_STALENESS_CUTOFF_MS = SWEEP_STALENESS_MINUTES * 60 * 1000;
 
 export async function POST(req: Request): Promise<NextResponse> {
   const sweepSecret = process.env.SWEEP_SECRET;
+  if (!sweepSecret) {
+    console.warn(
+      "[sweep] SWEEP_SECRET is not set. In production this endpoint MUST be protected. " +
+      "Set SWEEP_SECRET to a strong random value and pass it in the x-sweep-secret header."
+    );
+  }
   if (sweepSecret) {
     const authHeader = req.headers.get("x-sweep-secret");
     if (authHeader !== sweepSecret) {
@@ -72,9 +78,9 @@ export async function POST(req: Request): Promise<NextResponse> {
   await runReconciliationSweep({
     payments: stalePayments as SweepablePayment[],
     provider,
-    onVerified: async (paymentId, orderId, amount, gatewayRef) => {
+    onVerified: async (paymentId, orderId, amount, gatewayRef, vendorId) => {
       await transitionToVerifying(paymentId);
-      await recordPaymentVerified({ paymentId, orderId, amount, gatewayReference: gatewayRef });
+      await recordPaymentVerified({ paymentId, orderId, amount, gatewayReference: gatewayRef, vendorId });
       resolvedCount.verified++;
     },
     onFailed: async (paymentId) => {

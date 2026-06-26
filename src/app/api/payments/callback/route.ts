@@ -20,9 +20,15 @@
  * (WHERE status='pending') so only one concurrent callback can claim the
  * payment. The second callback sees 0 rows updated and takes the idempotent
  * early-return path.
+ *
+ * Amount-mismatch invariant: if the gateway confirms payment but the verified
+ * amount does not match the reserved total, we write an OpsQueueEntry for
+ * manual review rather than silently failing a payment the gateway already
+ * captured (PRD §5.4.3 verified-with-mismatch handling).
  */
 
 import { NextResponse } from "next/server";
+import { nanoid } from "nanoid";
 import { db } from "@/lib/db";
 import { getPaymentProvider } from "@/lib/payment/factory";
 import {
@@ -78,14 +84,25 @@ export async function GET(req: Request) {
     const verifiedAmount = verifyResult.amount ?? reservedTotal;
 
     if (verifiedAmount !== reservedTotal) {
-      await recordPaymentFailed(payment.id);
-      return failureRedirect(req, payment.orderId);
+      await db.opsQueueEntry.create({
+        data: {
+          id: `ops_${nanoid(16)}`,
+          paymentId: payment.id,
+          orderId: payment.orderId,
+          vendorId: payment.vendorId,
+          reason: `amount_mismatch:reserved=${reservedTotal},verified=${verifiedAmount}`,
+          inquiredAt: new Date(),
+        },
+      });
+      return pendingRedirect(req, payment.orderId);
     }
 
     await recordPaymentVerified({
       paymentId: payment.id,
       orderId: payment.orderId,
       amount: payment.amount,
+      tipAmount: payment.tipAmount,
+      vendorId: payment.vendorId,
       gatewayReference: verifyResult.refNumber,
     });
     return successRedirect(req, payment.orderId);

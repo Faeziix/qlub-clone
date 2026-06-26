@@ -9,7 +9,7 @@
  *
  *   inquire → succeeded  → call onVerified  (auto-complete)
  *   inquire → failed     → call onFailed    (release reserved leg)
- *   inquire → pending    → expiresAt passed → call onExpired  (release)
+ *   inquire → pending    → expiresAt passed → call onAmbiguous (ops queue)
  *                        → expiresAt future  → call onAmbiguous (ops queue)
  *   trackId missing      → call onExpired   (cannot inquire, release)
  *
@@ -42,7 +42,13 @@ export interface OpsQueueEntry {
 }
 
 export interface ReconciliationSweepCallbacks {
-  onVerified: (paymentId: string, orderId: string, amount: bigint, gatewayReference: string | undefined) => void | Promise<void>;
+  onVerified: (
+    paymentId: string,
+    orderId: string,
+    amount: bigint,
+    gatewayReference: string | undefined,
+    vendorId: string
+  ) => void | Promise<void>;
   onFailed: (paymentId: string) => void | Promise<void>;
   onExpired: (paymentId: string) => void | Promise<void>;
   onAmbiguous: (entry: OpsQueueEntry) => void | Promise<void>;
@@ -79,7 +85,8 @@ export async function runReconciliationSweep(input: ReconciliationSweepInput): P
         payment.id,
         payment.orderId,
         payment.amount,
-        undefined
+        undefined,
+        payment.vendorId
       );
       continue;
     }

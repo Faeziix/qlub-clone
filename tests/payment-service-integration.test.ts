@@ -37,6 +37,9 @@ const { mockDb } = vi.hoisted(() => {
     diningTable: {
       update: vi.fn(),
     },
+    opsQueueEntry: {
+      create: vi.fn().mockResolvedValue({}),
+    },
   };
 
   const mockDb = {
@@ -246,19 +249,18 @@ describe("Already-processed scenario", () => {
 // ──────────────────────────────────────────────────────────────────────────────
 
 describe("Overpay scenario — surplus refund in live verify path", () => {
-  it("marks surplus payment refunded when order is already fully paid before crediting", async () => {
-    tx.$executeRaw
-      .mockResolvedValueOnce(1)
-      .mockResolvedValueOnce(1);
+  it("queues surplus payment to ops (overpay_pending_payout_unwind) per PRD §6.6", async () => {
+    tx.$executeRaw.mockResolvedValueOnce(1);
 
     tx.$queryRaw.mockResolvedValueOnce([
-      { id: "ord-op", total: 500_000n, amountPaid: 500_000n, tableId: null, status: "paid" },
+      { id: "ord-op", total: 500_000n, amountPaid: 500_000n, tableId: null, status: "paid", vendorId: "v-1" },
     ]);
 
     const result = await recordPaymentVerified({
       paymentId: "pay-op-surplus",
       orderId: "ord-op",
       amount: 200_000n,
+      vendorId: "v-1",
       gatewayReference: "REF-OP-SURPLUS",
     });
 
@@ -268,8 +270,16 @@ describe("Overpay scenario — surplus refund in live verify path", () => {
 
     expect(tx.order.update).not.toHaveBeenCalled();
 
-    const secondExecuteRaw = tx.$executeRaw.mock.calls[1];
-    expect(secondExecuteRaw).toBeDefined();
+    expect(tx.opsQueueEntry.create).toHaveBeenCalledOnce();
+    expect(tx.opsQueueEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          paymentId: "pay-op-surplus",
+          orderId: "ord-op",
+          reason: "overpay_pending_payout_unwind",
+        }),
+      })
+    );
   });
 
   it("does NOT refund when payment covers remaining balance exactly", async () => {

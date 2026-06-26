@@ -11,17 +11,23 @@
  *   verifying → failed    (recordPaymentFailed   — verify=failed)
  *   verifying → succeeded (recordPaymentVerified — "already processed", idempotent)
  *   pending/verifying → expired (expirePayment — TTL passed, no gateway success)
- *   succeeded → refunded  (recordPaymentRefunded — payout unwind for overpay/refund)
+ *   succeeded → refunded  (recordPaymentRefunded — driven by payout record per PRD §6.6)
  *
- * Overpay handling (PRD §5.4.2):
+ * Overpay handling (PRD §5.4.2 + §6.6):
  *   On recordPaymentVerified, if amountPaid is ALREADY >= total before crediting
- *   this payment, the order is already fully paid — mark the incoming payment
- *   as refunded immediately and surface it for payout unwind. From day one.
+ *   this payment, the gateway has already captured the diner's money for a surplus
+ *   charge. The payment is left as 'succeeded' and an OpsQueueEntry is written with
+ *   reason='overpay_pending_payout_unwind' so the operator can issue a refund-as-payout.
+ *   The caller receives overpaid=true as a signal.
+ *
+ *   The status is NEVER set to 'refunded' here. Per PRD §6.6, status='refunded' is
+ *   driven exclusively by recordPaymentRefunded(), which the operator calls AFTER a
+ *   payout record is created and confirmed.
  */
 
 import "server-only";
 import { db } from "@/lib/db";
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 import { nanoid } from "nanoid";
 
 /**
@@ -46,7 +52,9 @@ export async function recordPaymentVerified(input: {
   paymentId: string;
   orderId: string;
   amount: bigint;
+  tipAmount?: bigint;
   gatewayReference?: string;
+  vendorId?: string;
 }): Promise<{ fullyPaid: boolean; idempotent: boolean; overpaid: boolean }> {
   return db.$transaction(async (tx) => {
     const updated = await tx.$executeRaw`
@@ -72,9 +80,9 @@ export async function recordPaymentVerified(input: {
     }
 
     const orderRows = await tx.$queryRaw<
-      { id: string; total: bigint; amountPaid: bigint; tableId: string | null; status: OrderStatus }[]
+      { id: string; total: bigint; amountPaid: bigint; tableId: string | null; status: OrderStatus; vendorId: string }[]
     >`
-      SELECT id, total, "amountPaid", "tableId", status
+      SELECT id, total, "amountPaid", "tableId", status, "vendorId"
       FROM "Order"
       WHERE id = ${input.orderId}
       FOR UPDATE
@@ -84,24 +92,35 @@ export async function recordPaymentVerified(input: {
 
     const alreadyFullyPaid = orderRow.amountPaid >= orderRow.total;
     if (alreadyFullyPaid) {
-      await tx.$executeRaw`
-        UPDATE "Payment"
-        SET status = 'refunded'
-        WHERE id = ${input.paymentId}
-          AND status = 'succeeded'
-      `;
+      const opsVendorId = input.vendorId ?? orderRow.vendorId;
+      await tx.opsQueueEntry.create({
+        data: {
+          id: `ops_${nanoid(16)}`,
+          paymentId: input.paymentId,
+          orderId: input.orderId,
+          vendorId: opsVendorId,
+          reason: "overpay_pending_payout_unwind",
+          inquiredAt: new Date(),
+        },
+      });
       return { fullyPaid: true, idempotent: false, overpaid: true };
     }
 
     const newAmountPaid = orderRow.amountPaid + input.amount;
     const fullyPaid = newAmountPaid >= orderRow.total;
 
+    const orderUpdateData: Prisma.OrderUpdateInput = {
+      amountPaid: newAmountPaid,
+      status: fullyPaid ? "paid" : orderRow.status,
+    };
+
+    if (input.tipAmount && input.tipAmount > 0n) {
+      orderUpdateData.tipAmount = { increment: input.tipAmount };
+    }
+
     await tx.order.update({
       where: { id: input.orderId },
-      data: {
-        amountPaid: newAmountPaid,
-        status: fullyPaid ? "paid" : orderRow.status,
-      },
+      data: orderUpdateData,
     });
 
     if (fullyPaid && orderRow.tableId) {
@@ -136,8 +155,12 @@ export async function expirePayment(paymentId: string): Promise<void> {
 
 /**
  * Transitions a succeeded payment to refunded.
- * Only succeeded payments can be refunded — this enforces that a payout record
- * already exists before the payment is marked refunded (PRD §6.6).
+ *
+ * Per PRD §6.6: this function MUST only be called AFTER a payout record has
+ * been created and confirmed. The caller (operator flow) is responsible for
+ * creating the payout record first. Calling this directly for overpay is wrong
+ * — overpay should surface via OpsQueueEntry with reason='overpay_pending_payout_unwind'
+ * so the operator issues a refund-as-payout before marking this status.
  *
  * Returns the number of rows updated (0 = not found or wrong state).
  */

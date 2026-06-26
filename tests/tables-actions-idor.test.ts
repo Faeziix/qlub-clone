@@ -27,6 +27,9 @@ const { mockGetSession, mockDb } = vi.hoisted(() => {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
     },
+    auditLog: {
+      create: vi.fn(),
+    },
   };
   return { mockGetSession, mockDb };
 });
@@ -149,6 +152,7 @@ describe("tables actions — authorised happy-path", () => {
     mockDb.diningTable.create.mockResolvedValue({ id: "new-table" });
     mockDb.diningTable.update.mockResolvedValue(tableOwnedByVendorA);
     mockDb.diningTable.delete.mockResolvedValue(tableOwnedByVendorA);
+    mockDb.auditLog.create.mockResolvedValue({ id: "audit-1" });
   });
 
   it("createTable succeeds when the caller owns the vendor", async () => {

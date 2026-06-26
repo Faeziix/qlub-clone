@@ -14,11 +14,44 @@ This is a real-money product. Treat every secret and credential accordingly.
   openssl rand -base64 48
   ```
 
-## Admin sessions
+## Admin sessions (hardened — ADR-0014)
 
-- Sessions are signed JWTs (`src/lib/auth.ts`) keyed off `AUTH_SECRET`.
+- Sessions are short-lived signed JWTs (`src/lib/auth.ts`) keyed off `AUTH_SECRET`.
+- **JWT lifetime: 1 hour** (`SESSION_TTL_SECONDS = 3600`). Cookie `maxAge` matches.
 - There is no token-minting utility. Sessions are issued only through the login
   flow after password verification.
+- `revalidateSession()` re-fetches the `StaffUser` row from the DB and re-issues
+  a fresh JWT. Called on sensitive actions (settings changes). If the user is
+  deactivated or deleted, the session is destroyed and the caller redirects to login.
+
+## Edge middleware — fail-closed admin guard
+
+`src/middleware.ts` verifies the admin session JWT at the edge before any
+`/admin/*` page renders. Unauthenticated requests are redirected to `/admin/login`.
+The login route is the only public admin route. The check composes with the
+`next-intl` routing middleware.
+
+See `docs/adr/0014-admin-auth-edge-middleware-rbac-session-hardening-audit-log.md`.
+
+## RBAC
+
+All admin actions enforce a minimum role requirement via `requireRole(minimum)` /
+`assertRole(session, minimum)` (`src/lib/rbac.ts`).
+
+| Action | Minimum role |
+|---|---|
+| Update order status, cancel order | `staff` |
+| Table management, menu mutations | `manager` |
+| Vendor settings | `owner` |
+
+Staff accounts cannot reach settings, menu edits, or table management.
+See `docs/adr/0014-*` for the full role matrix.
+
+## Audit log
+
+All admin mutations and logins are recorded in `AuditLog` via `recordAuditEvent`
+(`src/lib/audit.ts`). Fields: `actorId`, `vendorId`, `action`, `entity`,
+`entityId`, `before`, `after`, `at`.
 
 ## Demo accounts
 

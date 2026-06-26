@@ -13,6 +13,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 - **ADR 0001** — No committed secrets; `AUTH_SECRET` mandatory; no fallback; no backdoor scripts; hardened seed with crypto-random passwords.
 - **ADR 0002** — All table mutations require a valid admin session and vendor-scoped ownership check (IDOR fix).
 - **ADR 0003** — bun is the only package manager; Node ≥ 20 pinned via `engines` + `.nvmrc`; `eslint.ignoreDuringBuilds` removed; CI workflow enforces typecheck + lint on PRs.
+- **ADR 0014** — Edge middleware fail-closed for `/admin/*`; RBAC via `requireRole`/`assertRole`; 1-hour JWT sessions with DB re-validation on sensitive actions; all admin mutations + logins recorded in `AuditLog`.
 - **ADR 0006** — DR baseline: Neon-managed PITR/branching for Track A; restore runbook + RTO/RPO documented; Track B (domestic) DR deferred to Phase 5.
 - **ADR 0007** — Review is per-Payment (`paymentId @unique`): each split-bill payer can review once; no orderId on Review.
 - **ADR 0008** — Schema modernization: native Postgres enums, JSONB columns, Iran defaults (IRR/fa/Asia/Tehran/ir), translation tables, monotonic per-vendor orderNumber, AuditLog, sub-merchant fields.
@@ -69,6 +70,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ Order/payment writes were non-transactional → ✅ `createOrderFromCart`, `recordPayment`, and `initiatePaymentLeg` all use `db.$transaction`.
 - ❌ `nextVendorOrderNumber` used `db.$queryRaw` directly → ✅ Accepts a transaction client `tx` so the increment is atomic within the order creation transaction.
 - ❌ `createOrderFromCart` returned the order directly → ✅ Returns `{ order, priceChanged }` tuple; update all callers to destructure.
+- ❌ `server-only` import in utility modules (`rbac.ts`, `audit.ts`) breaks vitest because the real module is imported (not mocked) and the `server-only` package throws outside Next.js bundler → ✅ Only use `server-only` in modules that Next.js directly bundles and that are always mocked in tests (e.g., `auth.ts`, `db.ts`); omit it from domain helper utilities.
+- ❌ Using `requireSession` (no RBAC) in sensitive server actions → ✅ Replace with `requireRole(minimum)` from `src/lib/rbac.ts` to enforce role hierarchy at the action level.
 - ❌ `new TZDate(Date | number, tz)` does not work — TS overloads require `Date` or `number` separately → ✅ Use a conditional branch: `typeof date === "number" ? new TZDate(date, tz) : new TZDate(date, tz)`
 - ❌ `Intl.NumberFormat` with `style: 'currency', currency: 'IRR'` renders incorrectly for Iranian users → ✅ Use `toman-formatter.ts` exclusively; never IRR currency style.
 - ❌ Banking-holiday calendar must be updated annually (religious holidays shift ~10 days/year) → ✅ Update `IRANIAN_BANKING_HOLIDAYS` in `banking-holidays.ts` at each Nowruz; see `docs/i18n/banking-holiday-calendar.md`.
@@ -87,7 +90,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 ## Component Registry
 
 - `src/lib/env.ts` — `requireAuthSecret`, `assertServerEnv`, `isDemoSeedingEnabled`
-- `src/lib/auth.ts` — JWT session management
+- `src/lib/auth.ts` — JWT session management, `createSession`, `getSession`, `destroySession`, `revalidateSession` (DB re-validation + fresh JWT)
+- `src/lib/rbac.ts` — RBAC: `ROLE_HIERARCHY`, `assertRole(session, minimum)`, `requireRole(minimum)` (async, redirects if no session)
+- `src/lib/audit.ts` — `recordAuditEvent(params)` — writes to `AuditLog`
 - `src/lib/pricing.ts` — Bill math (VAT, service charge, split, tip)
 - `src/lib/orders.ts` — `createOrderFromCart` (server-authoritative, returns `{order, priceChanged}`), `initiatePaymentLeg` (pending reservation with TTL), `recordPayment` (idempotent, transactional), `createReview`
 - `src/lib/toman-formatter.ts` — Persian toman display: `formatRialAsTomanPersian`, `formatTomanAmountPersian`, `latinDigitsToPersian`, `persianDigitsToLatin`, `TOMAN_HEZAR_THRESHOLD_RIAL`
@@ -119,5 +124,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - #10 — next-intl Farsi-first RTL foundation: `[locale]` segment, server-side `<html lang dir>`, middleware, fa/en only
 - #11 — Persian formatting deep modules: toman-formatter, digit-normalizer, jalali, banking-holidays
 
+**Done (M4 issues):**
+- #14 — Admin auth: edge middleware, RBAC, session hardening, audit log
+
 **In progress / next:**
-- M3: remaining issues (design system, Vazirmatn, tokens)
+- M4: remaining issues

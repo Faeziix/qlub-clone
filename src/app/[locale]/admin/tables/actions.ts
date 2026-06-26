@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireSession } from "@/app/[locale]/admin/actions";
+import { requireRole } from "@/lib/rbac";
+import { recordAuditEvent } from "@/lib/audit";
 
 import { TableStatus } from "@prisma/client";
 
@@ -13,14 +14,6 @@ function randomPasscode(): string {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
-/**
- * Guards a table mutation by vendorId. Superadmins (vendorId null) may touch
- * any vendor; scoped admins may only touch their own.
- *
- * Separated from the DB lookup so it can be used for both createTable (where
- * the vendorId is a parameter) and update/delete (where it is resolved from
- * the table record).
- */
 function assertVendorOwnership(
   sessionVendorId: string | null,
   targetVendorId: string
@@ -30,29 +23,22 @@ function assertVendorOwnership(
   }
 }
 
-/**
- * Validates session, then fetches the table and verifies the caller owns its
- * vendor. Returns the table record.
- *
- * Session is checked before any DB read so unauthenticated callers are
- * redirected immediately without leaking table-existence information.
- */
 async function requireOwnedTable(tableId: string) {
-  const session = await requireSession();
+  const session = await requireRole("manager");
   const table = await db.diningTable.findUnique({
     where: { id: tableId },
     select: { id: true, vendorId: true },
   });
   if (!table) throw new Error("Table not found.");
   assertVendorOwnership(session.vendorId, table.vendorId);
-  return table;
+  return { table, session };
 }
 
 export async function createTable(
   vendorId: string,
   input: { code: string; label: string; seats: number; area: string }
 ) {
-  const session = await requireSession();
+  const session = await requireRole("manager");
   assertVendorOwnership(session.vendorId, vendorId);
 
   const code = input.code.trim();
@@ -64,7 +50,7 @@ export async function createTable(
     ? Math.max(1, Math.min(40, Math.round(input.seats)))
     : 2;
 
-  await db.diningTable.create({
+  const created = await db.diningTable.create({
     data: {
       vendorId,
       code,
@@ -76,6 +62,15 @@ export async function createTable(
     },
   });
 
+  await recordAuditEvent({
+    actorId: session.id,
+    vendorId,
+    action: "CREATE_TABLE",
+    entity: "DiningTable",
+    entityId: created.id,
+    after: { code, label: label || `Table ${code}`, seats },
+  });
+
   revalidatePath("/admin/tables");
 }
 
@@ -83,16 +78,35 @@ export async function updateTableStatus(tableId: string, status: string) {
   if (!STATUSES.includes(status as AllowedTableStatus)) {
     throw new Error("Invalid status.");
   }
-  await requireOwnedTable(tableId);
+  const { table, session } = await requireOwnedTable(tableId);
   await db.diningTable.update({
     where: { id: tableId },
     data: { status: status as TableStatus },
   });
+
+  await recordAuditEvent({
+    actorId: session.id,
+    vendorId: table.vendorId,
+    action: "UPDATE_TABLE_STATUS",
+    entity: "DiningTable",
+    entityId: tableId,
+    after: { status },
+  });
+
   revalidatePath("/admin/tables");
 }
 
 export async function deleteTable(tableId: string) {
-  await requireOwnedTable(tableId);
+  const { table, session } = await requireOwnedTable(tableId);
   await db.diningTable.delete({ where: { id: tableId } });
+
+  await recordAuditEvent({
+    actorId: session.id,
+    vendorId: table.vendorId,
+    action: "DELETE_TABLE",
+    entity: "DiningTable",
+    entityId: tableId,
+  });
+
   revalidatePath("/admin/tables");
 }

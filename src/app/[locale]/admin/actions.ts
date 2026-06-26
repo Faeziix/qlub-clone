@@ -8,6 +8,7 @@ import {
   verifyPassword,
   getSession,
 } from "@/lib/auth";
+import { recordAuditEvent } from "@/lib/audit";
 
 export async function login(_prev: unknown, formData: FormData) {
   const email = String(formData.get("email") ?? "").toLowerCase().trim();
@@ -27,10 +28,29 @@ export async function login(_prev: unknown, formData: FormData) {
     role: user.role as "superadmin" | "owner" | "manager" | "staff",
     vendorId: user.vendorId,
   });
+
+  await recordAuditEvent({
+    actorId: user.id,
+    vendorId: user.vendorId,
+    action: "LOGIN",
+    entity: "StaffUser",
+    entityId: user.id,
+  });
+
   redirect("/admin");
 }
 
 export async function logout() {
+  const session = await getSession();
+  if (session) {
+    await recordAuditEvent({
+      actorId: session.id,
+      vendorId: session.vendorId,
+      action: "LOGOUT",
+      entity: "StaffUser",
+      entityId: session.id,
+    });
+  }
   await destroySession();
   redirect("/admin/login");
 }

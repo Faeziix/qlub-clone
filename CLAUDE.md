@@ -10,10 +10,10 @@
 
 See `docs/adr/` for full ADRs. Key decisions:
 
-- **ADR 0001** — No committed secrets; `AUTH_SECRET` mandatory; no fallback; no backdoor scripts; hardened seed with crypto-random passwords.
-- **ADR 0002** — All table mutations require a valid admin session and vendor-scoped ownership check (IDOR fix).
-- **ADR 0003** — bun is the only package manager; Node ≥ 20 pinned via `engines` + `.nvmrc`; `eslint.ignoreDuringBuilds` removed; CI workflow enforces typecheck + lint on PRs.
-- **ADR 0014** — Edge middleware fail-closed for `/admin/*`; RBAC via `requireRole`/`assertRole`; 1-hour JWT sessions with DB re-validation on sensitive actions; all admin mutations + logins recorded in `AuditLog`.
+- **ADR-0001** — No committed secrets; `AUTH_SECRET` mandatory; no fallback; no backdoor scripts; hardened seed with crypto-random passwords.
+- **ADR-0002** — All table mutations require a valid admin session and vendor-scoped ownership check (IDOR fix).
+- **ADR-0003** — bun is the only package manager; Node ≥ 20 pinned via `engines` + `.nvmrc`; `eslint.ignoreDuringBuilds` removed; CI workflow enforces typecheck + lint on PRs.
+- **ADR-0014** — Edge middleware fail-closed for `/admin/*`; RBAC via `requireRole`/`assertRole`; 1-hour JWT sessions with DB re-validation on sensitive actions; all admin mutations + logins recorded in `AuditLog`.
 - **ADR 0006** — DR baseline: Neon-managed PITR/branching for Track A; restore runbook + RTO/RPO documented; Track B (domestic) DR deferred to Phase 5.
 - **ADR 0007** — Review is per-Payment (`paymentId @unique`): each split-bill payer can review once; no orderId on Review.
 - **ADR 0008** — Schema modernization: native Postgres enums, JSONB columns, Iran defaults (IRR/fa/Asia/Tehran/ir), translation tables, monotonic per-vendor orderNumber, AuditLog, sub-merchant fields.
@@ -43,7 +43,7 @@ See `docs/adr/` for full ADRs. Key decisions:
 ## Patterns & Conventions
 
 - Route: `/qr/[country]/[vendor]` — `country` is fixed to `ir` in production.
-- Admin routes: `/admin/*` — edge JWT-guarded via `middleware.ts`.
+- Admin routes: `/admin/*` — JWT-guarded via `proxy.ts` (Next 16 convention; nodejs runtime — renamed from the deprecated edge `middleware.ts`).
 - Server actions: always include auth check + vendor ownership verification.
 - Prisma: use `$transaction` + `SELECT … FOR UPDATE` for concurrent money operations.
 - Tests: assert external behavior (inputs → outputs/state), not implementation details.
@@ -78,6 +78,14 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ Test fixtures for `createOrderFromCart` missing `active: true` on the vendor mock → ✅ Always include `active: true` in vendor stubs because `createOrderFromCart` enforces the suspension check.
 - ❌ `bun test` runs bun's native test runner (ignores vitest.config.ts aliases) → ✅ Use `bun run test` to invoke vitest via the package.json script so aliases (including `server-only` stub) apply.
 - ❌ Banking-holiday calendar must be updated annually (religious holidays shift ~10 days/year) → ✅ Update `IRANIAN_BANKING_HOLIDAYS` in `banking-holidays.ts` at each Nowruz; see `docs/i18n/banking-holiday-calendar.md`.
+- ❌ `provider.request({ amount: leg.amount })` charges only the bill and silently undercharges tipping diners → ✅ Pass `leg.total` (= `amount + tipAmount`) to `provider.request()`; only `payment.amount` (bill portion) credits `order.amountPaid` in `recordPaymentVerified`.
+- ❌ Callback route passed `verifyResult.amount ?? payment.amount` to `recordPaymentVerified` without asserting equality with the reserved amount → ✅ Assert `verifyResult.amount === payment.amount + payment.tipAmount` before crediting; treat mismatch as payment failure.
+- ❌ `mobile: data.payerName` sent payer NAME as the gateway mobile field → ✅ Omit `mobile` from `provider.request()` until a dedicated `dinerMobile` field is added to the request schema.
+- ❌ State machine had no `verifying` intermediate state — concurrent callbacks could both apply `recordPaymentVerified` and double-credit `order.amountPaid` → ✅ `transitionToVerifying` claims the payment atomically (`WHERE status='pending'`); only the first caller gets 1 row; subsequent callers get 0 and return idempotent success.
+- ❌ `PaymentStatus` enum missing `verifying` value — adding it after the fact requires `ALTER TYPE ... ADD VALUE` not a full enum recreate in Postgres → ✅ Use `ALTER TYPE "PaymentStatus" ADD VALUE IF NOT EXISTS 'verifying' AFTER 'pending'` in the migration.
+- ❌ Ceiling-split tip distribution: proportionally splitting tip by bill chunks can produce gatewayTotal > ceiling → ✅ Split the TOTAL (amount+tip) by ceiling, then derive amount/tip portions from each total chunk proportionally.
+- ❌ Next 16 keeps deploying `src/middleware.ts` on the deprecated **edge** runtime, which can throw `MIDDLEWARE_INVOCATION_FAILED` at runtime even when the build passes → ✅ Rename to `src/proxy.ts` with `export default function proxy(...)` (Next 16 convention, **nodejs** runtime). `config.matcher` is unchanged; `jose`/`process.env` run fine on Node; `next-intl/middleware` import path is unchanged.
+- ❌ Vercel build fails with `P1012 Environment variable not found: DIRECT_URL` during `prisma migrate deploy` even though `prisma generate` passed (generate doesn't resolve datasource `env()`; migrate does) → ✅ Set both `DATABASE_URL` (pooled, `-pooler` host) and `DIRECT_URL` (unpooled, no `-pooler`) in Vercel env for Production/Preview. `prisma.config.ts` only loads a local `.env`, so Vercel needs them in project settings.
 
 ## Dependencies & Tooling
 
@@ -120,6 +128,15 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/app/api/otp/request/route.ts` — `POST /api/otp/request` — public OTP request endpoint
 - `src/app/api/otp/verify/route.ts` — `POST /api/otp/verify` — public OTP verify endpoint; sets `Order.phoneVerifiedAt`
 - `src/app/api/admin/otp-override/route.ts` — `POST /api/admin/otp-override` — staff+ operator override; sets `Order.phoneVerifiedAt` + audit log
+- `src/lib/payment/provider.ts` — `PaymentProvider` interface + all input/result types (issue #20)
+- `src/lib/payment/adapters/simulated.ts` — `SimulatedPaymentAdapter` in-process sandbox (issue #20)
+- `src/lib/payment/factory.ts` — `getPaymentProvider()` factory (reads `PAYMENT_PROVIDER` env)
+- `src/lib/payment/payment-service.ts` — `transitionToVerifying` (pending→verifying, atomic first-writer-wins), `recordPaymentVerified`, `recordPaymentFailed`, `expirePayment` (guards verifying too), `recordPaymentRefunded` (succeeded→refunded)
+- `src/lib/payment/ceiling-split.ts` — `splitIntoSubCharges`, `computeCeilingSplit` (splits bill+tip by IPG ceiling), `areCeilingSplitSubChargesFullyPaid`, `IPG_TRANSACTION_CEILING_RIAL`
+- `src/lib/payment/reconciliation-sweep.ts` — `runReconciliationSweep` (DI-based, testable), `buildReconciliationSweepRunner`, `SWEEP_STALENESS_MINUTES`; types: `SweepablePayment`, `OpsQueueEntry`, `ReconciliationSweepInput`
+- `src/app/api/payments/callback/route.ts` — `GET /api/payments/callback` — server-side gateway callback handler; uses `transitionToVerifying` before verify for concurrent-safe first-writer-wins claim
+- `src/app/api/payments/sweep/route.ts` — `POST /api/payments/sweep` — scheduled reconciliation sweep endpoint (requires `x-sweep-secret`)
+- `src/lib/payment/wallet-service.ts` — `issueRefundAsPayout` (float-guarded ledgered payout + sets Payment.status=refunded atomically), `depositFloat` (operator pre-funds wallet), `getWalletBalance`, `getWalletLedger`, `resolveOverpaymentViaRefund` (overpay unwind delegates to issueRefundAsPayout)
 
 ## API & Data Layer
 
@@ -156,3 +173,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 **Done (M5 issues):**
 - #17 — Real-time order board v1: `/api/admin/orders` polling endpoint (cursor pagination, JWT auth, tenant isolation); `useOrdersPolling` hook (axios, 8 s, merge-by-id); RBAC-gated status transitions (staff = workflow only, manager+ = all incl. cancel/paid/open); ceiling-split payment display (parentPaymentId badge)
 - #18 — Guest phone + SMS OTP: `phone.ts` E.164 normalizer (Persian/Arabic-Indic → ASCII → E.164); `sms-provider.ts` two-provider chain with console dev adapter; `otp.ts` lifecycle (SHA-256 hash, 2-min TTL, 5-attempt cap, Redis rate limits); `/api/otp/request` + `/api/otp/verify` public routes; `/api/admin/otp-override` staff+ override; schema: `Order.phoneVerifiedAt` + `Vendor.otpGateEnabled`; ADR-0019
+
+**Done (M6 issues):**
+- #20 — PaymentProvider interface + simulated/sandbox facilitator: `PaymentProvider` interface (request/redirectUrl/verify/inquire/refundViaPayout/onboardSubMerchant/verifyIban); `SimulatedPaymentAdapter` (in-process sessions, simulatePaid/simulateCancelled test helpers); `getPaymentProvider()` factory (PAYMENT_PROVIDER env, defaults to simulated); `/api/payments/callback` route (server-side verify, never trusts redirect params); `recordPaymentVerified`/`recordPaymentFailed`/`expirePayment` state machine transitions; ADR-0021
+- #21 — Payment state machine + idempotency + reconciliation sweep + ceiling-split: `transitionToVerifying` (pending→verifying atomic claim); `recordPaymentRefunded`; `ceiling-split.ts` (`splitIntoSubCharges`, `computeCeilingSplit`, `areCeilingSplitSubChargesFullyPaid`, `IPG_TRANSACTION_CEILING_RIAL`); `reconciliation-sweep.ts` (`runReconciliationSweep`, `buildReconciliationSweepRunner`); `/api/payments/sweep` scheduled sweep endpoint; `verifying` enum value added to `PaymentStatus`; migration 0005; 44 integration tests; ADR-0022
+- #23 — Refund-as-payout + platform-wallet ledger + overpayment unwind: `wallet-service.ts` (`issueRefundAsPayout`, `depositFloat`, `getWalletBalance`, `getWalletLedger`, `resolveOverpaymentViaRefund`); `PlatformWallet` + `WalletTransaction` models; `WalletTransactionType` enum; migration 0007; float guard blocks refunds exceeding available balance; overpayment unwind reuses the same path; `PaymentStatus=refunded` driven exclusively by payout record; 19 tests; ADR-0023

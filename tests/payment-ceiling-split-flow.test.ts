@@ -363,7 +363,7 @@ describe("Ceiling-split — reconciliation sweep on a split group (AC3)", () => 
     await runReconciliationSweep({
       payments: [sc2] as SweepablePayment[],
       provider: adapter,
-      onVerified: (paymentId, orderId, amount, gatewayRef) => {
+      onVerified: (paymentId, orderId, amount, _tipAmount, gatewayRef) => {
         transitionToVerifying(db, paymentId);
         recordVerified(db, paymentId, orderId, amount, gatewayRef);
       },

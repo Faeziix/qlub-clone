@@ -78,9 +78,9 @@ export async function POST(req: Request): Promise<NextResponse> {
   await runReconciliationSweep({
     payments: stalePayments as SweepablePayment[],
     provider,
-    onVerified: async (paymentId, orderId, amount, gatewayRef, vendorId) => {
+    onVerified: async (paymentId, orderId, amount, tipAmount, gatewayRef, vendorId) => {
       await transitionToVerifying(paymentId);
-      await recordPaymentVerified({ paymentId, orderId, amount, gatewayReference: gatewayRef, vendorId });
+      await recordPaymentVerified({ paymentId, orderId, amount, tipAmount, gatewayReference: gatewayRef, vendorId });
       resolvedCount.verified++;
     },
     onFailed: async (paymentId) => {

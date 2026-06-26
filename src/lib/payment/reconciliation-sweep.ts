@@ -46,6 +46,7 @@ export interface ReconciliationSweepCallbacks {
     paymentId: string,
     orderId: string,
     amount: bigint,
+    tipAmount: bigint,
     gatewayReference: string | undefined,
     vendorId: string
   ) => void | Promise<void>;
@@ -81,10 +82,23 @@ export async function runReconciliationSweep(input: ReconciliationSweepInput): P
     const inquireResult = await input.provider.inquire(payment.trackId);
 
     if (inquireResult.status === "succeeded") {
+      const reservedTotal = payment.amount + payment.tipAmount;
+      const inquiredAmount = inquireResult.amount ?? reservedTotal;
+      if (inquiredAmount !== reservedTotal) {
+        await input.onAmbiguous({
+          paymentId: payment.id,
+          orderId: payment.orderId,
+          vendorId: payment.vendorId,
+          reason: `amount_mismatch:reserved=${reservedTotal},inquired=${inquiredAmount}`,
+          inquiredAt: now,
+        });
+        continue;
+      }
       await input.onVerified(
         payment.id,
         payment.orderId,
         payment.amount,
+        payment.tipAmount,
         undefined,
         payment.vendorId
       );

@@ -620,7 +620,7 @@ describe("Reconciliation sweep — runReconciliationSweep logic", () => {
     await runReconciliationSweep({
       payments: [p as SweepablePayment],
       provider: adapter,
-      onVerified: (paymentId, orderId, amount, ref) => {
+      onVerified: (paymentId, orderId, amount, _tipAmount, ref) => {
         fakeRecordVerified(db, paymentId, orderId, amount, ref);
       },
       onFailed: (paymentId) => {
@@ -665,7 +665,7 @@ describe("Reconciliation sweep — runReconciliationSweep logic", () => {
     await runReconciliationSweep({
       payments: [p as SweepablePayment],
       provider: adapter,
-      onVerified: (paymentId, orderId, amount, ref) => {
+      onVerified: (paymentId, orderId, amount, _tipAmount, ref) => {
         fakeRecordVerified(db, paymentId, orderId, amount, ref);
       },
       onFailed: (paymentId) => {
@@ -708,7 +708,7 @@ describe("Reconciliation sweep — runReconciliationSweep logic", () => {
     await runReconciliationSweep({
       payments: [p as SweepablePayment],
       provider: adapter,
-      onVerified: (paymentId, orderId, amount, gatewayRef) => {
+      onVerified: (paymentId, orderId, amount, _tipAmount, gatewayRef) => {
         fakeRecordVerified(db, paymentId, orderId, amount, gatewayRef);
       },
       onFailed: (paymentId) => {
@@ -774,7 +774,7 @@ describe("Reconciliation sweep — runReconciliationSweep logic", () => {
     await runReconciliationSweep({
       payments: [p1, p2] as SweepablePayment[],
       provider: adapter,
-      onVerified: (paymentId, orderId, amount, ref) => {
+      onVerified: (paymentId, orderId, amount, _tipAmount, ref) => {
         fakeRecordVerified(db, paymentId, orderId, amount, ref);
       },
       onFailed: (paymentId) => { fakeRecordFailed(db, paymentId); },
@@ -828,7 +828,7 @@ describe("Reconciliation sweep — loop-abort regression (AC3)", () => {
     await runReconciliationSweep({
       payments: [ambigPayment, paidPayment] as SweepablePayment[],
       provider: adapter,
-      onVerified: (paymentId, orderId, amount, ref) => {
+      onVerified: (paymentId, orderId, amount, _tipAmount, ref) => {
         fakeRecordVerified(db, paymentId, orderId, amount, ref);
       },
       onFailed: (paymentId) => { fakeRecordFailed(db, paymentId); },

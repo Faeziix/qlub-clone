@@ -57,15 +57,21 @@ by writing both the balance update and the ledger entry in one DB transaction.
 2. Call provider.refundViaPayout({ paymentRef, amount, destinationIban })
    → payoutRef returned
 3. Call issueRefundAsPayout({ paymentId, amountRial, destinationIban, payoutRef })
-   a. Load PlatformWallet (inside $transaction)
+   a. SELECT PlatformWallet FOR UPDATE (inside $transaction)
    b. Float guard: if walletBalance < amountRial → return INSUFFICIENT_FLOAT
-   c. Atomic decrement: UPDATE ... SET balanceRial = balanceRial - amount WHERE balanceRial >= amount RETURNING balanceRial
-   d. Append WalletTransaction(type=refund_payout, paymentId, payoutRef, destinationIban)
-   e. UPDATE Payment SET status='refunded' WHERE status='succeeded'
+   c. UPDATE Payment SET status='refunded' WHERE id=? AND status='succeeded'
+      → 0 rows affected: return ALREADY_REFUNDED (idempotency gate)
+   d. Atomic decrement: UPDATE ... SET balanceRial = balanceRial - amount WHERE balanceRial >= amount RETURNING balanceRial
+      → empty result: return INSUFFICIENT_FLOAT (concurrency barrier)
+   e. Append WalletTransaction(type=refund_payout, paymentId, payoutRef, destinationIban)
 4. Return { success: true, payoutRef, newBalanceRial }
 ```
 
 Steps 3a–3e are atomic. The ledger is written only after the gateway call succeeds.
+
+**Idempotency**: The status-flip (step 3c) executes BEFORE the wallet debit (step 3d).
+A duplicate call on an already-refunded payment returns `ALREADY_REFUNDED` without
+touching the wallet balance. No double-debit is possible.
 
 ---
 
@@ -116,9 +122,10 @@ business-rule failures:
 | Error code           | Cause |
 |----------------------|-------|
 | `NO_WALLET`          | Platform wallet has never been created / funded |
-| `INSUFFICIENT_FLOAT` | `walletBalance < refundAmount` |
+| `INSUFFICIENT_FLOAT` | `walletBalance < refundAmount`, or concurrent drain between lock and debit |
 | `ZERO_AMOUNT`        | `amountRial ≤ 0` |
 | `PAYMENT_NOT_FOUND`  | (`resolveOverpaymentViaRefund` only) payment record missing |
+| `ALREADY_REFUNDED`   | Payment is not in `succeeded` state — already refunded, pending, failed, or expired. Safe to treat as a no-op duplicate. |
 
 ---
 
@@ -129,7 +136,7 @@ business-rule failures:
 | `src/lib/payment/wallet-service.ts` | Core wallet service |
 | `prisma/schema.prisma` | `PlatformWallet`, `WalletTransaction`, `WalletTransactionType` |
 | `prisma/migrations/0007_platform_wallet_ledger/` | DB migration |
-| `tests/wallet-refund-ledger.test.ts` | 20 tests covering all acceptance criteria including concurrency |
+| `tests/wallet-refund-ledger.test.ts` | 22 tests covering all acceptance criteria including concurrency and idempotency |
 | `prisma/migrations/0008_wallet_txn_destination_iban/` | Adds `destinationIban` column to `WalletTransaction` |
 
 ---

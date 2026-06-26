@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RefundResult, DepositResult } from "@/lib/payment/wallet-service";
 
+// ──────────────────────────────────────────────────────────────────────────
+// NOTE ON CALL ORDER — after the idempotency fix, issueRefundAsPayout runs:
+//   1. SELECT FOR UPDATE wallet  ($queryRaw #1)
+//   2. float guard — abort early if balance < amount
+//   3. UPDATE Payment status succeeded→refunded  ($executeRaw #1)
+//      abort with ALREADY_REFUNDED if 0 rows affected
+//   4. UPDATE PlatformWallet balance  ($queryRaw #2)
+//   5. walletTransaction.create  (ledger row)
+// All mock sequences below follow this order.
+// ──────────────────────────────────────────────────────────────────────────
+
 const { mockDb } = vi.hoisted(() => {
   const mockTx = {
     $executeRaw: vi.fn(),
@@ -81,6 +92,7 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
     tx.$queryRaw
       .mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 5_000_000n }])
       .mockResolvedValueOnce([{ balanceRial: 4_500_000n }]);
+    tx.$executeRaw.mockResolvedValueOnce(1);
     tx.walletTransaction.create.mockResolvedValueOnce({
       id: "wtx-1",
       walletId: "wallet-1",
@@ -91,7 +103,6 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
       destinationIban: "IR120570028780010872200101",
       createdAt: new Date(),
     });
-    tx.$executeRaw.mockResolvedValueOnce(1);
 
     const result: RefundResult = await issueRefundAsPayout({
       paymentId: "pay-1",
@@ -106,6 +117,7 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
     expect(result.newBalanceRial).toBe(4_500_000n);
 
     expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(tx.$executeRaw).toHaveBeenCalledOnce();
     expect(tx.walletTransaction.create).toHaveBeenCalledOnce();
     expect(tx.walletTransaction.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -118,7 +130,6 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
         }),
       })
     );
-    expect(tx.$executeRaw).toHaveBeenCalledOnce();
   });
 
   it("rejects with INSUFFICIENT_FLOAT when wallet balance < refund amount (AC2)", async () => {
@@ -152,6 +163,7 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
     assertFailure(result);
     expect(result.error).toBe("NO_WALLET");
     expect(tx.walletTransaction.create).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("rejects with ZERO_AMOUNT when amountRial is 0", async () => {
@@ -180,6 +192,59 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
     assertFailure(result);
     expect(result.error).toBe("ZERO_AMOUNT");
   });
+
+  it("rejects with ALREADY_REFUNDED when payment is not in succeeded state (idempotency guard)", async () => {
+    tx.$queryRaw.mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 5_000_000n }]);
+    tx.$executeRaw.mockResolvedValueOnce(0);
+
+    const result: RefundResult = await issueRefundAsPayout({
+      paymentId: "pay-already-refunded",
+      amountRial: 500_000n,
+      destinationIban: "IR120570028780010872200101",
+      description: "duplicate call",
+      payoutRef: "payout_dup_001",
+    });
+
+    assertFailure(result);
+    expect(result.error).toBe("ALREADY_REFUNDED");
+    expect(tx.walletTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it("does not double-debit on second invocation — walletTransaction.create called exactly once total", async () => {
+    const firstCallSetup = () => {
+      tx.$queryRaw
+        .mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 5_000_000n }])
+        .mockResolvedValueOnce([{ balanceRial: 4_500_000n }]);
+      tx.$executeRaw.mockResolvedValueOnce(1);
+      tx.walletTransaction.create.mockResolvedValueOnce({ id: "wtx-idem-1" });
+    };
+
+    const secondCallSetup = () => {
+      tx.$queryRaw.mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 4_500_000n }]);
+      tx.$executeRaw.mockResolvedValueOnce(0);
+    };
+
+    firstCallSetup();
+    const first = await issueRefundAsPayout({
+      paymentId: "pay-idem",
+      amountRial: 500_000n,
+      destinationIban: "IR120570028780010872200101",
+      payoutRef: "payout_idem_001",
+    });
+    assertSuccess(first);
+
+    secondCallSetup();
+    const second = await issueRefundAsPayout({
+      paymentId: "pay-idem",
+      amountRial: 500_000n,
+      destinationIban: "IR120570028780010872200101",
+      payoutRef: "payout_idem_001",
+    });
+    assertFailure(second);
+    expect(second.error).toBe("ALREADY_REFUNDED");
+
+    expect(tx.walletTransaction.create).toHaveBeenCalledOnce();
+  });
 });
 
 describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
@@ -187,6 +252,7 @@ describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
     tx.$queryRaw
       .mockResolvedValueOnce([{ id: "wallet-exact", balanceRial: 300_000n }])
       .mockResolvedValueOnce([{ balanceRial: 0n }]);
+    tx.$executeRaw.mockResolvedValueOnce(1);
     tx.walletTransaction.create.mockResolvedValueOnce({
       id: "wtx-exact",
       walletId: "wallet-exact",
@@ -197,7 +263,6 @@ describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
       destinationIban: "IR120570028780010872200101",
       createdAt: new Date(),
     });
-    tx.$executeRaw.mockResolvedValueOnce(1);
 
     const result: RefundResult = await issueRefundAsPayout({
       paymentId: "pay-exact-f",
@@ -224,12 +289,14 @@ describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
 
     assertFailure(result);
     expect(result.error).toBe("INSUFFICIENT_FLOAT");
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("returns INSUFFICIENT_FLOAT when concurrent writer drains balance between lock and update (AC2 concurrency)", async () => {
     tx.$queryRaw
       .mockResolvedValueOnce([{ id: "wallet-race", balanceRial: 500_000n }])
       .mockResolvedValueOnce([]);
+    tx.$executeRaw.mockResolvedValueOnce(1);
 
     const result: RefundResult = await issueRefundAsPayout({
       paymentId: "pay-race",
@@ -242,7 +309,7 @@ describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
     assertFailure(result);
     expect(result.error).toBe("INSUFFICIENT_FLOAT");
     expect(tx.walletTransaction.create).not.toHaveBeenCalled();
-    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).toHaveBeenCalledOnce();
   });
 });
 
@@ -395,6 +462,7 @@ describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", 
     tx.$queryRaw
       .mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 5_000_000n }])
       .mockResolvedValueOnce([{ balanceRial: 4_800_000n }]);
+    tx.$executeRaw.mockResolvedValueOnce(1);
     tx.walletTransaction.create.mockResolvedValueOnce({
       id: "wtx-overpay",
       walletId: "wallet-1",
@@ -405,7 +473,6 @@ describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", 
       destinationIban: "IR120570028780010872200101",
       createdAt: new Date(),
     });
-    tx.$executeRaw.mockResolvedValueOnce(1);
 
     const result: RefundResult = await resolveOverpaymentViaRefund({
       paymentId: "pay-surplus",

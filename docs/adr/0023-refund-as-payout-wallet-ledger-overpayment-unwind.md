@@ -54,9 +54,13 @@ Three public operations:
 **`issueRefundAsPayout(input)`** — the core refund path (AC1, AC2):
 1. `SELECT ... FOR UPDATE` on `PlatformWallet` — row-level lock prevents concurrent overdraw.
 2. Float guard: `walletBalance < refundAmount → INSUFFICIENT_FLOAT` (AC2).
-3. Atomic decrement: `UPDATE SET balanceRial = balanceRial - amount WHERE balanceRial >= amount RETURNING balanceRial`. Empty result → `INSUFFICIENT_FLOAT` (second concurrency barrier).
-4. Append `WalletTransaction(type=refund_payout)` with `paymentId`, `payoutRef`, and `destinationIban`.
-5. Conditional-UPDATE `Payment.status = 'refunded' WHERE status = 'succeeded'`.
+3. Conditional-UPDATE `Payment.status = 'refunded' WHERE id = ? AND status = 'succeeded'`
+   **before** debiting the wallet. If 0 rows affected the payment is not in `succeeded`
+   (already refunded, pending, failed, or non-existent) → `ALREADY_REFUNDED`. This is the
+   idempotency gate: a duplicate call returns `ALREADY_REFUNDED` on the second invocation
+   without touching the wallet balance.
+4. Atomic decrement: `UPDATE SET balanceRial = balanceRial - amount WHERE balanceRial >= amount RETURNING balanceRial`. Empty result → `INSUFFICIENT_FLOAT` (second concurrency barrier).
+5. Append `WalletTransaction(type=refund_payout)` with `paymentId`, `payoutRef`, and `destinationIban`.
 
 All five steps execute inside a single `db.$transaction()`. The caller supplies the
 `payoutRef` obtained by calling `provider.refundViaPayout()` BEFORE entering this
@@ -80,13 +84,33 @@ Helper reads: `getWalletBalance()` and `getWalletLedger()` for the settlement vi
 ```ts
 type RefundResult =
   | { success: true; payoutRef: string; newBalanceRial: bigint }
-  | { success: false; error: "NO_WALLET" | "INSUFFICIENT_FLOAT" | "ZERO_AMOUNT" | "PAYMENT_NOT_FOUND" }
+  | {
+      success: false;
+      error:
+        | "NO_WALLET"
+        | "INSUFFICIENT_FLOAT"
+        | "ZERO_AMOUNT"
+        | "PAYMENT_NOT_FOUND"
+        | "ALREADY_REFUNDED";
+    }
 ```
+
+`ALREADY_REFUNDED` surfaces when `issueRefundAsPayout` is called on a payment that
+is not in `succeeded` state (idempotency gate — see step 3 above). The caller can
+treat this as a safe no-op duplicate call.
 
 The caller does not need to try/catch for business-rule failures; only DB
 infrastructure errors bubble as exceptions.
 
-### 4. No card-rail reversals — ever
+### 4. Idempotency guarantee
+
+The status-flip-first ordering (step 3 before step 4) is the primary idempotency
+mechanism. Because `UPDATE Payment SET status='refunded' WHERE status='succeeded'` is
+a conditional atomic operation, only one concurrent caller can advance from
+`succeeded` to `refunded`; all others get 0 rows affected and return
+`ALREADY_REFUNDED` without touching the wallet.
+
+### 5. No card-rail reversals — ever
 
 `refundViaPayout()` on the `PaymentProvider` interface was already present (ADR-0021).
 The wallet service calls it to obtain a `payoutRef`, then ledgers the result.
@@ -106,6 +130,8 @@ SQL guard for that transition but is now called exclusively by `issueRefundAsPay
 - `PaymentStatus=refunded` is driven exclusively by a payout record, never by a
   gateway reversal (AC1).
 - Domain errors surface as typed values, not exceptions, improving callsite safety.
+- Idempotent under retry: the status-flip-first ordering ensures a duplicate call
+  returns `ALREADY_REFUNDED` without debiting the wallet a second time (PRD §5.4.3).
 
 **Constraints / not changed**
 - The actual gateway call (`provider.refundViaPayout()`) remains the caller's

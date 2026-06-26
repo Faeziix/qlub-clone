@@ -12,7 +12,15 @@ export interface RefundAsPayoutInput {
 
 export type RefundResult =
   | { success: true; payoutRef: string; newBalanceRial: bigint }
-  | { success: false; error: "NO_WALLET" | "INSUFFICIENT_FLOAT" | "ZERO_AMOUNT" | "PAYMENT_NOT_FOUND" };
+  | {
+      success: false;
+      error:
+        | "NO_WALLET"
+        | "INSUFFICIENT_FLOAT"
+        | "ZERO_AMOUNT"
+        | "PAYMENT_NOT_FOUND"
+        | "ALREADY_REFUNDED";
+    };
 
 export interface DepositFloatInput {
   amountRial: bigint;
@@ -58,6 +66,17 @@ export async function issueRefundAsPayout(input: RefundAsPayoutInput): Promise<R
       return { success: false, error: "INSUFFICIENT_FLOAT" };
     }
 
+    const statusFlippedCount = await tx.$executeRaw`
+      UPDATE "Payment"
+      SET status = 'refunded'
+      WHERE id = ${input.paymentId}
+        AND status = 'succeeded'
+    `;
+
+    if (statusFlippedCount === 0) {
+      return { success: false, error: "ALREADY_REFUNDED" };
+    }
+
     const updatedRows = await tx.$queryRaw<{ balanceRial: bigint }[]>`
       UPDATE "PlatformWallet"
       SET "balanceRial" = "balanceRial" - ${input.amountRial}
@@ -82,13 +101,6 @@ export async function issueRefundAsPayout(input: RefundAsPayoutInput): Promise<R
         description: input.description ?? null,
       },
     });
-
-    await tx.$executeRaw`
-      UPDATE "Payment"
-      SET status = 'refunded'
-      WHERE id = ${input.paymentId}
-        AND status = 'succeeded'
-    `;
 
     return {
       success: true,

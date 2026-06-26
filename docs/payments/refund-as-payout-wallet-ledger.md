@@ -42,6 +42,7 @@ Every debit and credit to the wallet is recorded as an append-only
 Each `refund_payout` row carries:
 - `paymentId` — the original `Payment` being refunded
 - `payoutRef` — the reference returned by `provider.refundViaPayout()`
+- `destinationIban` — the beneficiary IBAN the payout was sent to
 - `amountRial` — the refund amount in integer rial
 
 The invariant `walletBalance = Σ(deposits) − Σ(refund_payouts)` is enforced
@@ -58,8 +59,8 @@ by writing both the balance update and the ledger entry in one DB transaction.
 3. Call issueRefundAsPayout({ paymentId, amountRial, destinationIban, payoutRef })
    a. Load PlatformWallet (inside $transaction)
    b. Float guard: if walletBalance < amountRial → return INSUFFICIENT_FLOAT
-   c. Decrement walletBalance by amountRial
-   d. Append WalletTransaction(type=refund_payout, paymentId, payoutRef)
+   c. Atomic decrement: UPDATE ... SET balanceRial = balanceRial - amount WHERE balanceRial >= amount RETURNING balanceRial
+   d. Append WalletTransaction(type=refund_payout, paymentId, payoutRef, destinationIban)
    e. UPDATE Payment SET status='refunded' WHERE status='succeeded'
 4. Return { success: true, payoutRef, newBalanceRial }
 ```
@@ -68,15 +69,22 @@ Steps 3a–3e are atomic. The ledger is written only after the gateway call succ
 
 ---
 
-## Float Guard (AC2)
+## Float Guard and Concurrency Safety (AC2)
 
-The guard is a simple BigInt comparison inside the transaction:
+The wallet row is locked with `SELECT ... FOR UPDATE` before the balance check,
+preventing the read-check-write race under Postgres READ COMMITTED. After the
+lock, the balance is decremented atomically using a conditional UPDATE:
 
-```ts
-if (wallet.balanceRial < input.amountRial) {
-  return { success: false, error: "INSUFFICIENT_FLOAT" };
-}
+```sql
+UPDATE "PlatformWallet"
+SET "balanceRial" = "balanceRial" - $amount
+WHERE id = $id AND "balanceRial" >= $amount
+RETURNING "balanceRial"
 ```
+
+If 0 rows are returned (concurrent drain between lock acquisition and this
+update), `INSUFFICIENT_FLOAT` is returned without writing a ledger entry or
+touching `Payment.status`. No refund can overdraw the wallet.
 
 No payout is issued, no wallet entry is written, and `Payment.status` is not
 changed if the wallet lacks sufficient float.
@@ -121,7 +129,8 @@ business-rule failures:
 | `src/lib/payment/wallet-service.ts` | Core wallet service |
 | `prisma/schema.prisma` | `PlatformWallet`, `WalletTransaction`, `WalletTransactionType` |
 | `prisma/migrations/0007_platform_wallet_ledger/` | DB migration |
-| `tests/wallet-refund-ledger.test.ts` | 19 tests covering all acceptance criteria |
+| `tests/wallet-refund-ledger.test.ts` | 20 tests covering all acceptance criteria including concurrency |
+| `prisma/migrations/0008_wallet_txn_destination_iban/` | Adds `destinationIban` column to `WalletTransaction` |
 
 ---
 

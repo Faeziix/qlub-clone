@@ -234,15 +234,16 @@ model PlatformWallet {
 }
 
 model WalletTransaction {
-  id          String                  @id @default(cuid())
-  walletId    String
-  type        WalletTransactionType
-  amountRial  BigInt
-  paymentId   String?
-  payoutRef   String?
-  description String?
-  createdAt   DateTime                @default(now())
-  wallet      PlatformWallet          @relation(fields: [walletId], references: [id])
+  id               String                  @id @default(cuid())
+  walletId         String
+  type             WalletTransactionType
+  amountRial       BigInt
+  paymentId        String?
+  payoutRef        String?
+  destinationIban  String?
+  description      String?
+  createdAt        DateTime                @default(now())
+  wallet           PlatformWallet          @relation(fields: [walletId], references: [id])
 
   @@index([walletId])
   @@index([paymentId])

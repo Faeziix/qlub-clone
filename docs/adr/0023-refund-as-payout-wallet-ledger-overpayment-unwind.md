@@ -52,10 +52,10 @@ A `WalletTransactionType` enum enforces the allowed entry types at the DB level.
 Three public operations:
 
 **`issueRefundAsPayout(input)`** — the core refund path (AC1, AC2):
-1. Load `PlatformWallet`.
+1. `SELECT ... FOR UPDATE` on `PlatformWallet` — row-level lock prevents concurrent overdraw.
 2. Float guard: `walletBalance < refundAmount → INSUFFICIENT_FLOAT` (AC2).
-3. Decrement `walletBalance` by `amountRial`.
-4. Append `WalletTransaction(type=refund_payout)` with `paymentId` + `payoutRef`.
+3. Atomic decrement: `UPDATE SET balanceRial = balanceRial - amount WHERE balanceRial >= amount RETURNING balanceRial`. Empty result → `INSUFFICIENT_FLOAT` (second concurrency barrier).
+4. Append `WalletTransaction(type=refund_payout)` with `paymentId`, `payoutRef`, and `destinationIban`.
 5. Conditional-UPDATE `Payment.status = 'refunded' WHERE status = 'succeeded'`.
 
 All five steps execute inside a single `db.$transaction()`. The caller supplies the
@@ -101,7 +101,7 @@ SQL guard for that transition but is now called exclusively by `issueRefundAsPay
 **Positive**
 - Every refund is ledgered with a `payoutRef` and `paymentId`, making the wallet
   fully auditable at all times (AC4).
-- Float guard prevents refunds from exceeding available funds (AC2).
+- Float guard is concurrency-safe: `SELECT FOR UPDATE` + atomic conditional `UPDATE RETURNING` prevent overdraw even under concurrent payout requests (AC2).
 - Overpayment unwind reuses the exact same code path (AC3) — no parallel refund logic.
 - `PaymentStatus=refunded` is driven exclusively by a payout record, never by a
   gateway reversal (AC1).

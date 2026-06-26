@@ -1,20 +1,5 @@
-/**
- * Tests for issue #23 — Refund-as-payout + platform-wallet ledger + overpayment unwind.
- *
- * Acceptance criteria verified:
- * AC1 — Refunds are issued as ledgered payouts from the platform wallet; none are card-rail reversals.
- * AC2 — Refunds exceeding available float are blocked.
- * AC3 — Overpayment/double-settlement surpluses are refunded via the same path.
- * AC4 — Reconciliation ledger keeps the wallet balance auditable.
- *
- * All tests use vi.mock('@/lib/db') and an in-memory fake wallet state.
- * No real Postgres or live gateway required per the "sandbox path" implementation note.
- */
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RefundResult, DepositResult } from "@/lib/payment/wallet-service";
-
-// ── Hoisted mock state ─────────────────────────────────────────────────────────
 
 const { mockDb } = vi.hoisted(() => {
   const mockTx = {
@@ -69,7 +54,7 @@ import {
   depositFloat,
   getWalletBalance,
   getWalletLedger,
-  resolveOvepaymentViaRefund,
+  resolveOverpaymentViaRefund,
 } from "@/lib/payment/wallet-service";
 
 const tx = mockDb._tx;
@@ -91,20 +76,11 @@ function assertFailure<T extends { success: boolean }>(
   expect(result.success).toBe(false);
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// 1. issueRefundAsPayout — basic refund from funded wallet (AC1)
-// ──────────────────────────────────────────────────────────────────────────────
-
 describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", () => {
   it("creates a WalletTransaction debit and marks the payment refunded", async () => {
-    tx.platformWallet.findFirst.mockResolvedValueOnce({
-      id: "wallet-1",
-      balanceRial: 5_000_000n,
-    });
-    tx.platformWallet.update.mockResolvedValueOnce({
-      id: "wallet-1",
-      balanceRial: 4_500_000n,
-    });
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 5_000_000n }])
+      .mockResolvedValueOnce([{ balanceRial: 4_500_000n }]);
     tx.walletTransaction.create.mockResolvedValueOnce({
       id: "wtx-1",
       walletId: "wallet-1",
@@ -112,6 +88,7 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
       amountRial: 500_000n,
       paymentId: "pay-1",
       payoutRef: "payout_abc_123456789012",
+      destinationIban: "IR120570028780010872200101",
       createdAt: new Date(),
     });
     tx.$executeRaw.mockResolvedValueOnce(1);
@@ -128,7 +105,7 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
     expect(result.payoutRef).toBe("payout_abc_123456789012");
     expect(result.newBalanceRial).toBe(4_500_000n);
 
-    expect(tx.platformWallet.update).toHaveBeenCalledOnce();
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
     expect(tx.walletTransaction.create).toHaveBeenCalledOnce();
     expect(tx.walletTransaction.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -137,6 +114,7 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
           amountRial: 500_000n,
           paymentId: "pay-1",
           payoutRef: "payout_abc_123456789012",
+          destinationIban: "IR120570028780010872200101",
         }),
       })
     );
@@ -144,10 +122,7 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
   });
 
   it("rejects with INSUFFICIENT_FLOAT when wallet balance < refund amount (AC2)", async () => {
-    tx.platformWallet.findFirst.mockResolvedValueOnce({
-      id: "wallet-1",
-      balanceRial: 100_000n,
-    });
+    tx.$queryRaw.mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 100_000n }]);
 
     const result: RefundResult = await issueRefundAsPayout({
       paymentId: "pay-big",
@@ -159,13 +134,12 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
 
     assertFailure(result);
     expect(result.error).toBe("INSUFFICIENT_FLOAT");
-    expect(tx.platformWallet.update).not.toHaveBeenCalled();
     expect(tx.walletTransaction.create).not.toHaveBeenCalled();
     expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("rejects with NO_WALLET when no platform wallet exists", async () => {
-    tx.platformWallet.findFirst.mockResolvedValueOnce(null);
+    tx.$queryRaw.mockResolvedValueOnce([]);
 
     const result: RefundResult = await issueRefundAsPayout({
       paymentId: "pay-3",
@@ -191,7 +165,7 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
 
     assertFailure(result);
     expect(result.error).toBe("ZERO_AMOUNT");
-    expect(tx.platformWallet.findFirst).not.toHaveBeenCalled();
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("rejects with ZERO_AMOUNT when amountRial is negative", async () => {
@@ -208,20 +182,11 @@ describe("issueRefundAsPayout — ledgered payout from platform wallet (AC1)", (
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// 2. issueRefundAsPayout — float boundary at exactly the balance (AC2)
-// ──────────────────────────────────────────────────────────────────────────────
-
 describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
   it("allows refund when amountRial === walletBalance (exact float)", async () => {
-    tx.platformWallet.findFirst.mockResolvedValueOnce({
-      id: "wallet-exact",
-      balanceRial: 300_000n,
-    });
-    tx.platformWallet.update.mockResolvedValueOnce({
-      id: "wallet-exact",
-      balanceRial: 0n,
-    });
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: "wallet-exact", balanceRial: 300_000n }])
+      .mockResolvedValueOnce([{ balanceRial: 0n }]);
     tx.walletTransaction.create.mockResolvedValueOnce({
       id: "wtx-exact",
       walletId: "wallet-exact",
@@ -229,6 +194,7 @@ describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
       amountRial: 300_000n,
       paymentId: "pay-exact-f",
       payoutRef: "payout_exact",
+      destinationIban: "IR120570028780010872200101",
       createdAt: new Date(),
     });
     tx.$executeRaw.mockResolvedValueOnce(1);
@@ -246,10 +212,7 @@ describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
   });
 
   it("blocks refund when amountRial === walletBalance + 1 (one rial over float)", async () => {
-    tx.platformWallet.findFirst.mockResolvedValueOnce({
-      id: "wallet-over",
-      balanceRial: 300_000n,
-    });
+    tx.$queryRaw.mockResolvedValueOnce([{ id: "wallet-over", balanceRial: 300_000n }]);
 
     const result: RefundResult = await issueRefundAsPayout({
       paymentId: "pay-over-1",
@@ -262,11 +225,26 @@ describe("issueRefundAsPayout — float boundary guard (AC2)", () => {
     assertFailure(result);
     expect(result.error).toBe("INSUFFICIENT_FLOAT");
   });
-});
 
-// ──────────────────────────────────────────────────────────────────────────────
-// 3. depositFloat — operator pre-funds the wallet (AC4)
-// ──────────────────────────────────────────────────────────────────────────────
+  it("returns INSUFFICIENT_FLOAT when concurrent writer drains balance between lock and update (AC2 concurrency)", async () => {
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: "wallet-race", balanceRial: 500_000n }])
+      .mockResolvedValueOnce([]);
+
+    const result: RefundResult = await issueRefundAsPayout({
+      paymentId: "pay-race",
+      amountRial: 500_000n,
+      destinationIban: "IR120570028780010872200101",
+      description: "concurrent drain",
+      payoutRef: "payout_race",
+    });
+
+    assertFailure(result);
+    expect(result.error).toBe("INSUFFICIENT_FLOAT");
+    expect(tx.walletTransaction.create).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+  });
+});
 
 describe("depositFloat — operator pre-funds the platform wallet (AC4)", () => {
   it("creates the wallet if none exists and records a deposit transaction", async () => {
@@ -339,10 +317,6 @@ describe("depositFloat — operator pre-funds the platform wallet (AC4)", () => 
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// 4. getWalletBalance — returns current float (AC4)
-// ──────────────────────────────────────────────────────────────────────────────
-
 describe("getWalletBalance — returns current float (AC4)", () => {
   it("returns the current balance from the wallet record", async () => {
     mockDb.platformWallet.findFirst.mockResolvedValueOnce({
@@ -363,10 +337,6 @@ describe("getWalletBalance — returns current float (AC4)", () => {
     expect(balance).toBe(0n);
   });
 });
-
-// ──────────────────────────────────────────────────────────────────────────────
-// 5. getWalletLedger — reconciliation log is auditable (AC4)
-// ──────────────────────────────────────────────────────────────────────────────
 
 describe("getWalletLedger — reconciliation log is auditable (AC4)", () => {
   it("returns all wallet transactions in reverse-chronological order", async () => {
@@ -411,10 +381,6 @@ describe("getWalletLedger — reconciliation log is auditable (AC4)", () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// 6. resolveOverpaymentViaRefund — overpay unwind uses the same path (AC3)
-// ──────────────────────────────────────────────────────────────────────────────
-
 describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", () => {
   it("resolves an overpay ops-queue entry by issuing a refund-as-payout", async () => {
     mockDb.payment.findUnique.mockResolvedValueOnce({
@@ -426,14 +392,9 @@ describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", 
       status: "succeeded",
     });
 
-    tx.platformWallet.findFirst.mockResolvedValueOnce({
-      id: "wallet-1",
-      balanceRial: 5_000_000n,
-    });
-    tx.platformWallet.update.mockResolvedValueOnce({
-      id: "wallet-1",
-      balanceRial: 4_800_000n,
-    });
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 5_000_000n }])
+      .mockResolvedValueOnce([{ balanceRial: 4_800_000n }]);
     tx.walletTransaction.create.mockResolvedValueOnce({
       id: "wtx-overpay",
       walletId: "wallet-1",
@@ -441,11 +402,12 @@ describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", 
       amountRial: 200_000n,
       paymentId: "pay-surplus",
       payoutRef: "payout_overpay_xyz",
+      destinationIban: "IR120570028780010872200101",
       createdAt: new Date(),
     });
     tx.$executeRaw.mockResolvedValueOnce(1);
 
-    const result: RefundResult = await resolveOvepaymentViaRefund({
+    const result: RefundResult = await resolveOverpaymentViaRefund({
       paymentId: "pay-surplus",
       surplusAmountRial: 200_000n,
       destinationIban: "IR120570028780010872200101",
@@ -461,6 +423,7 @@ describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", 
           type: "refund_payout",
           amountRial: 200_000n,
           paymentId: "pay-surplus",
+          destinationIban: "IR120570028780010872200101",
         }),
       })
     );
@@ -476,12 +439,9 @@ describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", 
       status: "succeeded",
     });
 
-    tx.platformWallet.findFirst.mockResolvedValueOnce({
-      id: "wallet-1",
-      balanceRial: 100_000n,
-    });
+    tx.$queryRaw.mockResolvedValueOnce([{ id: "wallet-1", balanceRial: 100_000n }]);
 
-    const result: RefundResult = await resolveOvepaymentViaRefund({
+    const result: RefundResult = await resolveOverpaymentViaRefund({
       paymentId: "pay-big-surplus",
       surplusAmountRial: 5_000_000n,
       destinationIban: "IR120570028780010872200101",
@@ -496,7 +456,7 @@ describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", 
   it("rejects when payment not found", async () => {
     mockDb.payment.findUnique.mockResolvedValueOnce(null);
 
-    const result: RefundResult = await resolveOvepaymentViaRefund({
+    const result: RefundResult = await resolveOverpaymentViaRefund({
       paymentId: "pay-missing",
       surplusAmountRial: 200_000n,
       destinationIban: "IR120570028780010872200101",
@@ -507,10 +467,6 @@ describe("resolveOverpaymentViaRefund — surplus uses same refund path (AC3)", 
     expect(result.error).toBe("PAYMENT_NOT_FOUND");
   });
 });
-
-// ──────────────────────────────────────────────────────────────────────────────
-// 7. Wallet balance audit invariant — running total matches transactions (AC4)
-// ──────────────────────────────────────────────────────────────────────────────
 
 describe("Wallet audit invariant — balance matches running sum (AC4)", () => {
   it("wallet balance equals sum(deposits) - sum(refund_payouts) across ledger", () => {

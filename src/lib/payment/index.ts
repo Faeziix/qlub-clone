@@ -44,7 +44,7 @@ export {
   depositFloat,
   getWalletBalance,
   getWalletLedger,
-  resolveOvepaymentViaRefund,
+  resolveOverpaymentViaRefund,
 } from "./wallet-service";
 export type {
   RefundAsPayoutInput,

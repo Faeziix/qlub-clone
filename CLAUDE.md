@@ -111,6 +111,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/queries-active.ts` — `getVendorBySlugActive` — like `getVendorBySlug` but returns null for suspended (active=false) vendors; used by all public customer routes
 - `src/app/[locale]/admin/superadmin/actions.ts` — Superadmin server actions: `createTenant`, `suspendTenant`, `reactivateTenant`, `provisionOwner`, `listTenants`, `listPlatformStaff`, `changeStaffRole`, `deactivateStaff`, `reactivateStaff`
 - `src/components/customer/SuspendedTenantPage.tsx` — RTL Farsi-first "restaurant suspended" page shown instead of 404/500 for suspended tenants
+- `src/app/api/admin/orders/route.ts` — `GET /api/admin/orders` — JWT-authed, tenant-scoped, cursor-paginated order list for the live order board
+- `src/app/[locale]/admin/orders/_hooks/useOrdersPolling.ts` — `useOrdersPolling(initialOrders, opts)` — client-side polling hook (axios, 8 s interval, merge-by-id, cursor pagination)
 
 ## API & Data Layer
 
@@ -144,5 +146,5 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 - #27 — Superadmin tenant & owner management console: create/suspend/reactivate vendors, provision owner accounts, platform-wide staff management, suspension guard on customer routes
 
-**In progress / next:**
-- M4 complete
+**Done (M5 issues):**
+- #17 — Real-time order board v1: `/api/admin/orders` polling endpoint (cursor pagination, JWT auth, tenant isolation); `useOrdersPolling` hook (axios, 8 s, merge-by-id); RBAC-gated status transitions (staff = workflow only, manager+ = all incl. cancel/paid/open); ceiling-split payment display (parentPaymentId badge)

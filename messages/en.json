@@ -209,7 +209,10 @@
       "paymentMethodCard": "Card",
       "paymentMethodCash": "Cash",
       "paymentMethodIpg": "Online Payment (IPG)",
-      "paymentMethodUnknown": "Other"
+      "paymentMethodUnknown": "Other",
+      "ceilingSubCharges": "Ceiling split: {n} sub-charges",
+      "loadMore": "Load more",
+      "livePolling": "Live"
     },
     "menu": {
       "pageTitle": "Menu",

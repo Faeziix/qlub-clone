@@ -97,6 +97,7 @@ export default async function OrdersPage() {
       status: p.status,
       payerName: p.payerName,
       reference: p.reference,
+      parentPaymentId: p.parentPaymentId,
     })),
   }));
 
@@ -175,6 +176,9 @@ export default async function OrdersPage() {
             paymentMethodCash: t("paymentMethodCash"),
             paymentMethodIpg: t("paymentMethodIpg"),
             paymentMethodUnknown: t("paymentMethodUnknown"),
+            ceilingSubCharges: t("ceilingSubCharges"),
+            loadMore: t("loadMore"),
+            livePolling: t("livePolling"),
           }}
         />
       </div>

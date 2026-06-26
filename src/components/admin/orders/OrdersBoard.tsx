@@ -8,12 +8,15 @@ import {
   User,
   StickyNote,
   X,
+  RefreshCw,
+  Layers,
 } from "lucide-react";
 import { Card, StatusPill, EmptyRow } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { formatMoney, timeAgo, parseJSON, cn } from "@/lib/utils";
 import { updateOrderStatus, cancelOrder } from "@/app/[locale]/admin/orders/actions";
+import { useOrdersPolling } from "@/app/[locale]/admin/orders/_hooks/useOrdersPolling";
 
 // --- Types -------------------------------------------------------------------
 
@@ -38,6 +41,7 @@ export interface BoardPayment {
   status: string;
   payerName: string | null;
   reference: string | null;
+  parentPaymentId: string | null;
 }
 
 export interface BoardOrder {
@@ -102,6 +106,9 @@ export type OrdersBoardTranslations = {
   paymentMethodCash: string;
   paymentMethodIpg: string;
   paymentMethodUnknown: string;
+  ceilingSubCharges: string;
+  loadMore: string;
+  livePolling: string;
 };
 
 // --- Status flow -------------------------------------------------------------
@@ -227,6 +234,7 @@ function OrderRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-bold tabular-nums">#{order.orderNumber}</span>
             <StatusPill status={order.status} />
+            <CeilingSubChargesBadge payments={order.payments} t={t} />
             <span className="text-xs text-muted">{timeAgo(order.createdAt)}</span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
@@ -370,9 +378,10 @@ function OrderDetail({ order, t }: { order: BoardOrder; t: OrdersBoardTranslatio
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase text-muted">
-          {t.payments}
-        </p>
+        <div className="mb-2 flex items-center gap-2">
+          <p className="text-xs font-semibold uppercase text-muted">{t.payments}</p>
+          <CeilingSubChargesBadge payments={order.payments} t={t} />
+        </div>
         {order.payments.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-line py-6 text-center text-sm text-muted">
             {t.noPayments}
@@ -382,9 +391,19 @@ function OrderDetail({ order, t }: { order: BoardOrder; t: OrdersBoardTranslatio
             {order.payments.map((p) => (
               <div key={p.id} className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold">
-                    {resolvePaymentMethodLabel(p.method, t)}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold">
+                      {resolvePaymentMethodLabel(p.method, t)}
+                    </p>
+                    {p.parentPaymentId !== null && (
+                      <span
+                        title={t.ceilingSubCharges.replace("{n}", "1")}
+                        aria-label={t.ceilingSubCharges.replace("{n}", "1")}
+                      >
+                        <Layers size={12} className="text-muted" />
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted">
                     {p.payerName ? `${p.payerName} • ` : ""}
                     <span className="capitalize">{p.status}</span>
@@ -416,11 +435,44 @@ function OrderDetail({ order, t }: { order: BoardOrder; t: OrdersBoardTranslatio
   );
 }
 
+// --- Ceiling-split badge -----------------------------------------------------
+
+function CeilingSubChargesBadge({
+  payments,
+  t,
+}: {
+  payments: BoardPayment[];
+  t: OrdersBoardTranslations;
+}) {
+  const childCharges = payments.filter((p) => p.parentPaymentId !== null);
+  if (childCharges.length === 0) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-xs font-semibold text-muted"
+      title={t.ceilingSubCharges.replace("{n}", String(childCharges.length))}
+    >
+      <Layers size={11} />
+      {childCharges.length}×
+    </span>
+  );
+}
+
 // --- Board -------------------------------------------------------------------
 
-export function OrdersBoard({ orders, t }: { orders: BoardOrder[]; t: OrdersBoardTranslations }) {
+interface OrdersBoardProps {
+  orders: BoardOrder[];
+  t: OrdersBoardTranslations;
+  pollingIntervalMs?: number;
+}
+
+export function OrdersBoard({ orders: initialOrders, t, pollingIntervalMs = 8_000 }: OrdersBoardProps) {
   const [filter, setFilter] = React.useState<string>("all");
   const [selected, setSelected] = React.useState<BoardOrder | null>(null);
+
+  const { orders, isLoading, hasMore, loadMore, refresh } = useOrdersPolling(
+    initialOrders,
+    { intervalMs: pollingIntervalMs }
+  );
 
   const FILTERS = React.useMemo(() => [
     { key: "all", label: t.filterAll },
@@ -478,6 +530,22 @@ export function OrdersBoard({ orders, t }: { orders: BoardOrder[]; t: OrdersBoar
             </button>
           );
         })}
+
+        <div className="ms-auto flex items-center gap-2">
+          <span className="flex items-center gap-1.5 text-xs text-muted">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+            {t.livePolling}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            loading={isLoading}
+            onClick={refresh}
+            aria-label={t.livePolling}
+          >
+            <RefreshCw size={14} />
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-3 p-4">
@@ -493,6 +561,14 @@ export function OrdersBoard({ orders, t }: { orders: BoardOrder[]; t: OrdersBoar
           ))
         )}
       </div>
+
+      {hasMore && (
+        <div className="border-t border-line p-4 text-center">
+          <Button variant="outline" size="sm" loading={isLoading} onClick={loadMore}>
+            {t.loadMore}
+          </Button>
+        </div>
+      )}
 
       <Sheet
         open={!!liveOrder}

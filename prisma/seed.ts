@@ -181,14 +181,15 @@ const paulMenus: SeedMenu[] = [
             modifierGroups: [
               {
                 name: "Choose fillings",
+                faName: "انتخاب مواد میانی",
                 minSelect: 0,
                 maxSelect: 4,
                 options: [
-                  { name: "Cheese", isDefault: true },
-                  { name: "Mushroom" },
-                  { name: "Tomato" },
-                  { name: "Spinach" },
-                  { name: "Turkey Ham", priceDelta: 6 * R },
+                  { name: "Cheese", faName: "پنیر", isDefault: true },
+                  { name: "Mushroom", faName: "قارچ" },
+                  { name: "Tomato", faName: "گوجه‌فرنگی" },
+                  { name: "Spinach", faName: "اسفناج" },
+                  { name: "Turkey Ham", faName: "ژامبون بوقلمون", priceDelta: 6 * R },
                 ],
               },
             ],
@@ -362,13 +363,14 @@ const paulMenus: SeedMenu[] = [
             modifierGroups: [
               {
                 name: "Choice of side",
+                faName: "انتخاب پیش‌غذا",
                 required: true,
                 minSelect: 1,
                 maxSelect: 1,
                 options: [
-                  { name: "French Fries", isDefault: true },
-                  { name: "Mixed Salad" },
-                  { name: "Sweet Potato Fries", priceDelta: 6 * R },
+                  { name: "French Fries", faName: "سیب‌زمینی سرخ‌کرده", isDefault: true },
+                  { name: "Mixed Salad", faName: "سالاد مخلوط" },
+                  { name: "Sweet Potato Fries", faName: "سیب‌زمینی شیرین سرخ‌شده", priceDelta: 6 * R },
                 ],
               },
             ],
@@ -384,12 +386,13 @@ const paulMenus: SeedMenu[] = [
             modifierGroups: [
               {
                 name: "Add-ons",
+                faName: "افزودنی‌ها",
                 minSelect: 0,
                 maxSelect: 3,
                 options: [
-                  { name: "Extra Cheese", priceDelta: 6 * R },
-                  { name: "Turkey Bacon", priceDelta: 10 * R },
-                  { name: "Fried Egg", priceDelta: 6 * R },
+                  { name: "Extra Cheese", faName: "پنیر اضافه", priceDelta: 6 * R },
+                  { name: "Turkey Bacon", faName: "بیکن بوقلمون", priceDelta: 10 * R },
+                  { name: "Fried Egg", faName: "تخم‌مرغ سرخ‌شده", priceDelta: 6 * R },
                 ],
               },
             ],
@@ -457,13 +460,14 @@ const paulMenus: SeedMenu[] = [
             modifierGroups: [
               {
                 name: "How would you like it cooked?",
+                faName: "سطح پخت گوشت را انتخاب کنید",
                 required: true,
                 minSelect: 1,
                 maxSelect: 1,
                 options: [
-                  { name: "Medium Rare", isDefault: true },
-                  { name: "Medium" },
-                  { name: "Well Done" },
+                  { name: "Medium Rare", faName: "مدیوم ریر", isDefault: true },
+                  { name: "Medium", faName: "مدیوم" },
+                  { name: "Well Done", faName: "خوب‌پخته" },
                 ],
               },
             ],

@@ -53,7 +53,7 @@ function ModifierIndicator({
     <span
       className={cn(
         "grid h-5 w-5 shrink-0 place-items-center border-2 transition-colors",
-        single ? "rounded-full" : "rounded-md",
+        single ? "rounded-full" : "rounded",
         checked
           ? "border-brand bg-brand text-brand-fg"
           : "border-muted/50 bg-surface"
@@ -103,7 +103,7 @@ function ItemHero({
           "linear-gradient(135deg, hsl(var(--brand-soft)) 0%, hsl(var(--surface-2)) 100%)",
       }}
     >
-      <ChefHat size={48} className="text-brand/25" strokeWidth={1.5} />
+      <ChefHat size={32} className="text-brand/20" strokeWidth={1.5} />
     </div>
   );
 }
@@ -126,14 +126,17 @@ function ModifierGroupSection({
 
   function modifierHint(): string {
     if (single) return t("chooseOne");
-    const count =
-      lang === "fa"
-        ? latinDigitsToPersian(String(group.maxSelect))
-        : String(group.maxSelect);
+    const localCount = (n: number) =>
+      lang === "fa" ? latinDigitsToPersian(String(n)) : String(n);
     if (group.minSelect > 0 && group.minSelect === group.maxSelect) {
-      return t("chooseExactly").replace("{count}", count);
+      return t("chooseExactly").replace("{count}", localCount(group.maxSelect));
     }
-    return t("chooseUpTo").replace("{count}", count);
+    if (group.minSelect > 0 && group.minSelect < group.maxSelect) {
+      return t("chooseRange")
+        .replace("{min}", localCount(group.minSelect))
+        .replace("{max}", localCount(group.maxSelect));
+    }
+    return t("chooseUpTo").replace("{count}", localCount(group.maxSelect));
   }
 
   return (
@@ -276,9 +279,9 @@ export function ItemSheet({
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[200] bg-black/50 animate-fade-in data-[state=closed]:animate-fade-out" />
+        <Dialog.Overlay className="fixed inset-0 z-overlay bg-black/50 animate-fade-in data-[state=closed]:animate-fade-out" />
 
-        <div className="fixed inset-0 z-[300] flex items-end justify-center">
+        <div className="fixed inset-0 z-modal flex items-end justify-center">
           <Dialog.Content className="relative flex h-[92vh] w-full max-w-app flex-col rounded-t-3xl bg-surface shadow-sheet animate-slide-up">
             <VisuallyHidden.Root asChild>
               <Dialog.Title>{name}</Dialog.Title>
@@ -305,7 +308,12 @@ export function ItemSheet({
             </Dialog.Close>
 
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              <div className="relative h-64 w-full shrink-0 bg-surface-2">
+              <div
+                className={cn(
+                  "relative w-full shrink-0 bg-surface-2",
+                  item.imageUrl ? "h-64" : "h-20"
+                )}
+              >
                 <ItemHero imageUrl={item.imageUrl} name={name} />
               </div>
 

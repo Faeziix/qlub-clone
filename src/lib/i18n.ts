@@ -11,6 +11,25 @@ export function dirFor(locale: string): "ltr" | "rtl" {
   return locale === "fa" ? "rtl" : "ltr";
 }
 
+/** Per-locale overrides attached to menu nodes by the server query. */
+export type LocalizedText = { name?: string | null; description?: string | null };
+export type I18nMap = Record<string, LocalizedText> | null | undefined;
+
+export function localizedName(
+  node: { name: string; i18n?: I18nMap },
+  locale: string
+): string {
+  return node.i18n?.[locale]?.name || node.name;
+}
+
+export function localizedDescription(
+  node: { description?: string | null; i18n?: I18nMap },
+  locale: string
+): string | null {
+  const translated = node.i18n?.[locale]?.description;
+  return (translated ?? node.description) ?? null;
+}
+
 type Dict = Record<string, string>;
 
 const en: Dict = {

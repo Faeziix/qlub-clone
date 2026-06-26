@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Search, Globe, ChevronLeft, ShoppingBag } from "lucide-react";
 import type { VendorWithMenus, ItemWithModifiers } from "@/lib/queries";
 import { useCart } from "@/lib/store/cart";
-import { makeT, dirFor } from "@/lib/i18n";
+import { makeT, dirFor, localizedName, localizedDescription } from "@/lib/i18n";
 import { cn, formatAmount } from "@/lib/utils";
 import { DietBadge } from "@/components/ui/Badge";
 import { ItemSheet } from "./ItemSheet";
@@ -58,12 +58,12 @@ export function MenuExperience({
         ...c,
         items: c.items.filter(
           (i) =>
-            i.name.toLowerCase().includes(q) ||
-            i.description?.toLowerCase().includes(q)
+            localizedName(i, lang).toLowerCase().includes(q) ||
+            localizedDescription(i, lang)?.toLowerCase().includes(q)
         ),
       }))
       .filter((c) => c.items.length > 0);
-  }, [categories, query]);
+  }, [categories, query, lang]);
 
   // ── Landing screen: hero + menu picker (qlub "Select a menu") ──
   if (!entered) {
@@ -250,13 +250,16 @@ export function MenuExperience({
         <main className="px-4">
           {filtered.map((cat) => (
             <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-44 pt-5">
-              <h2 className="mb-3 text-xl font-extrabold">{cat.name}</h2>
+              <h2 className="mb-3 text-xl font-extrabold">
+                {localizedName(cat, lang)}
+              </h2>
               <div className="space-y-3">
                 {cat.items.map((item) => (
                   <ItemRow
                     key={item.id}
                     item={item}
                     currency={vendor.currency}
+                    lang={lang}
                     onClick={() => setActiveItem(item)}
                   />
                 ))}
@@ -330,13 +333,17 @@ export function MenuExperience({
 function ItemRow({
   item,
   currency,
+  lang,
   onClick,
 }: {
   item: ItemWithModifiers;
   currency: string;
+  lang: string;
   onClick: () => void;
 }) {
   const tags = Array.isArray(item.tags) ? item.tags : [];
+  const name = localizedName(item, lang);
+  const description = localizedDescription(item, lang);
   return (
     <button
       onClick={onClick}
@@ -344,14 +351,14 @@ function ItemRow({
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <h3 className="font-bold">{item.name}</h3>
+          <h3 className="font-bold">{name}</h3>
           {tags.slice(0, 2).map((tag) => (
             <DietBadge key={tag} tag={tag} />
           ))}
         </div>
-        {item.description && (
+        {description && (
           <p className="mt-1 line-clamp-2 text-sm text-muted">
-            {item.description}
+            {description}
           </p>
         )}
         <p className="mt-2 font-bold text-brand">
@@ -362,7 +369,7 @@ function ItemRow({
         <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-2">
           <Image
             src={item.imageUrl}
-            alt={item.name}
+            alt={name}
             fill
             className="object-cover"
             unoptimized

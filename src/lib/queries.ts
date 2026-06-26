@@ -1,6 +1,11 @@
 import "server-only";
 import { db } from "./db";
 import { bigintToNumber } from "./money";
+import {
+  aggregateRevenueStats,
+  computePeriodDelta,
+  buildTehranWindowBounds,
+} from "./dashboard-analytics";
 
 function localesToMap<T extends { locale: string }>(
   rows: T[],
@@ -156,41 +161,64 @@ export async function getOrder(orderId: string) {
 /** Admin: dashboard metrics for a vendor (or all, for superadmin). */
 export async function getDashboardStats(vendorId: string | null) {
   const where = vendorId ? { vendorId } : {};
-  const since = new Date(Date.now() - 30 * 86400000);
+  const WINDOW_DAYS = 30;
+  const now = new Date();
+  const { windowStart, prevWindowStart, prevWindowEnd } = buildTehranWindowBounds(
+    WINDOW_DAYS,
+    now
+  );
 
-  const [orders, payments, reviews, items, tables] = await Promise.all([
-    db.order.findMany({
-      where: { ...where, createdAt: { gte: since } },
-      orderBy: { createdAt: "desc" },
-    }),
-    db.payment.findMany({
-      where: { ...where, status: "succeeded", createdAt: { gte: since } },
-    }),
-    db.review.findMany({ where, orderBy: { createdAt: "desc" } }),
-    db.menuItem.count({ where }),
-    db.diningTable.count({ where }),
-  ]);
+  const succeededWhere = { ...where, status: "succeeded" as const };
 
-  const revenueRial = payments.reduce((s, p) => s + p.total, 0n);
-  const tipsRial = payments.reduce((s, p) => s + p.tipAmount, 0n);
-  const avgOrderRial =
-    payments.length > 0 ? revenueRial / BigInt(payments.length) : 0n;
+  const [orders, currentPayments, prevPayments, reviews, items, tables] =
+    await Promise.all([
+      db.order.findMany({
+        where: { ...where, createdAt: { gte: windowStart } },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.payment.findMany({
+        where: { ...succeededWhere, createdAt: { gte: windowStart } },
+        select: { orderId: true, amount: true, tipAmount: true, total: true, createdAt: true },
+      }),
+      db.payment.findMany({
+        where: {
+          ...succeededWhere,
+          createdAt: { gte: prevWindowStart, lt: prevWindowEnd },
+        },
+        select: { orderId: true, amount: true, tipAmount: true, total: true, createdAt: true },
+      }),
+      db.review.findMany({ where, orderBy: { createdAt: "desc" } }),
+      db.menuItem.count({ where }),
+      db.diningTable.count({ where }),
+    ]);
+
+  const currentStats = aggregateRevenueStats(currentPayments);
+  const prevStats = aggregateRevenueStats(prevPayments);
+
+  const revenueDelta = computePeriodDelta(currentStats.revenueRial, prevStats.revenueRial);
+  const orderCountDelta = computePeriodDelta(
+    BigInt(currentStats.distinctOrderCount),
+    BigInt(prevStats.distinctOrderCount)
+  );
+
   const avgRating = reviews.length
     ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
     : 0;
 
   return {
-    revenue: bigintToNumber(revenueRial),
-    tips: bigintToNumber(tipsRial),
+    revenue: bigintToNumber(currentStats.revenueRial),
+    tips: bigintToNumber(currentStats.tipsRial),
     orderCount: orders.length,
-    paidCount: payments.length,
-    avgOrder: bigintToNumber(avgOrderRial),
+    paidCount: currentPayments.length,
+    avgOrder: bigintToNumber(currentStats.avgOrderRial),
+    revenueDelta,
+    orderCountDelta,
     avgRating,
     reviewCount: reviews.length,
     itemCount: items,
     tableCount: tables,
     orders,
-    payments,
+    payments: currentPayments,
     reviews,
   };
 }

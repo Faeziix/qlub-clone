@@ -171,6 +171,10 @@ export default async function OrdersPage() {
             inclTip: t("inclTip"),
             walkIn: t("walkIn"),
             counter: t("counter"),
+            paymentMethodCard: t("paymentMethodCard"),
+            paymentMethodCash: t("paymentMethodCash"),
+            paymentMethodIpg: t("paymentMethodIpg"),
+            paymentMethodUnknown: t("paymentMethodUnknown"),
           }}
         />
       </div>

@@ -121,7 +121,8 @@
       "email": "ایمیل",
       "password": "رمز عبور",
       "signIn": "ورود",
-      "demoAccounts": "حساب‌های نمایشی"
+      "demoAccounts": "حساب‌های نمایشی",
+      "invalidCredentials": "ایمیل یا رمز عبور نامعتبر است."
     },
     "dashboard": {
       "pageTitle": "داشبورد",
@@ -198,7 +199,11 @@
       "markReady": "آماده شد",
       "markServed": "سرو شد",
       "item": "آیتم",
-      "items_plural": "آیتم"
+      "items_plural": "آیتم",
+      "paymentMethodCard": "کارت بانکی",
+      "paymentMethodCash": "نقدی",
+      "paymentMethodIpg": "پرداخت آنلاین (IPG)",
+      "paymentMethodUnknown": "سایر"
     },
     "menu": {
       "pageTitle": "منو",
@@ -350,6 +355,9 @@
       "tipPresetsHint": "سه درصد سریع برای انتخاب مهمانان.",
       "saveChanges": "ذخیره تغییرات",
       "saved": "تنظیمات ذخیره شد",
+      "saveFailed": "ذخیره تنظیمات ناموفق بود. دوباره امتحان کنید.",
+      "nameRequired": "نام رستوران الزامی است.",
+      "forbidden": "شما مجاز به ویرایش این فروشنده نیستید.",
       "superadminNote": "در حال ویرایش {name} (اولین فروشنده).",
       "profileUpdated": "پروفایل با موفقیت به‌روز شد.",
       "darkgold": "طلایی تاریک",
@@ -365,7 +373,9 @@
       "noData": "داده‌ای موجود نیست.",
       "openMenu": "باز کردن منو",
       "closeMenu": "بستن منو",
-      "close": "بستن"
+      "close": "بستن",
+      "allRestaurants": "همه رستوران‌ها",
+      "noVendor": "—"
     }
   }
 }

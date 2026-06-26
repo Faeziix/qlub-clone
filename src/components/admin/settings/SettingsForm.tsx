@@ -10,6 +10,7 @@ import {
   Sparkles,
   AlertCircle,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -188,10 +189,11 @@ export function SettingsForm({
   supportedLangs: string[];
   t: SettingsTranslations;
 }) {
+  const tSettings = useTranslations("admin.settings");
   const [form, setForm] = useState<FormState>(initial);
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
 
   const THEME_OPTIONS: ThemeOption[] = [
     { id: "darkgold", label: t.darkgold, swatch: "from-amber-400 to-yellow-700" },
@@ -204,7 +206,7 @@ export function SettingsForm({
   function patch<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
     setSaved(false);
-    setError(null);
+    setErrorKey(null);
   }
 
   function setTip(index: number, value: number) {
@@ -214,11 +216,11 @@ export function SettingsForm({
       return { ...f, tipPresets: next };
     });
     setSaved(false);
-    setError(null);
+    setErrorKey(null);
   }
 
   function onSave() {
-    setError(null);
+    setErrorKey(null);
     setSaved(false);
     const payload: VendorSettingsInput = {
       name: form.name,
@@ -240,7 +242,7 @@ export function SettingsForm({
       if (res.ok) {
         setSaved(true);
       } else {
-        setError(res.message);
+        setErrorKey(res.messageKey);
       }
     });
   }
@@ -484,13 +486,13 @@ export function SettingsForm({
       </Card>
 
       <div className="sticky bottom-4 z-10 flex items-center justify-end gap-3 rounded-2xl border border-line bg-surface/95 p-3 shadow-card backdrop-blur">
-        {error && (
+        {errorKey && (
           <span className="me-auto flex items-center gap-1.5 text-sm font-medium text-danger">
             <AlertCircle className="h-4 w-4" />
-            {error}
+            {tSettings(errorKey)}
           </span>
         )}
-        {saved && !error && (
+        {saved && !errorKey && (
           <span className="me-auto flex items-center gap-1.5 text-sm font-medium text-success">
             <Check className="h-4 w-4" />
             {t.saved}

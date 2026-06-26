@@ -54,7 +54,9 @@ export function LoginForm({ showDemoAccounts }: { showDemoAccounts: boolean }) {
               className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-brand"
             />
           </div>
-          {state?.error && <p className="text-sm text-danger">{state.error}</p>}
+          {state?.errorKey && (
+            <p className="text-sm text-danger">{t(state.errorKey)}</p>
+          )}
           <Button type="submit" fullWidth size="lg" loading={pending}>
             {t("signIn")}
           </Button>

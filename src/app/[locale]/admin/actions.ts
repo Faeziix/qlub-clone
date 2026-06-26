@@ -15,10 +15,10 @@ export async function login(_prev: unknown, formData: FormData) {
 
   const user = await db.staffUser.findUnique({ where: { email } });
   if (!user || !user.active) {
-    return { error: "Invalid email or password." };
+    return { errorKey: "invalidCredentials" as const };
   }
   const ok = await verifyPassword(password, user.passwordHash);
-  if (!ok) return { error: "Invalid email or password." };
+  if (!ok) return { errorKey: "invalidCredentials" as const };
 
   await createSession({
     id: user.id,

@@ -24,7 +24,7 @@ const THEMES = ["darkgold", "classic", "emerald", "rose", "midnight"] as const;
 
 export type SettingsActionState = {
   ok: boolean;
-  message: string;
+  messageKey: string;
 };
 
 export async function updateVendorSettings(
@@ -33,14 +33,13 @@ export async function updateVendorSettings(
 ): Promise<SettingsActionState> {
   const session = await requireSession();
 
-  // Authorization: non-superadmins may only update their own vendor.
   if (session.vendorId && session.vendorId !== vendorId) {
-    return { ok: false, message: "You are not allowed to edit this vendor." };
+    return { ok: false, messageKey: "forbidden" };
   }
 
   const name = data.name.trim();
   if (!name) {
-    return { ok: false, message: "Restaurant name is required." };
+    return { ok: false, messageKey: "nameRequired" };
   }
 
   const theme = THEMES.includes(data.theme as (typeof THEMES)[number])
@@ -75,11 +74,11 @@ export async function updateVendorSettings(
       },
     });
   } catch {
-    return { ok: false, message: "Failed to save settings. Please retry." };
+    return { ok: false, messageKey: "saveFailed" };
   }
 
   revalidatePath("/admin/settings");
   revalidatePath("/");
 
-  return { ok: true, message: "Settings saved." };
+  return { ok: true, messageKey: "saved" };
 }

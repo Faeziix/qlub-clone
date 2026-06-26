@@ -98,6 +98,10 @@ export type OrdersBoardTranslations = {
   inclTip: string;
   walkIn: string;
   counter: string;
+  paymentMethodCard: string;
+  paymentMethodCash: string;
+  paymentMethodIpg: string;
+  paymentMethodUnknown: string;
 };
 
 // --- Status flow -------------------------------------------------------------
@@ -112,14 +116,17 @@ const NEXT_STATUS: Record<string, string | null> = {
   cancelled: null,
 };
 
-const PAYMENT_LABELS: Record<string, string> = {
-  card: "Card",
-  apple_pay: "Apple Pay",
-  google_pay: "Google Pay",
-  tabby: "Tabby",
-  benefit: "Benefit",
-  cash: "Cash",
-};
+// --- Payment method label lookup ---------------------------------------------
+
+function resolvePaymentMethodLabel(
+  method: string,
+  t: OrdersBoardTranslations
+): string {
+  if (method === "card") return t.paymentMethodCard;
+  if (method === "cash") return t.paymentMethodCash;
+  if (method === "ipg") return t.paymentMethodIpg;
+  return t.paymentMethodUnknown;
+}
 
 // --- Action buttons ----------------------------------------------------------
 
@@ -376,7 +383,7 @@ function OrderDetail({ order, t }: { order: BoardOrder; t: OrdersBoardTranslatio
               <div key={p.id} className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">
-                    {PAYMENT_LABELS[p.method] ?? p.method}
+                    {resolvePaymentMethodLabel(p.method, t)}
                   </p>
                   <p className="text-xs text-muted">
                     {p.payerName ? `${p.payerName} • ` : ""}

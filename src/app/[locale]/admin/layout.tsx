@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { headers } from "next/headers";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +27,17 @@ export default async function AdminLayout({
     return <>{children}</>;
   }
 
+  const tCommon = await getTranslations("admin.common");
+
   const vendor = session.vendorId
     ? await db.vendor.findUnique({ where: { id: session.vendorId } })
     : null;
+
+  const vendorName =
+    vendor?.name ??
+    (session.role === "superadmin"
+      ? tCommon("allRestaurants")
+      : tCommon("noVendor"));
 
   return (
     <div className="min-h-screen bg-bg">
@@ -38,9 +47,7 @@ export default async function AdminLayout({
           email: session.email,
           role: session.role,
         }}
-        vendorName={
-          vendor?.name ?? (session.role === "superadmin" ? "All restaurants" : "—")
-        }
+        vendorName={vendorName}
       />
       <main className="lg:ps-72">
         <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8 lg:py-8">

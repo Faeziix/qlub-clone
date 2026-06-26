@@ -121,7 +121,8 @@
       "email": "Email",
       "password": "Password",
       "signIn": "Sign in",
-      "demoAccounts": "Demo accounts"
+      "demoAccounts": "Demo accounts",
+      "invalidCredentials": "Invalid email or password."
     },
     "dashboard": {
       "pageTitle": "Dashboard",
@@ -198,7 +199,11 @@
       "markReady": "Mark ready",
       "markServed": "Mark served",
       "item": "item",
-      "items_plural": "items"
+      "items_plural": "items",
+      "paymentMethodCard": "Card",
+      "paymentMethodCash": "Cash",
+      "paymentMethodIpg": "Online Payment (IPG)",
+      "paymentMethodUnknown": "Other"
     },
     "menu": {
       "pageTitle": "Menu",
@@ -350,6 +355,9 @@
       "tipPresetsHint": "Three quick-tap percentages offered to guests.",
       "saveChanges": "Save changes",
       "saved": "Settings saved",
+      "saveFailed": "Failed to save settings. Please retry.",
+      "nameRequired": "Restaurant name is required.",
+      "forbidden": "You are not allowed to edit this vendor.",
       "superadminNote": "You are editing {name} (first vendor). Use the vendor selector to switch.",
       "profileUpdated": "Profile updated successfully.",
       "darkgold": "Dark Gold",
@@ -365,7 +373,9 @@
       "noData": "No data.",
       "openMenu": "Open menu",
       "closeMenu": "Close menu",
-      "close": "Close"
+      "close": "Close",
+      "allRestaurants": "All restaurants",
+      "noVendor": "—"
     }
   }
 }

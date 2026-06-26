@@ -1,8 +1,9 @@
 /**
  * ESLint rule: no-raw-jsx-strings
  *
- * Bans natural-language string literals that appear directly as JSX text nodes or
- * as JSX attribute values (e.g. `label="Submit"`, `placeholder="Enter name"`).
+ * Bans natural-language string literals that appear directly as JSX text nodes,
+ * as JSX attribute values (e.g. `label="Submit"`, `placeholder="Enter name"`),
+ * or as string literals inside JSX expression containers ({" "} or {"Hello"}).
  *
  * Allowed:
  *   - Single-character or empty strings (icons, separators, punctuation like "·")
@@ -21,11 +22,26 @@
 const ALLOWED_JSX_TEXT_PATTERN = /^[\s·\-–—/|.,:;!?%$#@*()\[\]{}+<>=~`^&\\0-9‌‍]*$/u;
 const ALLOWED_ATTR_VALUES = /^(https?:|\/|#|%|_|--|\.|\d+|true|false|auto|none|inherit|sm|md|lg|xl|2xl)$/i;
 
+// Brand identifiers, product names, units and technical tokens that must never
+// be translated and are therefore exempt from the catalog requirement.
+const NON_TRANSLATABLE_LITERALS = new Set([
+  "qlub",
+  "qlub_",
+  "QSR",
+  "IPG",
+  "IRR",
+  "kcal",
+  "min",
+  "RTL",
+  "LTR",
+]);
+
 function isAllowedString(value) {
   if (value.trim().length === 0) return true;
   if (value.trim().length <= 2) return true;
   if (/^\d+$/.test(value.trim())) return true;
   if (ALLOWED_JSX_TEXT_PATTERN.test(value.trim())) return true;
+  if (NON_TRANSLATABLE_LITERALS.has(value.trim())) return true;
   return false;
 }
 
@@ -41,6 +57,29 @@ const TRANSLATABLE_ATTRS = new Set([
   "subtitle",
   "description",
 ]);
+
+function isInsideJSXContext(node) {
+  let current = node.parent;
+  while (current) {
+    if (
+      current.type === "JSXElement" ||
+      current.type === "JSXFragment" ||
+      current.type === "JSXExpressionContainer"
+    ) {
+      return true;
+    }
+    if (
+      current.type === "CallExpression" ||
+      current.type === "FunctionDeclaration" ||
+      current.type === "ArrowFunctionExpression" ||
+      current.type === "FunctionExpression"
+    ) {
+      return false;
+    }
+    current = current.parent;
+  }
+  return false;
+}
 
 module.exports = {
   meta: {
@@ -88,6 +127,20 @@ module.exports = {
             data: { text: val.slice(0, 40) },
           });
         }
+      },
+
+      // Catch string literals inside JSX expression containers: {"Hello world"}
+      // Also catches props like: error={"some text"} or children passed as strings
+      "JSXExpressionContainer > Literal"(node) {
+        if (typeof node.value !== "string") return;
+        const val = node.value;
+        if (isAllowedString(val)) return;
+        if (ALLOWED_ATTR_VALUES.test(val.trim())) return;
+        context.report({
+          node,
+          messageId: "noRawJsxString",
+          data: { text: val.slice(0, 40) },
+        });
       },
     };
   },

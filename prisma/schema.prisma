@@ -127,17 +127,18 @@ model ModifierOption {
 }
 
 model DiningTable {
-  id        String      @id @default(cuid())
-  vendorId  String
-  code      String
-  label     String?
-  passcode  String
-  seats     Int         @default(2)
-  area      String?
-  status    TableStatus @default(available)
-  createdAt DateTime    @default(now())
-  vendor    Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  orders    Order[]
+  id          String      @id @default(cuid())
+  vendorId    String
+  code        String
+  label       String?
+  passcode    String
+  tableToken  String?
+  seats       Int         @default(2)
+  area        String?
+  status      TableStatus @default(available)
+  createdAt   DateTime    @default(now())
+  vendor      Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orders      Order[]
 
   @@unique([vendorId, code])
   @@index([vendorId])

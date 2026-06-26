@@ -103,6 +103,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/limiters.ts` — Singleton limiter instances: `getLimiter("publicApi" | "adminAction" | "login")`
 - `src/lib/sanitize.ts` — `sanitizeFreeText(input, maxLength?)` — strips script/HTML/javascript: from free-text fields
 - `src/lib/csrf.ts` — `checkOrigin(request)` — CSRF/origin check for public POST routes
+- `src/lib/table-token.ts` — `cryptoPasscode()` (crypto-secure 4-digit passcode); `signTableToken({ vendorId, tableId }, opts?)` (HMAC-SHA256 JWS); `verifyTableToken(token)` (returns payload or null)
+- `src/app/api/qr/route.ts` — `GET /api/qr?data=<url>&size=<px>` — server-side QR PNG generation via `qrcode` lib, no external service
 - `src/instrumentation.ts` — Boot-time env assertion via `register()`
 
 ## API & Data Layer
@@ -132,6 +134,8 @@ See `docs/adr/` for full ADRs. Key decisions:
 - #14 — Admin auth: edge middleware, RBAC, session hardening, audit log
 
 - #15 — Abuse controls: rate limiting (Redis + in-memory), login lockout, zod validation hardening, free-text sanitization, CSRF/origin checks, generic error responses
+
+- #16 — Self-hosted QR (`/api/qr`, `qrcode` lib, no third-party service); crypto passcodes (`crypto.getRandomValues`); signed table tokens (HMAC-SHA256 JWS embedding `vendorId`+`tableId`); guest entry validates + rejects tampered/foreign tokens
 
 **In progress / next:**
 - M4 complete — no remaining issues

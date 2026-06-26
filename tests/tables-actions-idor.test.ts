@@ -56,6 +56,14 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/db", () => ({ db: mockDb }));
 
+// table-token is an auth-signing utility; mock it out here because the IDOR
+// tests do not exercise signing behaviour (that is covered by table-tokens.test.ts).
+vi.mock("@/lib/table-token", () => ({
+  cryptoPasscode: () => "1234",
+  signTableToken: vi.fn().mockResolvedValue("mock-token"),
+  verifyTableToken: vi.fn().mockResolvedValue(null),
+}));
+
 // ── Import the unit under test (after mocks are registered) ─────────────────
 
 import {

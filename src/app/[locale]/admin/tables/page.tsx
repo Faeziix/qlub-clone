@@ -41,6 +41,7 @@ export default async function TablesPage() {
     area: t.area ?? "Main",
     seats: t.seats,
     passcode: t.passcode,
+    tableToken: t.tableToken ?? null,
     status: t.status,
   }));
 

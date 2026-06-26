@@ -5,15 +5,12 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { recordAuditEvent } from "@/lib/audit";
 import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
+import { cryptoPasscode, signTableToken } from "@/lib/table-token";
 
 import { TableStatus } from "@prisma/client";
 
 const STATUSES = ["available", "occupied", "bill_requested"] as const;
 type AllowedTableStatus = (typeof STATUSES)[number];
-
-function randomPasscode(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
 
 function assertVendorOwnership(
   sessionVendorId: string | null,
@@ -60,9 +57,19 @@ export async function createTable(
       label: label || `Table ${code}`,
       area: input.area.trim() || "Main",
       seats,
-      passcode: randomPasscode(),
+      passcode: cryptoPasscode(),
       status: "available",
     },
+  });
+
+  const tableToken = await signTableToken({
+    vendorId,
+    tableId: created.id,
+  });
+
+  await db.diningTable.update({
+    where: { id: created.id },
+    data: { tableToken },
   });
 
   await recordAuditEvent({

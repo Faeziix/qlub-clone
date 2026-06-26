@@ -6,6 +6,7 @@ import { bigintFromJson } from "@/lib/money";
 import { nanoid } from "nanoid";
 import { checkOrigin } from "@/lib/csrf";
 import { getLimiter } from "@/lib/limiters";
+import { getPaymentProvider } from "@/lib/payment/factory";
 
 const schema = z.object({
   orderId: z.string().min(1).max(100),
@@ -54,8 +55,45 @@ export async function POST(req: Request) {
       payerName: data.payerName,
       payerEmail: data.payerEmail,
     });
+
+    if (data.method === "ipg") {
+      const provider = getPaymentProvider();
+      const callbackUrl = buildCallbackUrl(req, leg.id);
+      const { ref } = await provider.request({
+        merchantId: leg.vendorId,
+        amount: leg.amount,
+        callbackUrl,
+        orderId: data.orderId,
+        description: `پرداخت سفارش`,
+        mobile: data.payerName,
+      });
+
+      await storePendingTrackId(leg.id, ref);
+
+      const gatewayRedirectUrl = provider.redirectUrl(ref);
+      return NextResponse.json({
+        ok: true,
+        payment: serializePayment(leg),
+        gatewayRedirectUrl,
+        trackId: ref,
+      });
+    }
+
     return NextResponse.json({ ok: true, payment: serializePayment(leg) });
   } catch {
     return NextResponse.json({ ok: false, error: "Bad request" }, { status: 400 });
   }
+}
+
+function buildCallbackUrl(req: Request, paymentId: string): string {
+  const url = new URL(req.url);
+  return `${url.origin}/api/payments/callback?paymentId=${paymentId}`;
+}
+
+async function storePendingTrackId(paymentId: string, trackId: string): Promise<void> {
+  const { db } = await import("@/lib/db");
+  await db.payment.update({
+    where: { id: paymentId },
+    data: { trackId },
+  });
 }

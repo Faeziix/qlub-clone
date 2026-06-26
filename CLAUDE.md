@@ -120,6 +120,11 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/app/api/otp/request/route.ts` — `POST /api/otp/request` — public OTP request endpoint
 - `src/app/api/otp/verify/route.ts` — `POST /api/otp/verify` — public OTP verify endpoint; sets `Order.phoneVerifiedAt`
 - `src/app/api/admin/otp-override/route.ts` — `POST /api/admin/otp-override` — staff+ operator override; sets `Order.phoneVerifiedAt` + audit log
+- `src/lib/payment/provider.ts` — `PaymentProvider` interface + all input/result types (issue #20)
+- `src/lib/payment/adapters/simulated.ts` — `SimulatedPaymentAdapter` in-process sandbox (issue #20)
+- `src/lib/payment/factory.ts` — `getPaymentProvider()` factory (reads `PAYMENT_PROVIDER` env)
+- `src/lib/payment/payment-service.ts` — `recordPaymentVerified`, `recordPaymentFailed`, `expirePayment` state machine transitions
+- `src/app/api/payments/callback/route.ts` — `GET /api/payments/callback` — server-side gateway callback handler (verifies via provider, never trusts redirect params)
 
 ## API & Data Layer
 
@@ -156,3 +161,6 @@ See `docs/adr/` for full ADRs. Key decisions:
 **Done (M5 issues):**
 - #17 — Real-time order board v1: `/api/admin/orders` polling endpoint (cursor pagination, JWT auth, tenant isolation); `useOrdersPolling` hook (axios, 8 s, merge-by-id); RBAC-gated status transitions (staff = workflow only, manager+ = all incl. cancel/paid/open); ceiling-split payment display (parentPaymentId badge)
 - #18 — Guest phone + SMS OTP: `phone.ts` E.164 normalizer (Persian/Arabic-Indic → ASCII → E.164); `sms-provider.ts` two-provider chain with console dev adapter; `otp.ts` lifecycle (SHA-256 hash, 2-min TTL, 5-attempt cap, Redis rate limits); `/api/otp/request` + `/api/otp/verify` public routes; `/api/admin/otp-override` staff+ override; schema: `Order.phoneVerifiedAt` + `Vendor.otpGateEnabled`; ADR-0019
+
+**Done (M6 issues):**
+- #20 — PaymentProvider interface + simulated/sandbox facilitator: `PaymentProvider` interface (request/redirectUrl/verify/inquire/refundViaPayout/onboardSubMerchant/verifyIban); `SimulatedPaymentAdapter` (in-process sessions, simulatePaid/simulateCancelled test helpers); `getPaymentProvider()` factory (PAYMENT_PROVIDER env, defaults to simulated); `/api/payments/callback` route (server-side verify, never trusts redirect params); `recordPaymentVerified`/`recordPaymentFailed`/`expirePayment` state machine transitions; ADR-0021

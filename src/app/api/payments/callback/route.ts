@@ -5,21 +5,31 @@
  * payment. This handler performs SERVER-SIDE verification — the query string
  * params from the redirect are NEVER trusted for payment status.
  *
- * Flow:
+ * Full state machine flow:
  *   1. Read paymentId from query string (set by us when we built the callbackUrl).
  *   2. Load the pending Payment record to retrieve the trackId (ref).
- *   3. Call provider.verify(trackId) — the ONLY authoritative status source.
- *   4. Transition the payment state machine based on verified result.
- *   5. Redirect the browser to the success or failure page.
+ *   3. transitionToVerifying(paymentId) — atomic claim; 0 rows = already claimed.
+ *   4. Call provider.verify(trackId) — the ONLY authoritative status source.
+ *   5. Transition to succeeded / failed based on verify result.
+ *   6. Redirect the browser to the success or failure page.
  *
  * Security invariant: the redirect query string (status, amount, etc. from the
  * gateway) is IGNORED for anything money-related. Only provider.verify() counts.
+ *
+ * Concurrency invariant: transitionToVerifying uses a conditional UPDATE
+ * (WHERE status='pending') so only one concurrent callback can claim the
+ * payment. The second callback sees 0 rows updated and takes the idempotent
+ * early-return path.
  */
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getPaymentProvider } from "@/lib/payment/factory";
-import { recordPaymentVerified, recordPaymentFailed } from "@/lib/payment/payment-service";
+import {
+  transitionToVerifying,
+  recordPaymentVerified,
+  recordPaymentFailed,
+} from "@/lib/payment/payment-service";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -49,6 +59,15 @@ export async function GET(req: Request) {
   if (!payment.trackId) {
     await recordPaymentFailed(payment.id);
     return failureRedirect(req, payment.orderId);
+  }
+
+  if (payment.status === "verifying") {
+    return pendingRedirect(req, payment.orderId);
+  }
+
+  const claimed = await transitionToVerifying(payment.id);
+  if (claimed === 0) {
+    return pendingRedirect(req, payment.orderId);
   }
 
   const provider = getPaymentProvider();

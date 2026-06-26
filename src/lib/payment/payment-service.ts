@@ -1,24 +1,41 @@
 /**
  * payment-service.ts — server-side payment state machine transitions.
  *
- * These functions are called from the callback route after provider.verify()
- * returns an authoritative result. They implement the idempotent state machine
- * from §5.4.3 of the PRD using conditional updates (WHERE status = <expected>)
- * so concurrent callbacks or reconciliation sweeps cannot double-apply.
+ * Implements the idempotent state machine from PRD §5.4.3 using conditional
+ * updates (WHERE status = <expected>) so concurrent callbacks or reconciliation
+ * sweeps cannot double-apply.
  *
- * State transitions:
- *   pending → verifying (callback arrives)
- *   verifying → succeeded (verify = paid, first writer wins)
- *   verifying → failed (verify = failed)
- *   verifying → succeeded (verify = "already processed", idempotent no-op)
- *   pending/verifying → expired (TTL passed, sweep finds no gateway success)
- *   succeeded → refunded (payout unwind for overpay/refund)
+ * State machine:
+ *   pending → verifying  (transitionToVerifying — callback arrives, first writer wins)
+ *   verifying → succeeded (recordPaymentVerified — verify=paid)
+ *   verifying → failed    (recordPaymentFailed   — verify=failed)
+ *   verifying → succeeded (recordPaymentVerified — "already processed", idempotent)
+ *   pending/verifying → expired (expirePayment — TTL passed, no gateway success)
+ *   succeeded → refunded  (recordPaymentRefunded — payout unwind for overpay/refund)
  */
 
 import "server-only";
 import { db } from "@/lib/db";
 import { OrderStatus } from "@prisma/client";
 import { nanoid } from "nanoid";
+
+/**
+ * Transitions a pending payment to the verifying state.
+ * This is the first step when a callback arrives — it claims the payment
+ * exclusively so no concurrent callback or sweep can also start verifying it.
+ *
+ * Returns the number of rows updated (0 = already claimed or not found).
+ * The caller MUST check the return value: 0 means another process already
+ * owns this verification — abort and return idempotent success to the caller.
+ */
+export async function transitionToVerifying(paymentId: string): Promise<number> {
+  return db.$executeRaw`
+    UPDATE "Payment"
+    SET status = 'verifying'
+    WHERE id = ${paymentId}
+      AND status = 'pending'
+  `;
+}
 
 export async function recordPaymentVerified(input: {
   paymentId: string;
@@ -96,7 +113,23 @@ export async function expirePayment(paymentId: string): Promise<void> {
     UPDATE "Payment"
     SET status = 'expired'
     WHERE id = ${paymentId}
-      AND status = 'pending'
+      AND status IN ('pending', 'verifying')
       AND "expiresAt" < NOW()
+  `;
+}
+
+/**
+ * Transitions a succeeded payment to refunded.
+ * Only succeeded payments can be refunded — this enforces that a payout record
+ * already exists before the payment is marked refunded (PRD §6.6).
+ *
+ * Returns the number of rows updated (0 = not found or wrong state).
+ */
+export async function recordPaymentRefunded(paymentId: string): Promise<number> {
+  return db.$executeRaw`
+    UPDATE "Payment"
+    SET status = 'refunded'
+    WHERE id = ${paymentId}
+      AND status = 'succeeded'
   `;
 }

@@ -10,10 +10,10 @@
 
 See `docs/adr/` for full ADRs. Key decisions:
 
-- **ADR 0001** — No committed secrets; `AUTH_SECRET` mandatory; no fallback; no backdoor scripts; hardened seed with crypto-random passwords.
-- **ADR 0002** — All table mutations require a valid admin session and vendor-scoped ownership check (IDOR fix).
-- **ADR 0003** — bun is the only package manager; Node ≥ 20 pinned via `engines` + `.nvmrc`; `eslint.ignoreDuringBuilds` removed; CI workflow enforces typecheck + lint on PRs.
-- **ADR 0014** — Edge middleware fail-closed for `/admin/*`; RBAC via `requireRole`/`assertRole`; 1-hour JWT sessions with DB re-validation on sensitive actions; all admin mutations + logins recorded in `AuditLog`.
+- **ADR-0001** — No committed secrets; `AUTH_SECRET` mandatory; no fallback; no backdoor scripts; hardened seed with crypto-random passwords.
+- **ADR-0002** — All table mutations require a valid admin session and vendor-scoped ownership check (IDOR fix).
+- **ADR-0003** — bun is the only package manager; Node ≥ 20 pinned via `engines` + `.nvmrc`; `eslint.ignoreDuringBuilds` removed; CI workflow enforces typecheck + lint on PRs.
+- **ADR-0014** — Edge middleware fail-closed for `/admin/*`; RBAC via `requireRole`/`assertRole`; 1-hour JWT sessions with DB re-validation on sensitive actions; all admin mutations + logins recorded in `AuditLog`.
 - **ADR 0006** — DR baseline: Neon-managed PITR/branching for Track A; restore runbook + RTO/RPO documented; Track B (domestic) DR deferred to Phase 5.
 - **ADR 0007** — Review is per-Payment (`paymentId @unique`): each split-bill payer can review once; no orderId on Review.
 - **ADR 0008** — Schema modernization: native Postgres enums, JSONB columns, Iran defaults (IRR/fa/Asia/Tehran/ir), translation tables, monotonic per-vendor orderNumber, AuditLog, sub-merchant fields.
@@ -81,6 +81,9 @@ See `docs/adr/` for full ADRs. Key decisions:
 - ❌ `provider.request({ amount: leg.amount })` charges only the bill and silently undercharges tipping diners → ✅ Pass `leg.total` (= `amount + tipAmount`) to `provider.request()`; only `payment.amount` (bill portion) credits `order.amountPaid` in `recordPaymentVerified`.
 - ❌ Callback route passed `verifyResult.amount ?? payment.amount` to `recordPaymentVerified` without asserting equality with the reserved amount → ✅ Assert `verifyResult.amount === payment.amount + payment.tipAmount` before crediting; treat mismatch as payment failure.
 - ❌ `mobile: data.payerName` sent payer NAME as the gateway mobile field → ✅ Omit `mobile` from `provider.request()` until a dedicated `dinerMobile` field is added to the request schema.
+- ❌ State machine had no `verifying` intermediate state — concurrent callbacks could both apply `recordPaymentVerified` and double-credit `order.amountPaid` → ✅ `transitionToVerifying` claims the payment atomically (`WHERE status='pending'`); only the first caller gets 1 row; subsequent callers get 0 and return idempotent success.
+- ❌ `PaymentStatus` enum missing `verifying` value — adding it after the fact requires `ALTER TYPE ... ADD VALUE` not a full enum recreate in Postgres → ✅ Use `ALTER TYPE "PaymentStatus" ADD VALUE IF NOT EXISTS 'verifying' AFTER 'pending'` in the migration.
+- ❌ Ceiling-split tip distribution: proportionally splitting tip by bill chunks can produce gatewayTotal > ceiling → ✅ Split the TOTAL (amount+tip) by ceiling, then derive amount/tip portions from each total chunk proportionally.
 
 ## Dependencies & Tooling
 
@@ -126,8 +129,11 @@ See `docs/adr/` for full ADRs. Key decisions:
 - `src/lib/payment/provider.ts` — `PaymentProvider` interface + all input/result types (issue #20)
 - `src/lib/payment/adapters/simulated.ts` — `SimulatedPaymentAdapter` in-process sandbox (issue #20)
 - `src/lib/payment/factory.ts` — `getPaymentProvider()` factory (reads `PAYMENT_PROVIDER` env)
-- `src/lib/payment/payment-service.ts` — `recordPaymentVerified`, `recordPaymentFailed`, `expirePayment` state machine transitions
-- `src/app/api/payments/callback/route.ts` — `GET /api/payments/callback` — server-side gateway callback handler (verifies via provider, never trusts redirect params)
+- `src/lib/payment/payment-service.ts` — `transitionToVerifying` (pending→verifying, atomic first-writer-wins), `recordPaymentVerified`, `recordPaymentFailed`, `expirePayment` (guards verifying too), `recordPaymentRefunded` (succeeded→refunded)
+- `src/lib/payment/ceiling-split.ts` — `splitIntoSubCharges`, `computeCeilingSplit` (splits bill+tip by IPG ceiling), `areCeilingSplitSubChargesFullyPaid`, `IPG_TRANSACTION_CEILING_RIAL`
+- `src/lib/payment/reconciliation-sweep.ts` — `runReconciliationSweep` (DI-based, testable), `buildReconciliationSweepRunner`, `SWEEP_STALENESS_MINUTES`; types: `SweepablePayment`, `OpsQueueEntry`, `ReconciliationSweepInput`
+- `src/app/api/payments/callback/route.ts` — `GET /api/payments/callback` — server-side gateway callback handler; uses `transitionToVerifying` before verify for concurrent-safe first-writer-wins claim
+- `src/app/api/payments/sweep/route.ts` — `POST /api/payments/sweep` — scheduled reconciliation sweep endpoint (requires `x-sweep-secret`)
 
 ## API & Data Layer
 
@@ -167,3 +173,4 @@ See `docs/adr/` for full ADRs. Key decisions:
 
 **Done (M6 issues):**
 - #20 — PaymentProvider interface + simulated/sandbox facilitator: `PaymentProvider` interface (request/redirectUrl/verify/inquire/refundViaPayout/onboardSubMerchant/verifyIban); `SimulatedPaymentAdapter` (in-process sessions, simulatePaid/simulateCancelled test helpers); `getPaymentProvider()` factory (PAYMENT_PROVIDER env, defaults to simulated); `/api/payments/callback` route (server-side verify, never trusts redirect params); `recordPaymentVerified`/`recordPaymentFailed`/`expirePayment` state machine transitions; ADR-0021
+- #21 — Payment state machine + idempotency + reconciliation sweep + ceiling-split: `transitionToVerifying` (pending→verifying atomic claim); `recordPaymentRefunded`; `ceiling-split.ts` (`splitIntoSubCharges`, `computeCeilingSplit`, `areCeilingSplitSubChargesFullyPaid`, `IPG_TRANSACTION_CEILING_RIAL`); `reconciliation-sweep.ts` (`runReconciliationSweep`, `buildReconciliationSweepRunner`); `/api/payments/sweep` scheduled sweep endpoint; `verifying` enum value added to `PaymentStatus`; migration 0005; 44 integration tests; ADR-0022

@@ -344,6 +344,7 @@ enum PaymentMethod {
 
 enum PaymentStatus {
   pending
+  verifying
   succeeded
   failed
   refunded

@@ -210,11 +210,19 @@ The venue landing presents two primary CTAs below the hero section:
 - Logo missing → rounded square with restaurant name initials on `--brand` background
 - Menu tile image missing → gradient from `--brand-soft` to `--surface-2` with menu name text overlay
 
+### Waiter-led ordering (M10)
+The customer phone menu is **view-only**. There is no cart, no place-order button, and no add-to-cart affordance. Guests browse, view item details (including read-only modifier options), check order status, and pay the bill. Waiters enter orders via the admin order-entry console.
+
+- Tapping an item card opens `ItemSheet` in **read-only mode**: modifier groups are displayed as static lists (name + price delta), not interactive buttons.
+- The "+" badge is removed from `ItemCard`.
+- `MyOrderSheet` shows the waiter's order status and a Pay CTA; the "Add more items" button is removed.
+- On mount with a `tablePublicId`, `MenuExperience` auto-fetches the table's open bill to populate the "My Order" status banner.
+
 ### RTL-aware icon usage
 - `ChevronLeft` — back navigation (mirrors in RTL)
-- `ShoppingBag` — cart icon
 - `Search` — search field
 - `Globe` — language switcher
+- `ClipboardList` — "My Order" status link
 
 ## Money Display
 

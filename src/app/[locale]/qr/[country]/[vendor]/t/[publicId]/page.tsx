@@ -47,7 +47,7 @@ export default async function TableMenuPage({
     ? (vendorTheme as ThemePreset)
     : undefined;
 
-  const tableCode = await resolveTableForVendor(
+  const tableResolved = await resolveTableForVendor(
     vendor.id,
     rawPublicId,
     (publicId) =>
@@ -57,14 +57,13 @@ export default async function TableMenuPage({
       })
   );
 
-  const tablePublicId = tableCode ? normalizeTablePublicId(rawPublicId) : null;
+  const tablePublicId = tableResolved ? normalizeTablePublicId(rawPublicId) : null;
 
   return (
     <TenantThemeProvider theme={{ preset }}>
       <MenuExperience
         vendor={vendor}
         initialLang={resolvedLocale}
-        tableCode={tableCode}
         tablePublicId={tablePublicId}
       />
     </TenantThemeProvider>

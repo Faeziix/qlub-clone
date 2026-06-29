@@ -92,13 +92,6 @@ export function ItemCard({ item, lang, className, onClick }: ItemCardProps) {
         ) : (
           <ItemImageFallback name={name} />
         )}
-
-        <span
-          aria-hidden
-          className="absolute bottom-1.5 end-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-brand text-brand-fg text-sm font-black leading-none shadow-card"
-        >
-          +
-        </span>
       </div>
     </button>
   );

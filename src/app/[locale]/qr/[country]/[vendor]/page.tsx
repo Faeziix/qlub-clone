@@ -49,7 +49,6 @@ export default async function VendorMenuPage({
       <MenuExperience
         vendor={vendor}
         initialLang={resolvedLocale}
-        tableCode={null}
         tablePublicId={null}
       />
     </TenantThemeProvider>

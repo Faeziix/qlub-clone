@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Qlub Iran — Autonomous Milestone Loop (milestone-cycle workflow)</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2430; --line: #2d3644;
+    --ink: #e6edf3; --muted: #8b949e; --brand: #d29922; --green: #3fb950;
+    --red: #f85149; --blue: #58a6ff; --purple: #bc8cff; --teal: #2dd4bf;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .sub { color: var(--muted); margin: 0 0 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 18px 0 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+  .dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin: 14px 0; overflow-x: auto; }
+  .mermaid { display: flex; justify-content: center; }
+  ul { padding-left: 20px; }
+  li { margin: 5px 0; }
+  code { background: var(--surface2); border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; font-size: 13px; color: var(--brand); }
+  .pill { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .boards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 14px 0; }
+  .board { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .board h3 { margin: 0 0 6px; font-size: 14px; }
+  .board p { margin: 0; color: var(--muted); font-size: 13px; }
+  footer { margin-top: 50px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Autonomous Milestone Loop</h1>
+  <p class="sub"><code>/next-milestone</code> drives the deterministic <code>milestone-cycle</code> workflow — select a milestone → for each issue <b>implement ↔ (code ∥ QA ∥ design review) → decision-gate</b> → open ONE sign-off PR, for <code>Faeziix/qlub-clone</code>.</p>
+
+  <div class="legend">
+    <span><i class="dot" style="background:#1f6feb"></i> deterministic JS control flow</span>
+    <span><i class="dot" style="background:#bc8cff"></i> code reviewer — reads the diff</span>
+    <span><i class="dot" style="background:#f0883e"></i> QA agent — runtime/errors (HTTP + logs)</span>
+    <span><i class="dot" style="background:#2dd4bf"></i> design reviewer — drives Chrome + impeccable</span>
+    <span><i class="dot" style="background:#3fb950"></i> approved / integrated</span>
+    <span><i class="dot" style="background:#f85149"></i> escalate / pause for human</span>
+    <span><i class="dot" style="background:#d29922"></i> decision</span>
+  </div>
+
+  <h2>1 · End-to-end flow</h2>
+  <div class="card">
+    <pre class="mermaid">
+flowchart TD
+    start(["/next-milestone"]):::loop --> cmd["next-milestone command —<br/>calls Workflow milestone-cycle.js"]:::js
+    cmd --> selA["🤖 select agent (haiku) —<br/>lowest milestone with open issues ·<br/>create / rebase feat/mN branch"]:::agent
+    selA --> found{"workable issues?"}:::dec
+    found -->|no| done["return done / all blocked"]:::js
+    done --> endNone["⛔ End — report blocked / HITL"]:::stop
+    found -->|yes| loopIssues["for each issue (ascending #)"]:::js
+
+    loopIssues --> hitl{"HITL issue?"}:::dec
+    hitl -->|yes| esc["escalate — label blocked-on-human"]:::stop
+    hitl -->|no| claim["🏷️ claim issue (live) —<br/>label in-progress · Project Status=In Progress"]:::js
+    claim --> round["round = 0"]:::js
+    round --> gate{"rounds left? cap 5"}:::dec
+    gate -->|no| nonconv["non-convergence → escalate"]:::stop
+    gate -->|yes| impl["🤖 implement agent (sonnet · high) —<br/>tests-first · commit · push branch · capture base SHA<br/>comment 🤖 on issue · set Revision round<br/>rounds 2+ get ALL reviewers' blocking list"]:::agent
+    impl --> needsH{"impl needs human?"}:::dec
+    needsH -->|yes| esc
+
+    needsH -->|no| fan["⟂ parallel reviewers — barrier<br/>(scoped to this issue's base..head ·<br/>green lenses skipped on re-rounds)"]:::js
+    fan --> cr["🤖 code reviewer (opus · medium) —<br/>diff of THIS issue's delta · runs tests/lint/types ONCE ·<br/>every acceptance criterion · runs every round"]:::agent
+    fan --> qa["🤖 QA agent (sonnet · medium) —<br/>browser-free · HTTP + dev-server log ·<br/>5xx · hydration · console · blank renders<br/>(runnable-surface only · re-runs only if it failed)"]:::qa
+    fan --> ar["🤖 design reviewer (opus · medium) —<br/>drives LOCAL Chrome · uses app as a<br/>Farsi user · impeccable critique / detect / audit<br/>(UI only · re-runs only if it failed)"]:::app
+    qa --> eboard["❗ errors board + severity"]:::qa
+    ar --> boards["📋 boards + severity:<br/>🎨 styling · 🧩 business-logic ·<br/>🌐 rtl-i18n (only if i18n touched)"]:::app
+    cr --> merge{"decision-gate:<br/>code approved AND<br/>zero crit/high QA AND<br/>zero crit/high design?"}:::dec
+    eboard --> merge
+    boards --> merge
+
+    merge -->|yes| integrated["✅ integrate (live) — label agent-integrated ·<br/>Project Status=Done · Reviewers field=verdict"]:::ok
+    merge -->|no| inc["round++ · thread ALL reviewers'<br/>blocking items → next implement<br/>(med/low findings = advisory)"]:::js
+    inc --> gate
+
+    integrated --> nextIssue["next issue"]:::js
+    esc --> nextIssue
+    nonconv --> nextIssue
+    nextIssue --> moreIssues{"more issues?"}:::dec
+    moreIssues -->|yes| loopIssues
+    moreIssues -->|no| shipA["🤖 ship agent (sonnet) —<br/>ONE PR · Closes #… · Needs-your-decision ·<br/>Live-app review boards section"]:::agent
+
+    shipA --> complete{"milestone complete?<br/>(no open un-integrated issues)"}:::dec
+    complete -->|yes| ready["✅ READY PR — titled mN"]:::ok
+    complete -->|no| draft["📝 DRAFT PR — gated on your decisions"]:::stop
+    ready --> pause["⛔ pause — your merge / sign-off<br/>next milestone branches from main"]:::stop
+    draft --> pause
+
+    classDef loop fill:#21262d,stroke:#8b949e,color:#e6edf3;
+    classDef js fill:#0d2d6b,stroke:#1f6feb,color:#cae0ff;
+    classDef agent fill:#3a2a5d,stroke:#bc8cff,color:#eaddff;
+    classDef qa fill:#3d2607,stroke:#f0883e,color:#ffd9b3;
+    classDef app fill:#0c3b38,stroke:#2dd4bf,color:#b8fff6;
+    classDef dec fill:#3d2f0a,stroke:#d29922,color:#ffe9b3;
+    classDef ok fill:#0f3d22,stroke:#3fb950,color:#aff5c8;
+    classDef stop fill:#4a1410,stroke:#f85149,color:#ffc7c2;
+    </pre>
+  </div>
+
+  <h2>2 · The review fan-out &amp; decision-gate (one round)</h2>
+  <p class="sub">Three independent reviewers run in parallel against the same pushed code; the gate is the barrier that merges them. The QA agent stays browser-free so it never contends with the design reviewer's live Chrome.</p>
+  <div class="card">
+    <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant JS as Workflow (JS)
+    participant I as 🤖 Implementer
+    participant CR as 🤖 Code Reviewer
+    participant QA as 🤖 QA Agent
+    participant AR as 🤖 Design Reviewer
+    participant GH as GitHub / branch
+
+    JS->>I: implement round r — issue + acceptance criteria
+    I->>GH: commit + push to feat/mN
+    par parallel review (barrier)
+        JS->>CR: review the diff vs main, run tests/lint/types
+        CR-->>JS: approved? + blocking[]
+    and
+        JS->>QA: hit affected routes (HTTP) · read dev-server log
+        QA-->>JS: errors board {5xx, hydration, console} + severity
+    and
+        JS->>AR: exercise affected screens in Chrome + impeccable
+        AR-->>JS: boards {styling, business-logic, rtl-i18n*} + severity
+    end
+    Note over JS: gate = code approved AND no crit/high QA AND no crit/high design
+    alt gate passes
+        JS->>GH: integrate (agent-integrated)
+    else
+        JS->>I: round r+1 — all reviewers' critical/high
+    end
+    Note over QA: non-runnable issue → QA self-skips
+    Note over AR: non-UI issue → design self-skips · rtl-i18n* only if i18n touched
+    </pre>
+  </div>
+
+  <h2>3 · The boards — who owns what, and when</h2>
+  <p class="sub"><b>Critical / High block</b> the gate and drive fix-rounds; <b>Medium / Low</b> are advisory and surfaced in the PR. Each board only runs when it's relevant.</p>
+  <div class="boards">
+    <div class="board"><h3>❗ Errors / Crashes <span class="pill">QA agent</span></h3><p>500s, hydration warnings, console errors, blank renders, failed requests. Browser-free (HTTP + dev-server log). Runs on any runnable-surface issue.</p></div>
+    <div class="board"><h3>🎨 Styling / Visual <span class="pill">design reviewer</span></h3><p>Driven by <code>impeccable</code> (<code>critique</code>/<code>detect</code>/<code>audit</code>): layout, spacing, responsive framing, design-system consistency, anti-"AI-slop". UI issues only.</p></div>
+    <div class="board"><h3>🧩 Business-Logic / Flow <span class="pill">design reviewer</span></h3><p>Dead-end / orphan routes, missing buttons (e.g. no pay entry), can't re-order, cart not clearing, wrong totals. UI issues only.</p></div>
+    <div class="board"><h3>🌐 RTL / i18n <span class="pill">conditional</span></h3><p>Untranslated strings, wrong <code>dir</code>, digit/number formatting, LTR flash, wrong default locale. Only when the change touches an i18n surface.</p></div>
+  </div>
+
+  <h2>4 · Loop-control states</h2>
+  <div class="card">
+    <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Selecting
+    Selecting --> NoWork: no milestone with open issues
+    Selecting --> PerIssue: claimed milestone + branch
+    PerIssue --> Implementing: next issue
+    Implementing --> Reviewing: push round r
+    Reviewing --> Implementing: gate fails, rounds left
+    Reviewing --> Integrated: code approved + no crit/high app
+    Implementing --> Escalated: impl needs human
+    PerIssue --> Escalated: HITL or non-convergence
+    Integrated --> PerIssue: more issues
+    Escalated --> PerIssue: more issues
+    PerIssue --> Shipping: no issues left
+    Shipping --> ReadyPR: milestone complete
+    Shipping --> DraftPR: decisions outstanding
+    ReadyPR --> [*]: pause for your merge
+    DraftPR --> [*]: pause for your decisions
+    NoWork --> [*]: stop, report blocked / HITL
+</pre>
+  </div>
+
+  <h2>What makes it trustworthy</h2>
+  <ul>
+    <li><span class="pill">three lenses</span> A <b>code reviewer</b> (diff), a <b>QA agent</b> (runtime errors via HTTP + logs), and a <b>design reviewer</b> (Chrome + impeccable) run in parallel — each catches a class of bug the others miss.</li>
+    <li><span class="pill">no contention</span> The QA agent is <b>browser-free</b> (HTTP + dev-server log), so it never fights the design reviewer for the one connected Chrome.</li>
+    <li><span class="pill">design-aware</span> The styling board is driven by <code>impeccable</code> (<code>critique</code>/<code>detect</code>/<code>audit</code>), not eyeballing — scored against your <code>PRODUCT.md</code>/<code>DESIGN.md</code> when present.</li>
+    <li><span class="pill">severity-gated</span> Only <b>critical/high</b> findings block; medium/low ride along as advisory polish, so the gate stays fast.</li>
+    <li><span class="pill">relevance-gated</span> The design pass <b>self-skips non-UI issues</b>, the QA pass skips issues with no runnable surface, and the <b>RTL/i18n board only runs when i18n is touched</b> — no tokens burned where there's nothing to check.</li>
+    <li><span class="pill">bounded</span> <code>while (round &lt; MAX_ROUNDS)</code> caps implement↔review at 5 passes (raised from 3 for the extra reviewers) — no infinite ping-pong.</li>
+    <li><span class="pill">graceful</span> If a reviewer can't run (no browser, app won't boot), it <b>skips (non-blocking)</b> and the others remain the gate.</li>
+    <li><span class="pill">one sign-off</span> A whole milestone lands as a single PR; escalations (secrets, legal, irreversible) pause the loop for you instead of guessing.</li>
+    <li><span class="pill">live on GitHub</span> Labels and the <b>Project board</b> (#2 "Qlub Iran — Delivery") move <b>per-issue as it happens</b> — claim → In Progress, integrate → Done — not stamped in bulk at start/PR time. The <b>Revision round</b> and <b>Reviewers</b> Project fields track each issue's progress.</li>
+    <li><span class="pill">audit trail</span> The implementer and all three reviewers each <b>comment on the issue</b> (🤖 / 🔎 / 🧪 / 🎨), so the issue thread tells the whole story without opening the diff.</li>
+    <li><span class="pill">cost-aware</span> Reviews are <b>scoped to each issue's own <code>base..head</code> delta</b> (not the accumulating branch — avoids O(n²) re-reads), <b>green lenses are skipped</b> on fix rounds, tests run <b>once</b> (code lens only), and Opus reviewers run at <b>medium</b> effort. Relevance-gating means a docs-only change pays for one reviewer, not three.</li>
+  </ul>
+
+  <footer>
+    Source: <code>.claude/workflows/milestone-cycle.js</code> · driver: <code>.claude/commands/next-milestone.md</code> · run with <code>/next-milestone</code>.<br/>
+    Diagrams render client-side via Mermaid (loaded from CDN — needs internet on first open).
+  </footer>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "dark",
+    themeVariables: { fontSize: "14px", fontFamily: "Inter, system-ui, sans-serif" },
+    flowchart: { curve: "basis", nodeSpacing: 45, rankSpacing: 50 },
+    securityLevel: "loose",
+  });
+</script>
+</body>
+</html>

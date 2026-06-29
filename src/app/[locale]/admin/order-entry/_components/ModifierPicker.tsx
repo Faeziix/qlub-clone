@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsTomanPersian, formatRialAsTomanLatin } from "@/lib/toman-formatter";
 import type { MenuItemRow, SelectedOption } from "./types";
 
 interface ModifierPickerProps {
@@ -88,7 +88,7 @@ export function ModifierPicker({ item, locale, onConfirm, onClose, t }: Modifier
   const displayPrice = (rialAmount: number) =>
     locale === "fa"
       ? formatRialAsTomanPersian(BigInt(rialAmount))
-      : `${Math.round(rialAmount / 10).toLocaleString()} T`;
+      : formatRialAsTomanLatin(BigInt(rialAmount));
 
   return (
     <div className="fixed inset-0 z-modal flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>

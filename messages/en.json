@@ -542,7 +542,9 @@
       "tableStatus_bill_requested": "Bill requested",
       "orderNumber": "Order #{number}",
       "changeTable": "Change table",
-      "walkIn": "Walk-in"
+      "walkIn": "Walk-in",
+      "removeItem": "Remove item",
+      "decreaseQty": "Decrease quantity"
     }
   }
 }

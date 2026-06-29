@@ -3,7 +3,7 @@
 import { useState, useDeferredValue } from "react";
 import { Search, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsTomanPersian, formatRialAsTomanLatin } from "@/lib/toman-formatter";
 import type { MenuCategoryRow, MenuItemRow, SelectedOption } from "./types";
 import { ModifierPicker } from "./ModifierPicker";
 
@@ -57,7 +57,7 @@ export function MenuBrowser({ categories, locale, onAddItem, t }: MenuBrowserPro
   const displayPrice = (rialAmount: number) =>
     locale === "fa"
       ? formatRialAsTomanPersian(BigInt(rialAmount))
-      : `${Math.round(rialAmount / 10).toLocaleString()} T`;
+      : formatRialAsTomanLatin(BigInt(rialAmount));
 
   function handleItemClick(item: MenuItemRow) {
     if (item.modifierGroups.length > 0) {

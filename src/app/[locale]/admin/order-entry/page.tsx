@@ -16,7 +16,7 @@ export default async function OrderEntryPage() {
   const t = await getTranslations("admin.orderEntry");
   const locale = await getLocale();
 
-  const { tables, menuCategories } = await getWaiterPageData();
+  const { tables, menuCategories, vendorRates } = await getWaiterPageData();
 
   return (
     <div>
@@ -25,6 +25,7 @@ export default async function OrderEntryPage() {
         tables={tables}
         menuCategories={menuCategories}
         locale={locale}
+        vendorRates={vendorRates}
         t={{
           selectTable: t("selectTable"),
           noTables: t("noTables"),
@@ -60,6 +61,8 @@ export default async function OrderEntryPage() {
           orderNumber: t("orderNumber"),
           changeTable: t("changeTable"),
           walkIn: t("walkIn"),
+          removeItem: t("removeItem"),
+          decreaseQty: t("decreaseQty"),
         }}
       />
     </div>

@@ -24,7 +24,15 @@ export interface OpenOrderRow {
   serviceCharge: number;
   tax: number;
   total: number;
+  discount: number;
+  tipAmount: number;
   itemCount: number;
+}
+
+export interface VendorRates {
+  serviceChargePct: number;
+  taxPct: number;
+  taxInclusive: boolean;
 }
 
 export interface MenuCategoryRow {
@@ -64,6 +72,7 @@ export async function getWaiterPageData(): Promise<{
   tables: TableRow[];
   menuCategories: MenuCategoryRow[];
   vendorSlug: string;
+  vendorRates: VendorRates;
 }> {
   const session = await requireRole("staff");
   if (!session.vendorId) throw new Error("No vendor assigned");
@@ -103,7 +112,7 @@ export async function getWaiterPageData(): Promise<{
 
   const vendor = await db.vendor.findUnique({
     where: { id: session.vendorId },
-    select: { slug: true },
+    select: { slug: true, serviceChargePct: true, taxPct: true, taxInclusive: true },
   });
   if (!vendor) throw new Error("Vendor not found");
 
@@ -153,7 +162,13 @@ export async function getWaiterPageData(): Promise<{
       })),
     }));
 
-  return { tables: tableRows, menuCategories, vendorSlug: vendor.slug };
+  const vendorRates: VendorRates = {
+    serviceChargePct: vendor.serviceChargePct,
+    taxPct: vendor.taxPct,
+    taxInclusive: vendor.taxInclusive,
+  };
+
+  return { tables: tableRows, menuCategories, vendorSlug: vendor.slug, vendorRates };
 }
 
 export async function getOpenOrderForTable(tableId: string): Promise<OpenOrderRow | null> {
@@ -175,6 +190,8 @@ export async function getOpenOrderForTable(tableId: string): Promise<OpenOrderRo
       serviceCharge: true,
       tax: true,
       total: true,
+      discount: true,
+      tipAmount: true,
       items: { select: { id: true } },
     },
   });
@@ -189,6 +206,8 @@ export async function getOpenOrderForTable(tableId: string): Promise<OpenOrderRo
     serviceCharge: bigintToNumber(order.serviceCharge),
     tax: bigintToNumber(order.tax),
     total: bigintToNumber(order.total),
+    discount: bigintToNumber(order.discount),
+    tipAmount: bigintToNumber(order.tipAmount),
     itemCount: order.items.length,
   };
 }

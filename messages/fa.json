@@ -542,7 +542,9 @@
       "tableStatus_bill_requested": "درخواست صورتحساب",
       "orderNumber": "سفارش #{number}",
       "changeTable": "تغییر میز",
-      "walkIn": "بدون میز"
+      "walkIn": "بدون میز",
+      "removeItem": "حذف آیتم",
+      "decreaseQty": "کاهش تعداد"
     }
   }
 }

@@ -23,14 +23,14 @@ interface TablePickerProps {
 
 const TABLE_STATUS_STYLES: Record<string, string> = {
   available: "border-success/40 bg-success/5 text-success",
-  occupied: "border-amber-300 bg-amber-50 text-amber-700",
-  bill_requested: "border-purple-300 bg-purple-50 text-purple-700",
+  occupied: "border-warning/40 bg-warning/10 text-warning",
+  bill_requested: "border-brand/40 bg-brand-soft text-brand",
 };
 
 const TABLE_STATUS_DOT: Record<string, string> = {
   available: "bg-success",
-  occupied: "bg-amber-400",
-  bill_requested: "bg-purple-400",
+  occupied: "bg-warning",
+  bill_requested: "bg-brand",
 };
 
 export function TablePicker({

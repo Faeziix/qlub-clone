@@ -1,7 +1,7 @@
 "use client";
 
 import { Minus, Plus, Trash2 } from "lucide-react";
-import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
+import { formatRialAsTomanPersian, formatRialAsTomanLatin } from "@/lib/toman-formatter";
 import type { CartEntry } from "./types";
 import { cartLineTotal } from "./types";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,8 @@ interface WaiterCartProps {
     emptyCartHint: string;
     items: string;
     modifiers: string;
+    removeItem: string;
+    decreaseQty: string;
   };
 }
 
@@ -22,7 +24,7 @@ export function WaiterCart({ entries, locale, onChangeQty, t }: WaiterCartProps)
   const displayPrice = (rialAmount: number) =>
     locale === "fa"
       ? formatRialAsTomanPersian(BigInt(rialAmount))
-      : `${Math.round(rialAmount / 10).toLocaleString()} T`;
+      : formatRialAsTomanLatin(BigInt(rialAmount));
 
   if (entries.length === 0) {
     return (
@@ -63,7 +65,7 @@ export function WaiterCart({ entries, locale, onChangeQty, t }: WaiterCartProps)
               type="button"
               onClick={() => onChangeQty(entry.lineId, entry.quantity - 1)}
               className="grid h-6 w-6 place-items-center rounded-full bg-surface hover:bg-danger/10 hover:text-danger"
-              aria-label={entry.quantity === 1 ? "حذف" : "کاهش"}
+              aria-label={entry.quantity === 1 ? t.removeItem : t.decreaseQty}
             >
               {entry.quantity === 1 ? <Trash2 size={12} /> : <Minus size={12} />}
             </button>

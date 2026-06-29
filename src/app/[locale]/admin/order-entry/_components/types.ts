@@ -1,6 +1,6 @@
-import type { MenuItemRow, ModifierOptionRow, TableRow, OpenOrderRow, MenuCategoryRow } from "../actions";
+import type { MenuItemRow, ModifierOptionRow, TableRow, OpenOrderRow, MenuCategoryRow, VendorRates } from "../actions";
 
-export type { MenuItemRow, ModifierOptionRow, TableRow, OpenOrderRow, MenuCategoryRow };
+export type { MenuItemRow, ModifierOptionRow, TableRow, OpenOrderRow, MenuCategoryRow, VendorRates };
 
 export interface CartEntry {
   lineId: string;

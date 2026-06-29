@@ -4,7 +4,7 @@ import { useState, useReducer, useCallback, useTransition } from "react";
 import { nanoid } from "nanoid";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { TableRow, OpenOrderRow, MenuItemRow, MenuCategoryRow, SelectedOption, CartEntry } from "./types";
+import type { TableRow, OpenOrderRow, MenuItemRow, MenuCategoryRow, SelectedOption, CartEntry, VendorRates } from "./types";
 import { cartSubtotal } from "./types";
 import { TablePicker } from "./TablePicker";
 import { MenuBrowser } from "./MenuBrowser";
@@ -12,11 +12,13 @@ import { WaiterCart } from "./WaiterCart";
 import { BillSummary } from "./BillSummary";
 import { createOrAppendWaiterOrder, getOpenOrderForTable } from "../actions";
 import type { CartLine } from "@/lib/types";
+import { computeBill, recomputeOrderTotals } from "@/lib/pricing";
 
 interface OrderEntryClientProps {
   tables: TableRow[];
   menuCategories: MenuCategoryRow[];
   locale: string;
+  vendorRates: VendorRates;
   t: {
     selectTable: string;
     noTables: string;
@@ -52,6 +54,8 @@ interface OrderEntryClientProps {
     orderNumber: string;
     changeTable: string;
     walkIn: string;
+    removeItem: string;
+    decreaseQty: string;
   };
 }
 
@@ -74,18 +78,7 @@ function cartReducer(state: CartEntry[], action: CartAction): CartEntry[] {
   }
 }
 
-const SERVICE_CHARGE_PCT = 0.1;
-const TAX_PCT = 0.09;
-
-function computeClientBill(subtotalRial: bigint) {
-  const serviceCharge = (subtotalRial * BigInt(Math.round(SERVICE_CHARGE_PCT * 10000))) / 10000n;
-  const taxable = subtotalRial + serviceCharge;
-  const tax = (taxable * BigInt(Math.round(TAX_PCT * 10000))) / 10000n;
-  const total = taxable + tax;
-  return { serviceCharge, tax, total };
-}
-
-export function OrderEntryClient({ tables, menuCategories, locale, t }: OrderEntryClientProps) {
+export function OrderEntryClient({ tables, menuCategories, locale, vendorRates, t }: OrderEntryClientProps) {
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [openOrders, setOpenOrders] = useState<Record<string, OpenOrderRow | null>>({});
   const [cart, dispatch] = useReducer(cartReducer, []);
@@ -167,10 +160,23 @@ export function OrderEntryClient({ tables, menuCategories, locale, t }: OrderEnt
     });
   }
 
-  const subtotalRial = BigInt(Math.round(cartSubtotal(cart)));
-  const { serviceCharge, tax, total } = computeClientBill(subtotalRial);
-
   const openOrder = selectedTableId ? openOrders[selectedTableId] ?? null : null;
+
+  const cartLines = toCartLines(cart);
+  const newItemsSubtotalRial = BigInt(Math.round(cartSubtotal(cart)));
+
+  const billBreakdown = openOrder
+    ? recomputeOrderTotals(
+        BigInt(Math.round(openOrder.subtotal)),
+        newItemsSubtotalRial,
+        vendorRates,
+        BigInt(Math.round(openOrder.tipAmount)),
+        BigInt(Math.round(openOrder.discount))
+      )
+    : computeBill(cartLines, vendorRates);
+
+  const { subtotal: subtotalRial, serviceCharge, tax, total } = billBreakdown;
+
   const submitLabel = openOrder
     ? t.appendOrder.replace("{orderNumber}", openOrder.orderNumber)
     : t.submitOrder;
@@ -266,6 +272,8 @@ export function OrderEntryClient({ tables, menuCategories, locale, t }: OrderEnt
               emptyCartHint: t.emptyCartHint,
               items: t.items,
               modifiers: t.modifiers,
+              removeItem: t.removeItem,
+              decreaseQty: t.decreaseQty,
             }}
           />
         </div>

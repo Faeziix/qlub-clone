@@ -266,10 +266,10 @@ export function TablesGrid({
   t,
 }: TablesGridProps) {
   const [open, setOpen] = React.useState(false);
-  const origin = React.useMemo(
-    () => (typeof window !== "undefined" ? window.location.origin : ""),
-    []
-  );
+  const [origin, setOrigin] = React.useState("");
+  React.useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
   const [isPending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
 

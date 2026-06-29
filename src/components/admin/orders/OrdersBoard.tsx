@@ -543,7 +543,7 @@ export function OrdersBoard({ orders: initialOrders, t, pollingIntervalMs = 8_00
 
           <div className="flex shrink-0 items-center gap-2">
             <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
               {t.livePolling}
             </span>
             <Button

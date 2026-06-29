@@ -43,7 +43,7 @@ export default async function TablesPage() {
     area: t.area ?? "Main",
     seats: t.seats,
     passcode: t.passcode,
-    tableToken: t.tableToken ?? null,
+    publicId: t.publicId,
     status: t.status,
   }));
 
@@ -79,7 +79,6 @@ export default async function TablesPage() {
         vendorId={vendor.id}
         country={vendor.country}
         slug={vendor.slug}
-        theme={vendor.theme}
         tables={tableData}
         t={{
           addTable: t("addTable"),

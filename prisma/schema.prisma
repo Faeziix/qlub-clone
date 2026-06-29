@@ -145,7 +145,7 @@ model DiningTable {
   code        String
   label       String?
   passcode    String
-  tableToken  String?
+  publicId    String      @unique
   seats       Int         @default(2)
   area        String?
   status      TableStatus @default(available)

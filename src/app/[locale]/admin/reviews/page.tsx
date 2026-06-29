@@ -1,5 +1,6 @@
 import { Star, Utensils, ConciergeBell, Sparkles } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { db } from "@/lib/db";
 import { PageHeader, Card, StatCard } from "@/components/admin/ui";
@@ -18,8 +19,11 @@ export default async function ReviewsPage() {
   const t = await getTranslations("admin.reviews");
   const session = await requireSession();
 
+  if (session.role === "superadmin") redirect("/admin/superadmin");
+  if (!session.vendorId) redirect("/admin/login");
+
   const reviews = await db.review.findMany({
-    where: session.vendorId ? { vendorId: session.vendorId } : undefined,
+    where: { vendorId: session.vendorId },
     orderBy: { createdAt: "desc" },
   });
 

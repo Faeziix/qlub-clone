@@ -150,7 +150,11 @@
       "tables": "میزها و QR",
       "reviews": "نظرات",
       "settings": "تنظیمات",
-      "superadmin": "کنسول سوپرادمین"
+      "superadmin": "کنسول سوپرادمین",
+      "platformConsole": "کنسول پلتفرم",
+      "platformDashboard": "داشبورد پلتفرم",
+      "tenants": "رستوران‌ها",
+      "platformStaff": "کارکنان پلتفرم"
     },
     "auth": {
       "title": "qlub_ مدیریت",

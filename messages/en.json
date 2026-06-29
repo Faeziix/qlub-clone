@@ -150,7 +150,11 @@
       "tables": "Tables & QR",
       "reviews": "Reviews",
       "settings": "Settings",
-      "superadmin": "Superadmin Console"
+      "superadmin": "Superadmin Console",
+      "platformConsole": "Platform Console",
+      "platformDashboard": "Platform Dashboard",
+      "tenants": "Restaurants",
+      "platformStaff": "Platform Staff"
     },
     "auth": {
       "title": "qlub_ Manager",

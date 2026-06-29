@@ -1,5 +1,6 @@
 import { LayoutGrid, Armchair, CheckCircle2, Users } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { requireSession } from "../actions";
 import { db } from "@/lib/db";
 import { PageHeader, StatCard, EmptyRow } from "@/components/admin/ui";
@@ -11,9 +12,10 @@ export default async function TablesPage() {
   const t = await getTranslations("admin.tables");
   const session = await requireSession();
 
-  const vendor = session.vendorId
-    ? await db.vendor.findUnique({ where: { id: session.vendorId } })
-    : await db.vendor.findFirst({ orderBy: { createdAt: "asc" } });
+  if (session.role === "superadmin") redirect("/admin/superadmin");
+  if (!session.vendorId) redirect("/admin/login");
+
+  const vendor = await db.vendor.findUnique({ where: { id: session.vendorId } });
 
   if (!vendor) {
     return (

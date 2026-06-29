@@ -23,6 +23,13 @@ function isSuperadminPath(pathname: string): boolean {
   return /^(\/[a-z]{2})?\/admin\/superadmin(\/.*)?$/.test(pathname);
 }
 
+function isVendorAdminPath(pathname: string): boolean {
+  return (
+    /^(\/[a-z]{2})?\/admin\/(orders|menu|tables|reviews|settings)(\/.*)?$/.test(pathname) ||
+    /^(\/[a-z]{2})?\/admin$/.test(pathname)
+  );
+}
+
 function edgeSigningKey(secret: string): Uint8Array {
   return new TextEncoder().encode(secret);
 }
@@ -57,8 +64,11 @@ export default async function proxy(request: NextRequest) {
     }
 
     if (isSuperadminPath(pathname) && payload.role !== "superadmin") {
-      const adminUrl = new URL("/admin", request.url);
-      return NextResponse.redirect(adminUrl);
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+
+    if (isVendorAdminPath(pathname) && payload.role === "superadmin") {
+      return NextResponse.redirect(new URL("/admin/superadmin", request.url));
     }
   }
 

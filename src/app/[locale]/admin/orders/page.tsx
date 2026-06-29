@@ -5,6 +5,7 @@ import {
   Flame,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { PageHeader, StatCard } from "@/components/admin/ui";
@@ -18,8 +19,11 @@ export default async function OrdersPage() {
   const t = await getTranslations("admin.orders");
   const session = await requireSession();
 
+  if (session.role === "superadmin") redirect("/admin/superadmin");
+  if (!session.vendorId) redirect("/admin/login");
+
   const orders = await db.order.findMany({
-    where: session.vendorId ? { vendorId: session.vendorId } : undefined,
+    where: { vendorId: session.vendorId },
     include: {
       items: true,
       payments: true,

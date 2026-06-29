@@ -7,6 +7,7 @@ import {
   Users,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { requireSession } from "./actions";
 import { getDashboardStats } from "@/lib/queries";
 import { db } from "@/lib/db";
@@ -27,36 +28,34 @@ function formatDelta(delta: number): string {
 export default async function DashboardPage() {
   const t = await getTranslations("admin.dashboard");
   const session = await requireSession();
+
+  if (session.role === "superadmin") redirect("/admin/superadmin");
+  if (!session.vendorId) redirect("/admin/login");
+
   const stats = await getDashboardStats(session.vendorId);
 
-  const vendorCurrency = session.vendorId
-    ? (
-        await db.vendor.findUnique({
-          where: { id: session.vendorId },
-          select: { currency: true },
-        })
-      )?.currency ?? "IRR"
-    : "IRR";
+  const vendorCurrency =
+    (
+      await db.vendor.findUnique({
+        where: { id: session.vendorId },
+        select: { currency: true },
+      })
+    )?.currency ?? "IRR";
   const currency = vendorCurrency;
 
   const chartSeries = computeRevenueSeries(stats.payments, REVENUE_WINDOW_DAYS, new Date());
   const days = chartSeries.map((b) => ({ day: b.label, revenue: b.revenue, orders: b.orders }));
 
   const recentOrders = stats.orders.slice(0, 8);
-  const tables = session.vendorId
-    ? await db.diningTable.findMany({
-        where: { vendorId: session.vendorId },
-        orderBy: { code: "asc" },
-      })
-    : [];
+  const tables = await db.diningTable.findMany({
+    where: { vendorId: session.vendorId },
+    orderBy: { code: "asc" },
+  });
   const occupied = tables.filter((t) => t.status === "occupied").length;
 
-  // top items
   const itemCounts = new Map<string, number>();
   const orderItems = await db.orderItem.findMany({
-    where: session.vendorId
-      ? { order: { vendorId: session.vendorId } }
-      : {},
+    where: { order: { vendorId: session.vendorId } },
     take: 500,
     orderBy: { id: "desc" },
   });

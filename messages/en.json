@@ -483,7 +483,27 @@
       "error_vendorNotFound": "Restaurant not found.",
       "error_validationError": "The submitted data is invalid.",
       "error_cannotPromoteToSuperadmin": "Cannot promote to superadmin.",
-      "error_cannotModifySuperadmin": "Cannot modify a superadmin account."
+      "error_cannotModifySuperadmin": "Cannot modify a superadmin account.",
+      "totalOrders": "Total orders",
+      "activeTenants": "Active tenants",
+      "recentTenants": "Recent restaurants",
+      "searchTenants": "Search restaurants…",
+      "searchStaff": "Search staff…",
+      "filterByRole": "Filter by role",
+      "allRoles": "All roles",
+      "viewAll": "View all",
+      "noResults": "No results found.",
+      "joinedAt": "Joined",
+      "suspendedCount": "{count} suspended",
+      "platformOverview": "Platform overview",
+      "quickActions": "Quick actions",
+      "tenantJoined": "joined",
+      "noRecentTenants": "No restaurants added recently.",
+      "confirmSuspend": "Are you sure?",
+      "createdAt": "Created",
+      "enamadStatus_none": "No eNamad",
+      "enamadStatus_pending": "Pending",
+      "enamadStatus_verified": "Verified"
     }
   }
 }

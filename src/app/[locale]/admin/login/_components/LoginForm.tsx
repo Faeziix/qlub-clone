@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { Utensils } from "lucide-react";
 
 const DEMO_ACCOUNTS = [
-  { email: "admin@qlub.io", label: "platform superadmin" },
-  { email: "owner@paul.ae", label: "Paul owner" },
-  { email: "manager@paul.ae", label: "Paul manager" },
-  { email: "owner@olive.ae", label: "Olive Bistro owner" },
+  { email: "admin@qlub.ir", label: "platform superadmin" },
+  { email: "owner@paul-ir.example.com", label: "Paul owner" },
+  { email: "manager@paul-ir.example.com", label: "Paul manager" },
+  { email: "owner@olive-bistro-ir.example.com", label: "Olive Bistro owner" },
 ];
 
 export function LoginForm({ showDemoAccounts }: { showDemoAccounts: boolean }) {

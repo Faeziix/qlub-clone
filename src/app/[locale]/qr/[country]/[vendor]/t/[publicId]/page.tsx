@@ -6,26 +6,9 @@ import { TenantThemeProvider } from "@/components/ui/TenantThemeProvider";
 import { routing, type SupportedLocale } from "@/i18n/routing";
 import { THEME_PRESETS, type ThemePreset } from "@/lib/design-tokens";
 import { SuspendedTenantPage } from "@/components/customer/SuspendedTenantPage";
-import { normalizeTablePublicId } from "@/lib/table-code";
+import { resolveTableForVendor } from "@/lib/table-code";
 
 export const dynamic = "force-dynamic";
-
-async function resolveTableForVendor(
-  vendorId: string,
-  rawPublicId: string
-): Promise<string | null> {
-  const publicId = normalizeTablePublicId(rawPublicId);
-
-  const table = await db.diningTable.findUnique({
-    where: { publicId },
-    select: { id: true, vendorId: true, code: true },
-  });
-
-  if (!table) return null;
-  if (table.vendorId !== vendorId) return null;
-
-  return table.code;
-}
 
 export default async function TableMenuPage({
   params,
@@ -64,7 +47,15 @@ export default async function TableMenuPage({
     ? (vendorTheme as ThemePreset)
     : undefined;
 
-  const tableCode = await resolveTableForVendor(vendor.id, rawPublicId);
+  const tableCode = await resolveTableForVendor(
+    vendor.id,
+    rawPublicId,
+    (publicId) =>
+      db.diningTable.findUnique({
+        where: { publicId },
+        select: { vendorId: true, code: true },
+      })
+  );
 
   return (
     <TenantThemeProvider theme={{ preset }}>

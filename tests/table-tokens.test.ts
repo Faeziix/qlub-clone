@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cryptoPasscode } from "@/lib/table-token";
+import { cryptoPasscode } from "@/lib/table-passcode";
 
 describe("cryptoPasscode", () => {
   it("returns a 4-digit string", () => {

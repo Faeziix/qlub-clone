@@ -1,6 +1,10 @@
 -- Replace signed-JWT tableToken with short opaque publicId (8-char Crockford base32)
 -- Addresses issue #50: shorter, print-friendly QR codes without HMAC overhead.
 
+-- gen_random_bytes is provided by pgcrypto (not available by default in all Postgres
+-- installations, including Neon). Enable it idempotently before the backfill DO block.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- Step 1: Add publicId column (nullable to allow backfill of existing rows)
 ALTER TABLE "DiningTable" ADD COLUMN "publicId" TEXT;
 

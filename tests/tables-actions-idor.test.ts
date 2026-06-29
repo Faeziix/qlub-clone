@@ -56,7 +56,7 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/db", () => ({ db: mockDb }));
 
-vi.mock("@/lib/table-token", () => ({
+vi.mock("@/lib/table-passcode", () => ({
   cryptoPasscode: () => "1234",
 }));
 

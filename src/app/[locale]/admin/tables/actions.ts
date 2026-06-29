@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { recordAuditEvent } from "@/lib/audit";
 import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
-import { cryptoPasscode } from "@/lib/table-token";
+import { cryptoPasscode } from "@/lib/table-passcode";
 import { generateTablePublicId } from "@/lib/table-code";
 
 import { TableStatus } from "@prisma/client";

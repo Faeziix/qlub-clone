@@ -3,6 +3,7 @@ import {
   generateTablePublicId,
   normalizeTablePublicId,
   isValidTablePublicId,
+  resolveTableForVendor,
 } from "@/lib/table-code";
 
 const CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -64,6 +65,21 @@ describe("generateTablePublicId", () => {
     expect(generated).not.toBe(collisionCode);
 
     vi.restoreAllMocks();
+  });
+
+  it("output is never a JWT (no dots separating base64 sections)", () => {
+    for (let i = 0; i < 50; i++) {
+      const id = generateTablePublicId();
+      expect(id).not.toContain(".");
+      expect(id).not.toContain("eyJ");
+    }
+  });
+
+  it("a URL built with publicId contains no tt= query parameter", () => {
+    const id = generateTablePublicId();
+    const url = `/qr/ir/my-vendor/t/${id}`;
+    expect(url).not.toContain("tt=");
+    expect(url).not.toContain("eyJ");
   });
 });
 
@@ -127,32 +143,70 @@ describe("isValidTablePublicId", () => {
   });
 });
 
-describe("generated links do not contain tt or JWT", () => {
-  it("generateTablePublicId output is never a JWT (no dots separating base64 sections)", () => {
-    for (let i = 0; i < 50; i++) {
-      const id = generateTablePublicId();
-      expect(id).not.toContain(".");
-      expect(id).not.toContain("tt");
-    }
+describe("resolveTableForVendor", () => {
+  it("returns the table code when publicId is found and vendorId matches", async () => {
+    const findTable = vi
+      .fn()
+      .mockResolvedValue({ vendorId: "vendor-1", code: "T3" });
+
+    const result = await resolveTableForVendor("vendor-1", "ABCDEFGH", findTable);
+
+    expect(result).toBe("T3");
   });
 
-  it("a URL built with publicId contains no tt= query parameter", () => {
-    const id = generateTablePublicId();
-    const url = `/qr/ir/my-vendor/t/${id}`;
-    expect(url).not.toContain("tt=");
-    expect(url).not.toContain("eyJ");
-  });
-});
+  it("returns null when no table exists for the given publicId", async () => {
+    const findTable = vi.fn().mockResolvedValue(null);
 
-describe("IDOR: publicId is not shared across vendors", () => {
-  it("the same publicId string cannot validly identify tables in two different vendor paths", () => {
+    const result = await resolveTableForVendor("vendor-1", "ABCDEFGH", findTable);
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the resolved table belongs to a different vendor (IDOR guard)", async () => {
+    const findTable = vi
+      .fn()
+      .mockResolvedValue({ vendorId: "vendor-b", code: "T5" });
+
+    const result = await resolveTableForVendor("vendor-a", "ABCDEFGH", findTable);
+
+    expect(result).toBeNull();
+  });
+
+  it("normalizes look-alike characters before the DB lookup", async () => {
+    const findTable = vi
+      .fn()
+      .mockResolvedValue({ vendorId: "vendor-1", code: "T1" });
+
+    await resolveTableForVendor("vendor-1", "ABCDEFI0", findTable);
+
+    expect(findTable).toHaveBeenCalledWith("ABCDEF10");
+  });
+
+  it("normalizes uppercase before lookup (case-insensitive entry)", async () => {
+    const findTable = vi
+      .fn()
+      .mockResolvedValue({ vendorId: "vendor-1", code: "T2" });
+
+    await resolveTableForVendor("vendor-1", "abcdefgh", findTable);
+
+    expect(findTable).toHaveBeenCalledWith("ABCDEFGH");
+  });
+
+  it("a publicId minted for vendor-a cannot resolve a table under vendor-b (IDOR end-to-end)", async () => {
+    const vendorAId = "vendor-a-id";
+    const vendorBId = "vendor-b-id";
     const publicId = generateTablePublicId();
-    const urlVendorA = `/qr/ir/vendor-a/t/${publicId}`;
-    const urlVendorB = `/qr/ir/vendor-b/t/${publicId}`;
 
-    expect(urlVendorA).toContain("vendor-a");
-    expect(urlVendorB).toContain("vendor-b");
-    expect(urlVendorA).not.toContain("vendor-b");
-    expect(urlVendorB).not.toContain("vendor-a");
+    const findTable = vi
+      .fn()
+      .mockResolvedValue({ vendorId: vendorBId, code: "B1" });
+
+    const resultForVendorA = await resolveTableForVendor(
+      vendorAId,
+      publicId,
+      findTable
+    );
+
+    expect(resultForVendorA).toBeNull();
   });
 });

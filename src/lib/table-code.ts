@@ -43,3 +43,27 @@ export function isValidTablePublicId(id: string): boolean {
   if (id.length !== PUBLIC_ID_CHAR_COUNT) return false;
   return [...id].every((ch) => CROCKFORD_ALPHABET.includes(ch));
 }
+
+type OwnedTableRecord = { vendorId: string; code: string };
+
+export type FindTableFn = (
+  publicId: string
+) => Promise<OwnedTableRecord | null>;
+
+/**
+ * Resolves the human-readable table code for a given publicId, but only when
+ * the looked-up table actually belongs to the expected vendor. Returns null on
+ * an unknown publicId or a vendor mismatch (IDOR guard). Accepts a `findTable`
+ * callback so the function can be exercised in unit tests without a real DB.
+ */
+export async function resolveTableForVendor(
+  vendorId: string,
+  rawPublicId: string,
+  findTable: FindTableFn
+): Promise<string | null> {
+  const publicId = normalizeTablePublicId(rawPublicId);
+  const table = await findTable(publicId);
+  if (!table) return null;
+  if (table.vendorId !== vendorId) return null;
+  return table.code;
+}

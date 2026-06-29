@@ -40,7 +40,7 @@ export default async function AdminLayout({
       : tCommon("noVendor"));
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg lg:flex">
       <AdminSidebar
         user={{
           name: session.name,
@@ -49,7 +49,7 @@ export default async function AdminLayout({
         }}
         vendorName={vendorName}
       />
-      <main className="lg:ps-72">
+      <main className="min-w-0 flex-1">
         <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8 lg:py-8">
           {children}
         </div>

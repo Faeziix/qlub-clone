@@ -26,6 +26,7 @@ import { ItemSheet } from "./ItemSheet";
 import { CartSheet } from "./CartSheet";
 import { LanguageSheet } from "./LanguageSheet";
 import { PayBillSheet } from "./PayBillSheet";
+import { NoOpenBillSheet } from "./NoOpenBillSheet";
 import { MyOrderSheet } from "./MyOrderSheet";
 import { ItemCard } from "./_components/ItemCard";
 import { CategoryChips } from "./_components/CategoryChips";
@@ -45,10 +46,12 @@ export function MenuExperience({
   vendor,
   initialLang,
   tableCode,
+  tablePublicId,
 }: {
   vendor: VendorWithMenus;
   initialLang: string;
   tableCode: string | null;
+  tablePublicId: string | null;
 }) {
   const [lang, setLang] = React.useState(initialLang);
   const t = makeT(lang);
@@ -66,6 +69,7 @@ export function MenuExperience({
   const [langOpen, setLangOpen] = React.useState(false);
   const [payBillOpen, setPayBillOpen] = React.useState(false);
   const [payBillNotice, setPayBillNotice] = React.useState<string | null>(null);
+  const [noOpenBillOpen, setNoOpenBillOpen] = React.useState(false);
   const [resolvingTableBill, setResolvingTableBill] = React.useState(false);
   const [myOrderOpen, setMyOrderOpen] = React.useState(false);
   const [activeCat, setActiveCat] = React.useState(0);
@@ -163,7 +167,7 @@ export function MenuExperience({
   }
 
   async function handlePayBill() {
-    if (!tableCode) {
+    if (!tablePublicId) {
       setPayBillNotice(null);
       setPayBillOpen(true);
       return;
@@ -172,12 +176,11 @@ export function MenuExperience({
     setResolvingTableBill(true);
     try {
       const { data } = await axios.get<{ id: string }>("/api/orders/active", {
-        params: { vendor: vendor.slug, table: tableCode },
+        params: { vendor: vendor.slug, tablePublicId },
       });
       router.push(`/qr/${vendor.country}/${vendor.slug}/pay?order=${data.id}&lang=${lang}`);
     } catch {
-      setPayBillNotice(t("noOpenBillAtTable"));
-      setPayBillOpen(true);
+      setNoOpenBillOpen(true);
     } finally {
       setResolvingTableBill(false);
     }
@@ -261,6 +264,16 @@ export function MenuExperience({
           country={vendor.country}
           lang={lang}
           notice={payBillNotice}
+        />
+
+        <NoOpenBillSheet
+          open={noOpenBillOpen}
+          onClose={() => setNoOpenBillOpen(false)}
+          lang={lang}
+          onBrowseMenu={() => {
+            setNoOpenBillOpen(false);
+            handleViewMenu();
+          }}
         />
 
         {activeOrderSnapshot && (
@@ -442,6 +455,12 @@ export function MenuExperience({
           onAddMoreItems={() => setMyOrderOpen(false)}
         />
       )}
+      <NoOpenBillSheet
+        open={noOpenBillOpen}
+        onClose={() => setNoOpenBillOpen(false)}
+        lang={lang}
+        onBrowseMenu={() => setNoOpenBillOpen(false)}
+      />
     </div>
   );
 }

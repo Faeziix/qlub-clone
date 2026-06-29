@@ -114,6 +114,7 @@ const en: Dict = {
   orderNotFound: "No order found with that number. Please check and try again.",
   noOpenBillAtTable:
     "No open bill for this table yet. Place an order first, or enter an order number.",
+  noOpenBillWaiter: "No open bill for this table yet. Ask your waiter.",
   selectMenuToContinue: "Choose a menu to continue",
   noMenusAvailable: "No menus available right now.",
   categoryNav: "Menu categories",
@@ -247,6 +248,7 @@ const fa: Dict = {
   orderNotFound: "سفارشی با این شماره یافت نشد. لطفاً دوباره بررسی کنید.",
   noOpenBillAtTable:
     "هنوز صورتحساب بازی برای این میز نیست. ابتدا سفارش ثبت کنید یا شماره سفارش را وارد کنید.",
+  noOpenBillWaiter: "هنوز صورتحسابی برای این میز باز نیست. از گارسون بخواهید.",
   selectMenuToContinue: "یک منو برای ادامه انتخاب کنید",
   noMenusAvailable: "در حال حاضر منویی در دسترس نیست.",
   categoryNav: "دسته‌بندی‌های منو",

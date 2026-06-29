@@ -50,6 +50,7 @@ export default async function VendorMenuPage({
         vendor={vendor}
         initialLang={resolvedLocale}
         tableCode={null}
+        tablePublicId={null}
       />
     </TenantThemeProvider>
   );

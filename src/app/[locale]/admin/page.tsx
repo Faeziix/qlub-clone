@@ -7,6 +7,7 @@ import {
   Users,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { requireSession } from "./actions";
 import { getDashboardStats } from "@/lib/queries";
 import { db } from "@/lib/db";
@@ -27,36 +28,34 @@ function formatDelta(delta: number): string {
 export default async function DashboardPage() {
   const t = await getTranslations("admin.dashboard");
   const session = await requireSession();
+
+  if (session.role === "superadmin") redirect("/admin/superadmin");
+  if (!session.vendorId) redirect("/admin/login");
+
   const stats = await getDashboardStats(session.vendorId);
 
-  const vendorCurrency = session.vendorId
-    ? (
-        await db.vendor.findUnique({
-          where: { id: session.vendorId },
-          select: { currency: true },
-        })
-      )?.currency ?? "IRR"
-    : "IRR";
+  const vendorCurrency =
+    (
+      await db.vendor.findUnique({
+        where: { id: session.vendorId },
+        select: { currency: true },
+      })
+    )?.currency ?? "IRR";
   const currency = vendorCurrency;
 
   const chartSeries = computeRevenueSeries(stats.payments, REVENUE_WINDOW_DAYS, new Date());
   const days = chartSeries.map((b) => ({ day: b.label, revenue: b.revenue, orders: b.orders }));
 
   const recentOrders = stats.orders.slice(0, 8);
-  const tables = session.vendorId
-    ? await db.diningTable.findMany({
-        where: { vendorId: session.vendorId },
-        orderBy: { code: "asc" },
-      })
-    : [];
+  const tables = await db.diningTable.findMany({
+    where: { vendorId: session.vendorId },
+    orderBy: { code: "asc" },
+  });
   const occupied = tables.filter((t) => t.status === "occupied").length;
 
-  // top items
   const itemCounts = new Map<string, number>();
   const orderItems = await db.orderItem.findMany({
-    where: session.vendorId
-      ? { order: { vendorId: session.vendorId } }
-      : {},
+    where: { order: { vendorId: session.vendorId } },
     take: 500,
     orderBy: { id: "desc" },
   });
@@ -141,24 +140,24 @@ export default async function DashboardPage() {
               <thead>
                 <tr className="text-start text-xs uppercase text-muted">
                   <th className="pb-2 font-semibold">{t("order")}</th>
-                  <th className="pb-2 font-semibold">{t("guest")}</th>
+                  <th className="hidden pb-2 font-semibold sm:table-cell">{t("guest")}</th>
                   <th className="pb-2 font-semibold">{t("status")}</th>
                   <th className="pb-2 text-end font-semibold">{t("total")}</th>
-                  <th className="pb-2 text-end font-semibold">{t("time")}</th>
+                  <th className="hidden pb-2 text-end font-semibold sm:table-cell">{t("time")}</th>
                 </tr>
               </thead>
               <tbody>
                 {recentOrders.map((o) => (
                   <tr key={o.id} className="border-t border-line">
                     <td className="py-2.5 font-semibold">{o.orderNumber}</td>
-                    <td className="py-2.5 text-muted">{o.guestName ?? "—"}</td>
+                    <td className="hidden py-2.5 text-muted sm:table-cell">{o.guestName ?? "—"}</td>
                     <td className="py-2.5">
                       <StatusPill status={o.status} />
                     </td>
                     <td className="py-2.5 text-end font-semibold tabular-nums">
                       {formatMoney(o.total)}
                     </td>
-                    <td className="py-2.5 text-end text-xs text-muted">
+                    <td className="hidden py-2.5 text-end text-xs text-muted sm:table-cell">
                       {timeAgo(o.createdAt)}
                     </td>
                   </tr>

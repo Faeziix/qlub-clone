@@ -5,7 +5,8 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { recordAuditEvent } from "@/lib/audit";
 import { checkAdminActionLimit } from "@/lib/admin-rate-limit";
-import { cryptoPasscode, signTableToken } from "@/lib/table-token";
+import { cryptoPasscode } from "@/lib/table-passcode";
+import { generateTablePublicId } from "@/lib/table-code";
 
 import { TableStatus } from "@prisma/client";
 
@@ -63,6 +64,11 @@ export async function createTable(
     ? Math.max(1, Math.min(40, Math.round(input.seats)))
     : 2;
 
+  let publicId = generateTablePublicId();
+  while (await db.diningTable.findUnique({ where: { publicId } })) {
+    publicId = generateTablePublicId();
+  }
+
   const created = await db.diningTable.create({
     data: {
       vendorId,
@@ -71,18 +77,9 @@ export async function createTable(
       area: input.area.trim() || "Main",
       seats,
       passcode: cryptoPasscode(),
+      publicId,
       status: "available",
     },
-  });
-
-  const tableToken = await signTableToken({
-    vendorId,
-    tableId: created.id,
-  });
-
-  await db.diningTable.update({
-    where: { id: created.id },
-    data: { tableToken },
   });
 
   await recordAuditEvent({
@@ -91,7 +88,7 @@ export async function createTable(
     action: "CREATE_TABLE",
     entity: "DiningTable",
     entityId: created.id,
-    after: { code, label: label || `Table ${code}`, seats },
+    after: { code, label: label || `Table ${code}`, seats, publicId },
   });
 
   revalidatePath("/admin/tables");

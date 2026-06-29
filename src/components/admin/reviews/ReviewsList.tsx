@@ -83,7 +83,7 @@ export function ReviewsList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-0.5">
         {FILTERS.map((f) => {
           const active = filter === f.key;
           return (
@@ -92,7 +92,7 @@ export function ReviewsList({
               type="button"
               onClick={() => setFilter(f.key as FilterKey)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
                 active
                   ? "border-brand bg-brand text-brand-fg"
                   : "border-line bg-surface text-muted hover:bg-surface-2"

@@ -47,7 +47,7 @@ export async function login(_prev: unknown, formData: FormData) {
     entityId: user.id,
   });
 
-  redirect("/admin");
+  redirect(user.role === "superadmin" ? "/admin/superadmin" : "/admin");
 }
 
 export async function logout() {

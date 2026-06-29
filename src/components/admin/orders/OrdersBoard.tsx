@@ -509,49 +509,53 @@ export function OrdersBoard({ orders: initialOrders, t, pollingIntervalMs = 8_00
 
   return (
     <Card className="p-0">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line p-4">
-        {FILTERS.map((f) => {
-          const count = counts[f.key] ?? 0;
-          const active = filter === f.key;
-          return (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors",
-                active
-                  ? "bg-brand text-brand-fg"
-                  : "bg-surface-2 text-muted hover:text-ink"
-              )}
-            >
-              {f.label}
-              <span
-                className={cn(
-                  "rounded-full px-1.5 text-xs tabular-nums",
-                  active ? "bg-brand-fg/20" : "bg-line/60"
-                )}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
+      <div className="border-b border-line p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-0.5">
+            {FILTERS.map((f) => {
+              const count = counts[f.key] ?? 0;
+              const active = filter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setFilter(f.key)}
+                  className={cn(
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors",
+                    active
+                      ? "bg-brand text-brand-fg"
+                      : "bg-surface-2 text-muted hover:text-ink"
+                  )}
+                >
+                  {f.label}
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 text-xs tabular-nums",
+                      active ? "bg-brand-fg/20" : "bg-line/60"
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
-        <div className="ms-auto flex items-center gap-2">
-          <span className="flex items-center gap-1.5 text-xs text-muted">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-            {t.livePolling}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            loading={isLoading}
-            onClick={refresh}
-            aria-label={t.livePolling}
-          >
-            <RefreshCw size={14} />
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="hidden items-center gap-1.5 text-xs text-muted sm:flex">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
+              {t.livePolling}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              loading={isLoading}
+              onClick={refresh}
+              aria-label={t.livePolling}
+            >
+              <RefreshCw size={14} />
+            </Button>
+          </div>
         </div>
       </div>
 

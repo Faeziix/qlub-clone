@@ -6,7 +6,6 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomInt, randomBytes } from "node:crypto";
-import { SignJWT } from "jose";
 
 const db = new PrismaClient();
 
@@ -18,25 +17,21 @@ function randomStaffPassword() {
   return randomBytes(18).toString("base64url");
 }
 
-const TABLE_TOKEN_ALGORITHM = "HS256";
-const TABLE_TOKEN_SUBJECT = "table-access";
-const TABLE_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 365;
+const CROCKFORD_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
-function tableSigningKey() {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) {
-    throw new Error("AUTH_SECRET is required to sign seeded table tokens.");
+function generateSeedPublicId(): string {
+  const bytes = randomBytes(5);
+  const n =
+    (BigInt(bytes[0]) << 32n) |
+    (BigInt(bytes[1]) << 24n) |
+    (BigInt(bytes[2]) << 16n) |
+    (BigInt(bytes[3]) << 8n) |
+    BigInt(bytes[4]);
+  let code = "";
+  for (let shift = 35; shift >= 0; shift -= 5) {
+    code += CROCKFORD_ALPHABET[Number((n >> BigInt(shift)) & 31n)];
   }
-  return new TextEncoder().encode(secret);
-}
-
-async function signSeedTableToken(vendorId: string, tableId: string) {
-  return new SignJWT({ vendorId, tableId })
-    .setProtectedHeader({ alg: TABLE_TOKEN_ALGORITHM })
-    .setSubject(TABLE_TOKEN_SUBJECT)
-    .setIssuedAt()
-    .setExpirationTime(`${TABLE_TOKEN_TTL_SECONDS}s`)
-    .sign(tableSigningKey());
+  return code;
 }
 
 // Defaults to a per-account crypto-random password (no static credential in
@@ -862,26 +857,29 @@ async function seedVendor(opts: {
   }
 
   // Tables with QR passcodes
+  const usedPublicIds = new Set<string>();
   const tables = [];
   const areas = ["Main Hall", "Terrace", "Main Hall", "Window", "Terrace"];
   for (let t = 1; t <= 12; t++) {
+    let publicId = generateSeedPublicId();
+    while (usedPublicIds.has(publicId)) {
+      publicId = generateSeedPublicId();
+    }
+    usedPublicIds.add(publicId);
+
     const table = await db.diningTable.create({
       data: {
         vendorId: vendor.id,
         code: String(t),
         label: `Table ${t}`,
         passcode: randomTablePasscode(),
+        publicId,
         seats: 2 + (t % 4),
         area: areas[t % areas.length],
         status: t <= 3 ? "occupied" : "available",
       },
     });
-    const tableToken = await signSeedTableToken(vendor.id, table.id);
-    const tokenizedTable = await db.diningTable.update({
-      where: { id: table.id },
-      data: { tableToken },
-    });
-    tables.push(tokenizedTable);
+    tables.push(table);
   }
 
   return { vendor, items: createdItems, tables };

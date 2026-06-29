@@ -10,12 +10,12 @@ export function PageHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:items-end sm:gap-4">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">{title}</h1>
+        <h1 className="text-xl font-extrabold tracking-tight sm:text-2xl">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
@@ -54,16 +54,16 @@ export function StatCard({
 }) {
   return (
     <Card className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-muted">{label}</span>
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-sm font-medium text-muted">{label}</span>
         {icon && (
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-soft text-brand">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
             {icon}
           </span>
         )}
       </div>
-      <div className="text-2xl font-extrabold tabular-nums">{value}</div>
-      <div className="flex items-center gap-2 text-xs">
+      <div className="truncate text-xl font-extrabold tabular-nums sm:text-2xl">{value}</div>
+      <div className="flex min-h-[20px] items-center gap-2 text-xs">
         {delta && (
           <span
             className={cn(
@@ -76,7 +76,7 @@ export function StatCard({
             {delta.value}
           </span>
         )}
-        {hint && <span className="text-muted">{hint}</span>}
+        {hint && <span className="truncate text-muted">{hint}</span>}
       </div>
     </Card>
   );
@@ -110,7 +110,7 @@ export function StatusPill({ status }: { status: string }) {
 
 export function EmptyRow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-line py-12 text-center text-sm text-muted">
+    <div className="rounded-2xl border border-dashed border-line px-4 py-12 text-center text-sm leading-relaxed text-muted">
       {children}
     </div>
   );

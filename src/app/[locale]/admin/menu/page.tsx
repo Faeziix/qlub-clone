@@ -1,5 +1,6 @@
 import { UtensilsCrossed, LayoutGrid, CheckCircle2, BookOpen } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { db } from "@/lib/db";
 import { PageHeader, StatCard, EmptyRow } from "@/components/admin/ui";
@@ -11,33 +12,10 @@ export default async function MenuPage() {
   const t = await getTranslations("admin.menu");
   const session = await requireSession();
 
-  // Resolve which vendor's menus to show.
-  // owner/manager/staff -> their own vendor.
-  // superadmin (vendorId null) -> first vendor in the system (with a note).
-  let vendorId = session.vendorId;
-  let vendorName: string | null = null;
-  let crossVendorNote = false;
+  if (session.role === "superadmin") redirect("/admin/superadmin");
+  if (!session.vendorId) redirect("/admin/login");
 
-  if (!vendorId) {
-    const firstVendor = await db.vendor.findFirst({
-      orderBy: { createdAt: "asc" },
-      select: { id: true, name: true },
-    });
-    if (firstVendor) {
-      vendorId = firstVendor.id;
-      vendorName = firstVendor.name;
-      crossVendorNote = true;
-    }
-  }
-
-  if (!vendorId) {
-    return (
-      <>
-        <PageHeader title={t("pageTitle")} subtitle={t("pageSubtitle")} />
-        <EmptyRow>{t("noVendor")}</EmptyRow>
-      </>
-    );
-  }
+  const vendorId = session.vendorId;
 
   const menusRaw = await db.menu.findMany({
     where: { vendorId },
@@ -104,11 +82,7 @@ export default async function MenuPage() {
     <>
       <PageHeader
         title={t("pageTitle")}
-        subtitle={
-          crossVendorNote
-            ? t("superadminNote", { name: vendorName ?? "" })
-            : t("pageSubtitle")
-        }
+        subtitle={t("pageSubtitle")}
       />
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">

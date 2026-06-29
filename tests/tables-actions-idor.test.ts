@@ -56,12 +56,12 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/db", () => ({ db: mockDb }));
 
-// table-token is an auth-signing utility; mock it out here because the IDOR
-// tests do not exercise signing behaviour (that is covered by table-tokens.test.ts).
-vi.mock("@/lib/table-token", () => ({
+vi.mock("@/lib/table-passcode", () => ({
   cryptoPasscode: () => "1234",
-  signTableToken: vi.fn().mockResolvedValue("mock-token"),
-  verifyTableToken: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/table-code", () => ({
+  generateTablePublicId: () => "AAAABBBB",
 }));
 
 // ── Import the unit under test (after mocks are registered) ─────────────────
@@ -156,7 +156,10 @@ describe("tables actions — authorised happy-path", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetSession.mockResolvedValue(sessionVendorA);
-    mockDb.diningTable.findUnique.mockResolvedValue(tableOwnedByVendorA);
+    mockDb.diningTable.findUnique.mockImplementation(({ where }: { where: Record<string, unknown> }) => {
+      if ("publicId" in where) return Promise.resolve(null);
+      return Promise.resolve(tableOwnedByVendorA);
+    });
     mockDb.vendor.findUnique.mockResolvedValue({ id: VENDOR_A_ID, active: true });
     mockDb.diningTable.create.mockResolvedValue({ id: "new-table" });
     mockDb.diningTable.update.mockResolvedValue(tableOwnedByVendorA);
@@ -232,6 +235,10 @@ describe("tables actions — suspended-vendor refusal", () => {
       ...sessionVendorA,
       role: "superadmin",
       vendorId: null,
+    });
+    mockDb.diningTable.findUnique.mockImplementation(({ where }: { where: Record<string, unknown> }) => {
+      if ("publicId" in where) return Promise.resolve(null);
+      return Promise.resolve(tableOwnedByVendorA);
     });
     mockDb.diningTable.create.mockResolvedValue({ id: "new-table" });
     await expect(

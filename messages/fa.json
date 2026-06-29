@@ -150,7 +150,11 @@
       "tables": "میزها و QR",
       "reviews": "نظرات",
       "settings": "تنظیمات",
-      "superadmin": "کنسول سوپرادمین"
+      "superadmin": "کنسول سوپرادمین",
+      "platformConsole": "کنسول پلتفرم",
+      "platformDashboard": "داشبورد پلتفرم",
+      "tenants": "رستوران‌ها",
+      "platformStaff": "کارکنان پلتفرم"
     },
     "auth": {
       "title": "qlub_ مدیریت",
@@ -479,7 +483,27 @@
       "error_vendorNotFound": "رستوران یافت نشد.",
       "error_validationError": "اطلاعات وارد‌شده نامعتبر است.",
       "error_cannotPromoteToSuperadmin": "ارتقاء به سوپرادمین امکان‌پذیر نیست.",
-      "error_cannotModifySuperadmin": "حساب سوپرادمین قابل ویرایش نیست."
+      "error_cannotModifySuperadmin": "حساب سوپرادمین قابل ویرایش نیست.",
+      "totalOrders": "کل سفارش‌ها",
+      "activeTenants": "رستوران‌های فعال",
+      "recentTenants": "رستوران‌های اخیر",
+      "searchTenants": "جستجوی رستوران‌ها…",
+      "searchStaff": "جستجوی کارکنان…",
+      "filterByRole": "فیلتر بر اساس نقش",
+      "allRoles": "همه نقش‌ها",
+      "viewAll": "مشاهده همه",
+      "noResults": "نتیجه‌ای یافت نشد.",
+      "joinedAt": "تاریخ عضویت",
+      "suspendedCount": "{count} تعلیق‌شده",
+      "platformOverview": "مروری بر پلتفرم",
+      "quickActions": "اقدامات سریع",
+      "tenantJoined": "پیوست",
+      "noRecentTenants": "هیچ رستورانی اخیراً اضافه نشده.",
+      "confirmSuspend": "آیا مطمئن هستید؟",
+      "createdAt": "ایجادشده",
+      "enamadStatus_none": "بدون اینماد",
+      "enamadStatus_pending": "در انتظار",
+      "enamadStatus_verified": "تأییدشده"
     }
   }
 }

@@ -30,7 +30,7 @@ interface TableRow {
   area: string;
   seats: number;
   passcode: string;
-  tableToken: string | null;
+  publicId: string;
   status: string;
 }
 
@@ -38,7 +38,6 @@ interface TablesGridProps {
   vendorId: string;
   country: string;
   slug: string;
-  theme: string;
   tables: TableRow[];
   t: TablesTranslations;
 }
@@ -80,18 +79,8 @@ const STATUS_DOT: Record<TableStatusOption, string> = {
   bill_requested: "bg-purple-500",
 };
 
-function buildCustomerUrl(
-  country: string,
-  slug: string,
-  code: string,
-  theme: string,
-  tableToken: string | null
-) {
-  const base = `/qr/${country}/${slug}?table=${encodeURIComponent(code)}`;
-  const withTheme = theme ? `${base}&theme=${encodeURIComponent(theme)}` : base;
-  return tableToken
-    ? `${withTheme}&tt=${encodeURIComponent(tableToken)}`
-    : withTheme;
+function buildCustomerUrl(country: string, slug: string, publicId: string) {
+  return `/qr/${country}/${slug}/t/${publicId}`;
 }
 
 function CopyButton({ value, copy, copied }: { value: string; copy: string; copied: string }) {
@@ -261,12 +250,14 @@ export function TablesGrid({
   vendorId,
   country,
   slug,
-  theme,
   tables,
   t,
 }: TablesGridProps) {
   const [open, setOpen] = React.useState(false);
   const [origin, setOrigin] = React.useState("");
+  React.useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
   const [isPending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
 
@@ -274,10 +265,6 @@ export function TablesGrid({
   const [label, setLabel] = React.useState("");
   const [area, setArea] = React.useState("");
   const [seats, setSeats] = React.useState(2);
-
-  React.useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
 
   function resetForm() {
     setCode("");
@@ -332,13 +319,7 @@ export function TablesGrid({
               key={table.id}
               table={table}
               origin={origin}
-              customerUrl={buildCustomerUrl(
-                country,
-                slug,
-                table.code,
-                theme,
-                table.tableToken
-              )}
+              customerUrl={buildCustomerUrl(country, slug, table.publicId)}
               t={t}
             />
           ))}

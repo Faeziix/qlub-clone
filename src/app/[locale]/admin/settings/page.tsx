@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { requireSession } from "@/app/[locale]/admin/actions";
 import { PageHeader, Card } from "@/components/admin/ui";
 import { Building2 } from "lucide-react";
@@ -11,11 +12,10 @@ export default async function SettingsPage() {
   const t = await getTranslations("admin.settings");
   const session = await requireSession();
 
-  const vendor = session.vendorId
-    ? await db.vendor.findUnique({ where: { id: session.vendorId } })
-    : await db.vendor.findFirst({ orderBy: { createdAt: "asc" } });
+  if (session.role === "superadmin") redirect("/admin/superadmin");
+  if (!session.vendorId) redirect("/admin/login");
 
-  const totalVendors = session.vendorId ? 1 : await db.vendor.count();
+  const vendor = await db.vendor.findUnique({ where: { id: session.vendorId } });
 
   if (!vendor) {
     return (
@@ -61,20 +61,9 @@ export default async function SettingsPage() {
     ] as number[],
   };
 
-  const isSuperadmin = session.vendorId === null;
-
   return (
     <div className="space-y-6">
       <PageHeader title={t("pageTitle")} subtitle={t("pageSubtitle")} />
-
-      {isSuperadmin && totalVendors > 1 && (
-        <div className="flex items-start gap-3 rounded-2xl border border-line bg-surface-2 p-4 text-sm">
-          <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-          <p className="text-muted">
-            {t("superadminNote", { name: vendor.name })}
-          </p>
-        </div>
-      )}
 
       <SettingsForm
         vendorId={vendor.id}

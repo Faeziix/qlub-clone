@@ -6,18 +6,21 @@ import { TenantThemeProvider } from "@/components/ui/TenantThemeProvider";
 import { routing, type SupportedLocale } from "@/i18n/routing";
 import { THEME_PRESETS, type ThemePreset } from "@/lib/design-tokens";
 import { SuspendedTenantPage } from "@/components/customer/SuspendedTenantPage";
+import { resolveTableForVendor } from "@/lib/table-code";
 
 export const dynamic = "force-dynamic";
 
-export default async function VendorMenuPage({
+export default async function TableMenuPage({
   params,
-  searchParams,
 }: {
-  params: Promise<{ locale: string; country: string; vendor: string }>;
-  searchParams: Promise<{ theme?: string }>;
+  params: Promise<{
+    locale: string;
+    country: string;
+    vendor: string;
+    publicId: string;
+  }>;
 }) {
-  const { locale, vendor: slug } = await params;
-  const sp = await searchParams;
+  const { locale, vendor: slug, publicId: rawPublicId } = await params;
 
   const suspendedCheck = await db.vendor.findUnique({
     where: { slug },
@@ -39,17 +42,27 @@ export default async function VendorMenuPage({
     ? (locale as SupportedLocale)
     : routing.defaultLocale;
 
-  const rawTheme = sp.theme ?? vendor.theme;
-  const preset = THEME_PRESETS.includes(rawTheme as ThemePreset)
-    ? (rawTheme as ThemePreset)
+  const vendorTheme = vendor.theme;
+  const preset = THEME_PRESETS.includes(vendorTheme as ThemePreset)
+    ? (vendorTheme as ThemePreset)
     : undefined;
+
+  const tableCode = await resolveTableForVendor(
+    vendor.id,
+    rawPublicId,
+    (publicId) =>
+      db.diningTable.findUnique({
+        where: { publicId },
+        select: { vendorId: true, code: true },
+      })
+  );
 
   return (
     <TenantThemeProvider theme={{ preset }}>
       <MenuExperience
         vendor={vendor}
         initialLang={resolvedLocale}
-        tableCode={null}
+        tableCode={tableCode}
       />
     </TenantThemeProvider>
   );

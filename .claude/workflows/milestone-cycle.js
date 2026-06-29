@@ -1,11 +1,12 @@
 export const meta = {
   name: "milestone-cycle",
   description:
-    "Advance the next milestone: implement each of its issues on one milestone branch with an independent review + decision-gate per issue (auto-integrate obvious work, escalate only when a human decision is required), then open ONE PR for sign-off",
+    "Advance the next milestone: select its issues with per-issue discipline (ready-for-agent gate + in-progress claim + Blocked-by verification), implement each on one milestone branch with an independent review + decision-gate (auto-integrate obvious work, escalate only when a human decision is required), then open ONE PR for sign-off",
   phases: [
     {
       title: "Select",
-      detail: "claim the next milestone + its branch, list workable issues",
+      detail:
+        "claim the next milestone + its branch; gate issues on ready-for-agent + Blocked-by, mark in-progress",
     },
     {
       title: "Implement & Review",
@@ -15,7 +16,7 @@ export const meta = {
     {
       title: "Ship",
       detail:
-        "open ONE ready PR for the finished milestone, or a draft PR enumerating the human decisions needed",
+        "open ONE ready PR for the finished milestone, or a draft PR enumerating the human decisions + not-ready issues",
     },
   ],
 };
@@ -40,7 +41,7 @@ const SELECT_SCHEMA = {
     reason: {
       type: "string",
       description:
-        "if not found, why (no milestones left / current milestone fully blocked on human)",
+        "if not found, why (no milestones left / current milestone fully blocked-on-human or not-ready)",
     },
     milestone: { type: "string" },
     milestoneNumber: { type: "number" },
@@ -56,6 +57,21 @@ const SELECT_SCHEMA = {
           title: { type: "string" },
           hitl: { type: "boolean" },
           acceptanceCriteria: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
+    notReady: {
+      type: "array",
+      description:
+        "open milestone issues excluded for a NON-terminal reason (missing ready-for-agent, or gated by an open out-of-run blocker) — they keep the milestone incomplete",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["number", "title", "reason"],
+        properties: {
+          number: { type: "number" },
+          title: { type: "string" },
+          reason: { type: "string" },
         },
       },
     },
@@ -119,10 +135,14 @@ const sel = await agent(
 
 - Milestones run in order M1, M2, … (\`gh api repos/${REPO}/milestones --jq 'sort_by(.title)'\`). The pick is the LOWEST-titled milestone that still has open issues. You may not skip ahead: if an earlier milestone has any open issue, that earlier milestone is the pick.
 - For the picked milestone, list its open issues: \`gh issue list -R ${REPO} --milestone "<title>" --state open --limit 100 --json number,title,labels,body\`.
-- Build the workable set in ASCENDING issue-number order, EXCLUDING any issue labeled \`agent-integrated\` (already on the branch) or \`blocked-on-human\` (awaiting a human decision). Include \`hitl\` issues that are not yet \`blocked-on-human\`, and set hitl=true for them.
-- Cross-milestone blockers: parse each body's "## Blocked by" \`#N\`; any blocker that belongs to an EARLIER milestone must be CLOSED. Intra-milestone blockers are satisfied by ascending order — do NOT exclude on those.
-- If a workable set exists: ensure the labels \`agent-integrated\` and \`blocked-on-human\` exist (\`gh label create ... || true\`); compute branch \`feat/m<milestoneNumber>-<short-slug>\`; \`git checkout main && git pull\`; if the branch exists check it out and \`git rebase main\`, else create it from main. Return found=true with milestone, milestoneNumber, branch, and the issues array (each with parsed acceptanceCriteria).
-- If the picked milestone has NO workable issues (all remaining are blocked-on-human): return found=false, reason naming the milestone and the blocked issue numbers. Do NOT create a branch.
+- Ensure the labels \`agent-integrated\`, \`blocked-on-human\`, and \`in-progress\` exist (\`gh label create ... || true\`).
+- Build the WORKABLE set in ASCENDING issue-number order. An open issue is workable only if ALL of these hold:
+  • it is NOT labeled \`agent-integrated\` (already on the branch) and NOT \`blocked-on-human\` (awaiting a human decision);
+  • it is labeled \`ready-for-agent\` (the agent-readiness gate) OR labeled \`hitl\` (HITL issues are carried in so they can be escalated — set hitl=true for them, they need no ready-for-agent label);
+  • every \`#N\` parsed from its body's "## Blocked by" section is satisfied. A blocker is satisfied when it is CLOSED (\`gh issue view N -R ${REPO} --json state,milestone\`), OR it is an EARLIER issue (lower number) in THIS milestone that is itself in this run's workable set (ascending order guarantees it lands on the branch first). A blocker in an EARLIER milestone MUST be CLOSED.
+- Any OPEN issue in the milestone excluded for a NON-terminal reason — missing the \`ready-for-agent\` label (and not hitl), or gated by a still-open out-of-run blocker — goes into \`notReady\` as {number, title, reason}. Do NOT put \`agent-integrated\`/\`blocked-on-human\` issues in notReady (they are already accounted for).
+- If a workable set exists: claim each NON-hitl workable issue by adding the \`in-progress\` label (\`gh issue edit <n> --add-label in-progress\`); \`git checkout main && git pull\`; if branch \`feat/m<milestoneNumber>-<short-slug>\` exists check it out and \`git rebase main\`, else create it from main. Return found=true with milestone, milestoneNumber, branch, the issues array (each with parsed acceptanceCriteria), and notReady.
+- If the picked milestone has NO workable issues (all remaining are blocked-on-human and/or not-ready): return found=false, reason naming the milestone and the blocked / not-ready issue numbers. Do NOT create a branch.
 - If NO milestone has open issues: return found=false, reason "all milestones complete".`,
   { label: "select", phase: "Select", schema: SELECT_SCHEMA, model: "haiku" },
 );
@@ -133,8 +153,9 @@ if (!sel || !sel.found) {
     reason: (sel && sel.reason) || "selection agent produced no result",
   };
 }
+const notReady = sel.notReady || [];
 log(
-  `Milestone ${sel.milestone} on ${sel.branch} — ${sel.issues.length} workable issue(s)`,
+  `Milestone ${sel.milestone} on ${sel.branch} — ${sel.issues.length} workable issue(s)${notReady.length ? `, ${notReady.length} not-ready` : ""}`,
 );
 
 phase("Implement & Review");
@@ -146,7 +167,7 @@ for (const iss of sel.issues) {
     escalated.push({
       number: iss.number,
       title: iss.title,
-      ask: `[HITL] This issue is gated on a human decision (see issue #${iss.number} body and the PRD #1 plan). Make the decision(s), then remove the \`hitl\` and \`blocked-on-human\` labels to let the agent implement it.`,
+      ask: `[HITL] This issue is gated on a human decision (see issue #${iss.number} body and the PRD #1 plan). Make the decision(s), then remove the \`hitl\` and \`blocked-on-human\` labels and add \`ready-for-agent\` to let the agent implement it.`,
     });
     log(`#${iss.number}: HITL — escalating without implementing`);
     continue;
@@ -249,17 +270,19 @@ const ship = await agent(
 
 This run integrated these issues onto the branch: ${JSON.stringify(integrated.map((i) => i.number))}.
 This run escalated these issues (need a human decision): ${JSON.stringify(escalated, null, 2)}.
+Open milestone issues that were NOT workable this run (not yet ready / still blocked): ${JSON.stringify(notReady, null, 2)}.
 
 Do, in order:
 1. Push \`${sel.branch}\`.
-2. For each INTEGRATED issue: add the \`agent-integrated\` label (\`gh issue edit <n> --add-label agent-integrated\`).
-3. For each ESCALATED issue: add the \`blocked-on-human\` label and post ONE comment containing its exact \`ask\` (so the human sees the precise decision needed). Do not duplicate a comment that already says the same thing.
-4. Determine completeness: list the milestone's still-open issues NOT labeled \`agent-integrated\` (\`gh issue list --milestone "${sel.milestone}" --state open\`). The milestone is COMPLETE only if that list is empty.
-5. Find any existing open PR for \`${sel.branch}\` (\`gh pr list --head ${sel.branch}\`). If one exists, UPDATE it (title/body, and toggle draft↔ready with \`gh pr ready\` / \`gh pr ready --undo\`) rather than opening a new one. Otherwise create it.
-   - The PR body must begin with a \`Closes #<n>\` line for EVERY \`agent-integrated\` issue in the milestone (so merging closes them), map what shipped to the milestone's issues, and have a clear "## Needs your decision" section listing every escalated issue and its ask (or "none" if complete).
+2. For each INTEGRATED issue: swap labels — \`gh issue edit <n> --remove-label in-progress --add-label agent-integrated\`.
+3. For each ESCALATED issue: \`gh issue edit <n> --remove-label in-progress --add-label blocked-on-human\` (the remove is a no-op if the label was never applied, e.g. HITL issues) and post ONE comment containing its exact \`ask\` (so the human sees the precise decision needed). Do not duplicate a comment that already says the same thing.
+4. For each NOT-READY issue: leave its labels untouched — it never carried \`in-progress\`; it simply keeps the milestone open until it is groomed (\`ready-for-agent\`) or its blocker closes.
+5. Determine completeness: list the milestone's still-open issues NOT labeled \`agent-integrated\` (\`gh issue list --milestone "${sel.milestone}" --state open\`). The milestone is COMPLETE only if that list is empty.
+6. Find any existing open PR for \`${sel.branch}\` (\`gh pr list --head ${sel.branch}\`). If one exists, UPDATE it (title/body, and toggle draft↔ready with \`gh pr ready\` / \`gh pr ready --undo\`) rather than opening a new one. Otherwise create it.
+   - The PR body must begin with a \`Closes #<n>\` line for EVERY \`agent-integrated\` issue in the milestone (so merging closes them), map what shipped to the milestone's issues, and contain two clear sections: "## Needs your decision" listing every escalated issue and its ask, and "## Not yet ready" listing every notReady issue and its reason. Write "none" under a section that is empty.
    - If the milestone is COMPLETE: make it a READY PR titled \`${sel.milestone}\`.
-   - If NOT complete: make it a DRAFT PR — the "Needs your decision" section is the gate; merging waits until those are resolved and their issues implemented.
-6. Never modify or close issue #1.
+   - If NOT complete: make it a DRAFT PR — the "Needs your decision" / "Not yet ready" sections are the gate; merging waits until those are resolved and their issues integrated.
+7. Never modify or close issue #1.
 
 Return the PR url and whether it is a draft.`,
   { label: "ship", phase: "Ship", schema: SHIP_SCHEMA, model: "sonnet" },
@@ -271,6 +294,7 @@ return {
   branch: sel.branch,
   integrated: integrated.map((i) => i.number),
   escalated: escalated.map((e) => ({ issue: e.number, ask: e.ask })),
+  notReady: notReady.map((n) => ({ issue: n.number, reason: n.reason })),
   prUrl: ship ? ship.prUrl : null,
   draft: ship ? ship.draft : true,
   needsHuman: escalated.length > 0,

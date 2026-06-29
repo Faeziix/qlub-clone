@@ -55,7 +55,7 @@ export async function GET(req: Request) {
   }
 
   if (payment.status === "succeeded") {
-    return successRedirect(req, payment.orderId);
+    return successRedirect(req, payment.orderId, payment.id);
   }
 
   if (payment.status === "failed" || payment.status === "expired") {
@@ -105,7 +105,7 @@ export async function GET(req: Request) {
       vendorId: payment.vendorId,
       gatewayReference: verifyResult.refNumber,
     });
-    return successRedirect(req, payment.orderId);
+    return successRedirect(req, payment.orderId, payment.id);
   }
 
   if (verifyResult.status === "failed") {
@@ -116,9 +116,11 @@ export async function GET(req: Request) {
   return pendingRedirect(req, payment.orderId);
 }
 
-function successRedirect(req: Request, orderId: string): NextResponse {
+function successRedirect(req: Request, orderId: string, paymentId: string): NextResponse {
   const { origin } = new URL(req.url);
-  return NextResponse.redirect(`${origin}/payment/success?orderId=${orderId}`);
+  return NextResponse.redirect(
+    `${origin}/payment/success?orderId=${orderId}&paymentId=${paymentId}`
+  );
 }
 
 function failureRedirect(req: Request, orderId: string): NextResponse {

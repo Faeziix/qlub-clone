@@ -93,7 +93,7 @@ export function StatusPill({ status }: { status: string }) {
     cancelled: "bg-danger/10 text-danger",
     available: "bg-success/10 text-success",
     occupied: "bg-amber-100 text-amber-700",
-    "bill-requested": "bg-purple-100 text-purple-700",
+    bill_requested: "bg-purple-100 text-purple-700",
     succeeded: "bg-success/10 text-success",
   };
   return (
@@ -103,7 +103,7 @@ export function StatusPill({ status }: { status: string }) {
         map[status] ?? "bg-surface-2 text-muted"
       )}
     >
-      {status.replace("-", " ")}
+      {status.replace("_", " ")}
     </span>
   );
 }

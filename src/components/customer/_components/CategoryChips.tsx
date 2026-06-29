@@ -52,7 +52,7 @@ export function CategoryChips({
           onClick={() => onSelect(cat.id, i)}
           className={cn(
             "shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-fast",
-            "min-h-[36px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2",
+            "min-h-[44px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand focus-visible:outline-offset-2",
             i === activeCat
               ? "bg-brand text-brand-fg"
               : "bg-surface-2 text-ink hover:bg-line"

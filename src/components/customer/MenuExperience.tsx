@@ -488,7 +488,7 @@ function MenuBrowseHeader({
         <button
           type="button"
           onClick={onBack}
-          className="grid h-9 w-9 place-items-center rounded-full bg-surface-2 transition-colors hover:bg-line"
+          className="grid h-11 w-11 place-items-center rounded-full bg-surface-2 transition-colors hover:bg-line"
           aria-label={t("back")}
         >
           <ChevronLeft size={20} />
@@ -497,7 +497,7 @@ function MenuBrowseHeader({
         <button
           type="button"
           onClick={onLanguageOpen}
-          className="grid h-9 w-9 place-items-center rounded-full bg-surface-2 transition-colors hover:bg-line"
+          className="grid h-11 w-11 place-items-center rounded-full bg-surface-2 transition-colors hover:bg-line"
           aria-label={t("language")}
         >
           <Globe size={18} />
@@ -741,7 +741,7 @@ function MenuPickerPanel({
         <button
           type="button"
           onClick={onBack}
-          className="grid h-8 w-8 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink transition-colors"
+          className="grid h-11 w-11 place-items-center rounded-full bg-surface-2 text-muted hover:text-ink transition-colors"
           aria-label={t("back")}
         >
           <ArrowLeft size={16} aria-hidden />

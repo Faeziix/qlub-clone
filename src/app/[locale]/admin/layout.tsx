@@ -45,7 +45,7 @@ export default async function AdminLayout({
     }
 
     return (
-      <div className="min-h-screen bg-bg lg:flex">
+      <div className="min-h-screen bg-bg md:flex">
         <SuperadminSidebar
           user={{
             name: session.name,
@@ -54,7 +54,7 @@ export default async function AdminLayout({
           }}
         />
         <main className="min-w-0 flex-1">
-          <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8 lg:py-8">
+          <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8 lg:px-8">
             {children}
           </div>
         </main>
@@ -71,7 +71,7 @@ export default async function AdminLayout({
   const vendorName = vendor?.name ?? tCommon("noVendor");
 
   return (
-    <div className="min-h-screen bg-bg lg:flex">
+    <div className="min-h-screen bg-bg md:flex">
       <AdminSidebar
         user={{
           name: session.name,
@@ -81,7 +81,7 @@ export default async function AdminLayout({
         vendorName={vendorName}
       />
       <main className="min-w-0 flex-1">
-        <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8 lg:py-8">
+        <div className="mx-auto max-w-7xl px-4 py-6 md:px-6 md:py-8 lg:px-8">
           {children}
         </div>
       </main>

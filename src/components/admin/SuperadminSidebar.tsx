@@ -30,7 +30,7 @@ export function SuperadminSidebar({ user }: { user: SidebarUser }) {
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-surface px-4 py-3 lg:hidden">
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-line bg-surface px-4 py-3 md:hidden">
         <div className="flex items-center gap-2">
           <ShieldCheck size={18} className="text-brand" />
           <span className="text-lg font-black">
@@ -46,20 +46,20 @@ export function SuperadminSidebar({ user }: { user: SidebarUser }) {
         </button>
       </div>
 
-      <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-e border-line bg-surface lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-e border-line bg-surface md:flex">
         <PlatformSidebarContent user={user} />
       </aside>
 
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
           onClick={() => setOpen(false)}
         />
       )}
 
       <aside
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex w-72 flex-col border-e border-line bg-surface transition-transform lg:hidden",
+          "fixed inset-y-0 start-0 z-50 flex w-64 flex-col border-e border-line bg-surface transition-transform md:hidden",
           open ? "translate-x-0" : "-translate-x-full rtl:translate-x-full"
         )}
       >
@@ -101,7 +101,7 @@ function PlatformSidebarContent({
         {onClose && (
           <button
             onClick={onClose}
-            className="grid h-8 w-8 place-items-center rounded-lg bg-surface-2 lg:hidden"
+            className="grid h-8 w-8 place-items-center rounded-lg bg-surface-2 md:hidden"
             aria-label={tCommon("closeMenu")}
           >
             <X size={18} />

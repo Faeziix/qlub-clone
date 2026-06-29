@@ -78,9 +78,15 @@ Five named presets override brand tokens. Applied via `TenantThemeProvider` with
 | Name | Min-width | Usage |
 |---|---|---|
 | `sm` | 640 px | Mostly unused — design is mobile-first |
-| `md` | 768 px | Desktop frame activates; desktop admin layouts |
-| `lg` | 1024 px | Admin dashboard multi-column |
+| `md` | 768 px | Admin sidebar appears; tablet admin layout |
+| `lg` | 1024 px | Admin multi-column stat grids (`lg:grid-cols-4`, `lg:grid-cols-3`) |
 | `xl` | 1280 px | Wide admin tables |
+
+### Admin shell
+
+- **Mobile (< 768 px)**: hamburger header + slide-over drawer
+- **Tablet / Desktop (≥ 768 px)**: in-flow `w-64` aside + `flex-1` main, `max-w-7xl` content
+- Sidebar width: `w-64` (256 px) — fixed, not collapsible on tablet
 
 ### Customer shell width
 The customer experience is constrained to `max-w-app` (480 px) centered on the page.

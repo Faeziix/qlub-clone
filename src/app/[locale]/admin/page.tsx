@@ -140,24 +140,24 @@ export default async function DashboardPage() {
               <thead>
                 <tr className="text-start text-xs uppercase text-muted">
                   <th className="pb-2 font-semibold">{t("order")}</th>
-                  <th className="pb-2 font-semibold">{t("guest")}</th>
+                  <th className="hidden pb-2 font-semibold sm:table-cell">{t("guest")}</th>
                   <th className="pb-2 font-semibold">{t("status")}</th>
                   <th className="pb-2 text-end font-semibold">{t("total")}</th>
-                  <th className="pb-2 text-end font-semibold">{t("time")}</th>
+                  <th className="hidden pb-2 text-end font-semibold sm:table-cell">{t("time")}</th>
                 </tr>
               </thead>
               <tbody>
                 {recentOrders.map((o) => (
                   <tr key={o.id} className="border-t border-line">
                     <td className="py-2.5 font-semibold">{o.orderNumber}</td>
-                    <td className="py-2.5 text-muted">{o.guestName ?? "—"}</td>
+                    <td className="hidden py-2.5 text-muted sm:table-cell">{o.guestName ?? "—"}</td>
                     <td className="py-2.5">
                       <StatusPill status={o.status} />
                     </td>
                     <td className="py-2.5 text-end font-semibold tabular-nums">
                       {formatMoney(o.total)}
                     </td>
-                    <td className="py-2.5 text-end text-xs text-muted">
+                    <td className="hidden py-2.5 text-end text-xs text-muted sm:table-cell">
                       {timeAgo(o.createdAt)}
                     </td>
                   </tr>

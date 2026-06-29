@@ -266,7 +266,10 @@ export function TablesGrid({
   t,
 }: TablesGridProps) {
   const [open, setOpen] = React.useState(false);
-  const [origin, setOrigin] = React.useState("");
+  const origin = React.useMemo(
+    () => (typeof window !== "undefined" ? window.location.origin : ""),
+    []
+  );
   const [isPending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
 
@@ -274,10 +277,6 @@ export function TablesGrid({
   const [label, setLabel] = React.useState("");
   const [area, setArea] = React.useState("");
   const [seats, setSeats] = React.useState(2);
-
-  React.useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
 
   function resetForm() {
     setCode("");

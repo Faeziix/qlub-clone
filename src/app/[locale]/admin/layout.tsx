@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 const VENDOR_ROUTES = [
   "/admin/orders",
+  "/admin/order-entry",
   "/admin/menu",
   "/admin/tables",
   "/admin/reviews",

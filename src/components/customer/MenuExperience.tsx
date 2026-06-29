@@ -7,25 +7,20 @@ import {
   Search,
   Globe,
   ChevronLeft,
-  ShoppingBag,
   UtensilsCrossed,
   CreditCard,
   ArrowLeft,
   ClipboardList,
 } from "lucide-react";
 import type { VendorWithMenus } from "@/lib/queries";
-import { useCart } from "@/lib/store/cart";
-import { useActiveOrder } from "@/lib/store/active-order";
 import { makeT, dirFor, localizedName } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
-import { formatRialAsToman } from "@/lib/money";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { ItemSheet } from "./ItemSheet";
-import { CartSheet } from "./CartSheet";
 import { LanguageSheet } from "./LanguageSheet";
 import { PayBillSheet } from "./PayBillSheet";
+import { NoOpenBillSheet } from "./NoOpenBillSheet";
 import { MyOrderSheet } from "./MyOrderSheet";
 import { ItemCard } from "./_components/ItemCard";
 import { CategoryChips } from "./_components/CategoryChips";
@@ -33,22 +28,16 @@ import type { ItemWithModifiers } from "@/lib/queries";
 import axios from "axios";
 import type { CustomerOrderSnapshot } from "@/lib/types";
 
-function subtotalLabel(rialAmount: bigint, locale: string): string {
-  return locale === "fa"
-    ? formatRialAsTomanPersian(rialAmount)
-    : `${formatRialAsToman(rialAmount)} Toman`;
-}
-
 type LandingView = "main" | "menuPicker";
 
 export function MenuExperience({
   vendor,
   initialLang,
-  tableCode,
+  tablePublicId,
 }: {
   vendor: VendorWithMenus;
   initialLang: string;
-  tableCode: string | null;
+  tablePublicId: string | null;
 }) {
   const [lang, setLang] = React.useState(initialLang);
   const t = makeT(lang);
@@ -62,10 +51,10 @@ export function MenuExperience({
   const [rawQuery, setRawQuery] = React.useState("");
   const query = React.useDeferredValue(rawQuery);
   const [activeItem, setActiveItem] = React.useState<ItemWithModifiers | null>(null);
-  const [cartOpen, setCartOpen] = React.useState(false);
   const [langOpen, setLangOpen] = React.useState(false);
   const [payBillOpen, setPayBillOpen] = React.useState(false);
   const [payBillNotice, setPayBillNotice] = React.useState<string | null>(null);
+  const [noOpenBillOpen, setNoOpenBillOpen] = React.useState(false);
   const [resolvingTableBill, setResolvingTableBill] = React.useState(false);
   const [myOrderOpen, setMyOrderOpen] = React.useState(false);
   const [activeCat, setActiveCat] = React.useState(0);
@@ -73,39 +62,25 @@ export function MenuExperience({
   const [activeOrderSnapshot, setActiveOrderSnapshot] =
     React.useState<CustomerOrderSnapshot | null>(null);
 
-  const cart = useCart();
-  const activeOrderStore = useActiveOrder();
-  const [hydrated, setHydrated] = React.useState(false);
-
   React.useEffect(() => {
-    cart.init(vendor.slug, tableCode);
-    setHydrated(true);
+    if (!tablePublicId) return;
 
-    const stored = activeOrderStore.getActiveOrder(vendor.slug, tableCode);
-    if (stored) {
-      axios
-        .get<CustomerOrderSnapshot>(`/api/orders/${stored.orderId}`)
-        .then(({ data }) => {
-          const isTerminal = data.status === "paid" || data.status === "cancelled";
-          if (isTerminal) {
-            activeOrderStore.clearActiveOrder(vendor.slug, tableCode);
-          } else {
-            setActiveOrderSnapshot(data);
-          }
-        })
-        .catch(() => {
-          activeOrderStore.clearActiveOrder(vendor.slug, tableCode);
-        });
-    }
+    axios
+      .get<{ id: string; status: string; orderNumber: string }>("/api/orders/active", {
+        params: { vendor: vendor.slug, tablePublicId },
+      })
+      .then(({ data }) =>
+        axios.get<CustomerOrderSnapshot>(`/api/orders/${data.id}`)
+      )
+      .then(({ data }) => {
+        const isTerminal = data.status === "paid" || data.status === "cancelled";
+        if (!isTerminal) {
+          setActiveOrderSnapshot(data);
+        }
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const count = hydrated ? cart.count() : 0;
-  const subtotal = hydrated ? cart.subtotal() : 0n;
-
-  const activeOrderEntry = hydrated
-    ? activeOrderStore.getActiveOrder(vendor.slug, tableCode)
-    : null;
 
   const menu = menus[activeMenu];
   const categories = React.useMemo(() => menu?.categories ?? [], [menu]);
@@ -163,7 +138,7 @@ export function MenuExperience({
   }
 
   async function handlePayBill() {
-    if (!tableCode) {
+    if (!tablePublicId) {
       setPayBillNotice(null);
       setPayBillOpen(true);
       return;
@@ -172,23 +147,14 @@ export function MenuExperience({
     setResolvingTableBill(true);
     try {
       const { data } = await axios.get<{ id: string }>("/api/orders/active", {
-        params: { vendor: vendor.slug, table: tableCode },
+        params: { vendor: vendor.slug, tablePublicId },
       });
       router.push(`/qr/${vendor.country}/${vendor.slug}/pay?order=${data.id}&lang=${lang}`);
     } catch {
-      setPayBillNotice(t("noOpenBillAtTable"));
-      setPayBillOpen(true);
+      setNoOpenBillOpen(true);
     } finally {
       setResolvingTableBill(false);
     }
-  }
-
-  function handleOrderPlaced(orderId: string) {
-    activeOrderStore.setActiveOrder(vendor.slug, orderId, tableCode);
-    axios
-      .get<CustomerOrderSnapshot>(`/api/orders/${orderId}`)
-      .then(({ data }) => setActiveOrderSnapshot(data))
-      .catch(() => {});
   }
 
   function handleOrderRefreshed(updated: CustomerOrderSnapshot) {
@@ -196,14 +162,9 @@ export function MenuExperience({
   }
 
   function handleOrderStatusCleared() {
-    activeOrderStore.clearActiveOrder(vendor.slug, tableCode);
     setActiveOrderSnapshot(null);
     setMyOrderOpen(false);
   }
-
-  const activeOrderRef = activeOrderSnapshot
-    ? { id: activeOrderSnapshot.id, orderNumber: activeOrderSnapshot.orderNumber }
-    : null;
 
   if (!entered) {
     return (
@@ -263,6 +224,16 @@ export function MenuExperience({
           notice={payBillNotice}
         />
 
+        <NoOpenBillSheet
+          open={noOpenBillOpen}
+          onClose={() => setNoOpenBillOpen(false)}
+          lang={lang}
+          onBrowseMenu={() => {
+            setNoOpenBillOpen(false);
+            handleViewMenu();
+          }}
+        />
+
         {activeOrderSnapshot && (
           <MyOrderSheet
             open={myOrderOpen}
@@ -273,10 +244,6 @@ export function MenuExperience({
             order={activeOrderSnapshot}
             onOrderRefreshed={handleOrderRefreshed}
             onStatusCleared={handleOrderStatusCleared}
-            onAddMoreItems={() => {
-              setMyOrderOpen(false);
-              handleViewMenu();
-            }}
           />
         )}
       </div>
@@ -343,7 +310,7 @@ export function MenuExperience({
         </main>
       </div>
 
-      {activeOrderEntry && count === 0 && (
+      {activeOrderSnapshot && (
         <div className="fixed inset-x-0 bottom-0 z-40 safe-bottom">
           <div className="mx-auto max-w-app px-4 pb-4">
             <button
@@ -356,45 +323,7 @@ export function MenuExperience({
                 {t("myOrder")}
               </span>
               <span className="text-sm font-semibold text-muted">
-                {activeOrderSnapshot?.orderNumber}
-              </span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 safe-bottom">
-          <div className="mx-auto max-w-app px-4 pb-4 space-y-2">
-            {activeOrderEntry && (
-              <button
-                type="button"
-                onClick={() => setMyOrderOpen(true)}
-                className="flex w-full items-center justify-between rounded-2xl bg-surface border border-brand/30 px-4 py-2.5 shadow-card"
-              >
-                <span className="flex items-center gap-1.5 text-sm font-semibold text-brand">
-                  <ClipboardList size={16} aria-hidden />
-                  {t("myOrder")}
-                </span>
-                <span className="text-xs font-medium text-muted">
-                  {activeOrderSnapshot?.orderNumber}
-                </span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setCartOpen(true)}
-              className="flex w-full items-center justify-between rounded-2xl bg-brand px-5 py-4 text-brand-fg shadow-float animate-slide-up"
-            >
-              <span className="flex items-center gap-2 font-bold">
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-brand-fg/20 text-sm">
-                  {count}
-                </span>
-                {t("viewOrder")}
-              </span>
-              <span className="flex items-center gap-2 font-bold">
-                {subtotalLabel(subtotal, lang)}
-                <ShoppingBag size={18} />
+                {activeOrderSnapshot.orderNumber}
               </span>
             </button>
           </div>
@@ -409,15 +338,6 @@ export function MenuExperience({
           onClose={() => setActiveItem(null)}
         />
       )}
-      <CartSheet
-        open={cartOpen}
-        onClose={() => setCartOpen(false)}
-        vendor={vendor}
-        lang={lang}
-        tableCode={tableCode}
-        activeOrder={activeOrderRef}
-        onOrderPlaced={handleOrderPlaced}
-      />
       <LanguageSheet
         open={langOpen}
         onClose={() => setLangOpen(false)}
@@ -439,9 +359,14 @@ export function MenuExperience({
           order={activeOrderSnapshot}
           onOrderRefreshed={handleOrderRefreshed}
           onStatusCleared={handleOrderStatusCleared}
-          onAddMoreItems={() => setMyOrderOpen(false)}
         />
       )}
+      <NoOpenBillSheet
+        open={noOpenBillOpen}
+        onClose={() => setNoOpenBillOpen(false)}
+        lang={lang}
+        onBrowseMenu={() => setNoOpenBillOpen(false)}
+      />
     </div>
   );
 }

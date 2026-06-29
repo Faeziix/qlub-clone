@@ -6,7 +6,7 @@ import { TenantThemeProvider } from "@/components/ui/TenantThemeProvider";
 import { routing, type SupportedLocale } from "@/i18n/routing";
 import { THEME_PRESETS, type ThemePreset } from "@/lib/design-tokens";
 import { SuspendedTenantPage } from "@/components/customer/SuspendedTenantPage";
-import { resolveTableForVendor } from "@/lib/table-code";
+import { resolveTableForVendor, normalizeTablePublicId } from "@/lib/table-code";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +47,7 @@ export default async function TableMenuPage({
     ? (vendorTheme as ThemePreset)
     : undefined;
 
-  const tableCode = await resolveTableForVendor(
+  const tableResolved = await resolveTableForVendor(
     vendor.id,
     rawPublicId,
     (publicId) =>
@@ -57,12 +57,14 @@ export default async function TableMenuPage({
       })
   );
 
+  const tablePublicId = tableResolved ? normalizeTablePublicId(rawPublicId) : null;
+
   return (
     <TenantThemeProvider theme={{ preset }}>
       <MenuExperience
         vendor={vendor}
         initialLang={resolvedLocale}
-        tableCode={tableCode}
+        tablePublicId={tablePublicId}
       />
     </TenantThemeProvider>
   );

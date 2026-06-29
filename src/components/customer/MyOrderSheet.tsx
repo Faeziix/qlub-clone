@@ -9,7 +9,6 @@ import {
   Utensils,
   XCircle,
   CreditCard,
-  Plus,
 } from "lucide-react";
 import axios from "axios";
 import { Sheet } from "@/components/ui/Sheet";
@@ -158,7 +157,6 @@ interface MyOrderSheetProps {
   order: CustomerOrderSnapshot;
   onOrderRefreshed: (updated: CustomerOrderSnapshot) => void;
   onStatusCleared: () => void;
-  onAddMoreItems: () => void;
 }
 
 export function MyOrderSheet({
@@ -170,7 +168,6 @@ export function MyOrderSheet({
   order,
   onOrderRefreshed,
   onStatusCleared,
-  onAddMoreItems,
 }: MyOrderSheetProps) {
   const t = makeT(lang);
   const dir = dirFor(lang);
@@ -303,33 +300,22 @@ export function MyOrderSheet({
           </div>
         </div>
 
-        {!isTerminal && (
-          <div className="shrink-0 border-t border-line bg-surface px-5 py-4 pb-4 safe-bottom space-y-3">
-            {!isFullyPaid && (
-              <Button
-                fullWidth
-                size="lg"
-                variant="cta"
-                onClick={handlePayNow}
-                className="justify-between px-5"
-              >
-                <div className="flex items-center gap-2">
-                  <CreditCard size={18} aria-hidden />
-                  <span>{t("payBill")}</span>
-                </div>
-                <span className="tabular-nums" dir="rtl">
-                  {rialDisplay(remaining.toString(), lang)}
-                </span>
-              </Button>
-            )}
+        {!isTerminal && !isFullyPaid && (
+          <div className="shrink-0 border-t border-line bg-surface px-5 py-4 pb-4 safe-bottom">
             <Button
               fullWidth
-              variant="secondary"
-              onClick={onAddMoreItems}
-              className="justify-center gap-2"
+              size="lg"
+              variant="cta"
+              onClick={handlePayNow}
+              className="justify-between px-5"
             >
-              <Plus size={16} aria-hidden />
-              {t("addMoreItems")}
+              <div className="flex items-center gap-2">
+                <CreditCard size={18} aria-hidden />
+                <span>{t("payBill")}</span>
+              </div>
+              <span className="tabular-nums" dir="rtl">
+                {rialDisplay(remaining.toString(), lang)}
+              </span>
             </Button>
           </div>
         )}

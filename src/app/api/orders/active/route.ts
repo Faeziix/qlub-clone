@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { checkOrigin } from "@/lib/csrf";
 import { getLimiter } from "@/lib/limiters";
+import { normalizeTablePublicId, isValidTablePublicId } from "@/lib/table-code";
 
 const TERMINAL_STATUSES = ["paid", "cancelled"] as const;
 
@@ -27,10 +28,15 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = request.nextUrl;
   const vendorSlug = searchParams.get("vendor");
-  const tableCode = searchParams.get("table");
+  const rawTablePublicId = searchParams.get("tablePublicId");
 
-  if (!vendorSlug || !tableCode) {
+  if (!vendorSlug || !rawTablePublicId) {
     return NextResponse.json({ error: "missing_params" }, { status: 400 });
+  }
+
+  const tablePublicId = normalizeTablePublicId(rawTablePublicId);
+  if (!isValidTablePublicId(tablePublicId)) {
+    return NextResponse.json({ error: "invalid_table_id" }, { status: 400 });
   }
 
   const vendor = await db.vendor.findUnique({
@@ -41,10 +47,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 
+  const table = await db.diningTable.findUnique({
+    where: { publicId: tablePublicId },
+    select: { id: true, vendorId: true },
+  });
+  if (!table || table.vendorId !== vendor.id) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
   const order = await db.order.findFirst({
     where: {
       vendorId: vendor.id,
-      table: { code: tableCode },
+      tableId: table.id,
       status: { notIn: [...TERMINAL_STATUSES] },
     },
     orderBy: { createdAt: "desc" },

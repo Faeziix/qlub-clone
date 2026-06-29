@@ -4,20 +4,13 @@ import * as React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import Image from "next/image";
-import { X, Check, ChefHat } from "lucide-react";
-import { cva } from "class-variance-authority";
+import { X, ChefHat } from "lucide-react";
 import type { ItemWithModifiers } from "@/lib/queries";
-import type { SelectedModifier } from "@/lib/types";
-import { useCart } from "@/lib/store/cart";
 import { makeT, localizedName, localizedDescription, type I18nMap } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { formatRialAsTomanPersian, latinDigitsToPersian } from "@/lib/toman-formatter";
+import { formatRialAsTomanPersian } from "@/lib/toman-formatter";
 import { formatRialAsToman } from "@/lib/money";
-import { Button } from "@/components/ui/Button";
-import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { DietBadge } from "@/components/ui/Badge";
-
-const INSTRUCTIONS_MAX = 160;
 
 function displayPrice(rialAmount: bigint | number, locale: string): string {
   const rial =
@@ -28,41 +21,6 @@ function displayPrice(rialAmount: bigint | number, locale: string): string {
 }
 
 type Group = ItemWithModifiers["modifierGroups"][number];
-
-const modifierOptionVariants = cva(
-  "flex w-full items-center gap-3 rounded-2xl border px-4 text-start transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand",
-  {
-    variants: {
-      checked: {
-        true: "border-brand bg-brand-soft",
-        false: "border-line bg-surface hover:bg-surface-2",
-      },
-    },
-    defaultVariants: { checked: false },
-  }
-);
-
-function ModifierIndicator({
-  checked,
-  single,
-}: {
-  checked: boolean;
-  single: boolean;
-}) {
-  return (
-    <span
-      className={cn(
-        "grid h-5 w-5 shrink-0 place-items-center border-2 transition-colors",
-        single ? "rounded-full" : "rounded",
-        checked
-          ? "border-brand bg-brand text-brand-fg"
-          : "border-muted/50 bg-surface"
-      )}
-    >
-      {checked && <Check size={12} strokeWidth={3} aria-hidden />}
-    </span>
-  );
-}
 
 function ItemHero({
   imageUrl,
@@ -108,44 +66,21 @@ function ItemHero({
   );
 }
 
-function ModifierGroupSection({
+function ReadOnlyModifierGroup({
   group,
-  selected,
-  onToggle,
-  t,
   lang,
+  t,
 }: {
   group: Group;
-  selected: string[];
-  onToggle: (group: Group, optionId: string) => void;
-  t: (key: string) => string;
   lang: string;
+  t: (key: string) => string;
 }) {
-  const single = group.maxSelect <= 1;
   const groupName = localizedName(group as { name: string; i18n?: I18nMap }, lang);
-
-  function modifierHint(): string {
-    if (single) return t("chooseOne");
-    const localCount = (n: number) =>
-      lang === "fa" ? latinDigitsToPersian(String(n)) : String(n);
-    if (group.minSelect > 0 && group.minSelect === group.maxSelect) {
-      return t("chooseExactly").replace("{count}", localCount(group.maxSelect));
-    }
-    if (group.minSelect > 0 && group.minSelect < group.maxSelect) {
-      return t("chooseRange")
-        .replace("{min}", localCount(group.minSelect))
-        .replace("{max}", localCount(group.maxSelect));
-    }
-    return t("chooseUpTo").replace("{count}", localCount(group.maxSelect));
-  }
 
   return (
     <div className="mt-6">
       <div className="flex items-start justify-between gap-2 px-5">
-        <div>
-          <h3 className="font-bold leading-snug">{groupName}</h3>
-          <p className="mt-0.5 text-sm text-muted">{modifierHint()}</p>
-        </div>
+        <h3 className="font-bold leading-snug">{groupName}</h3>
         <span
           className={cn(
             "mt-0.5 shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
@@ -158,21 +93,14 @@ function ModifierGroupSection({
         </span>
       </div>
 
-      <div className="mt-3 space-y-2 px-5">
+      <ul className="mt-3 space-y-2 px-5">
         {group.options.map((option) => {
-          const checked = selected.includes(option.id);
           const optionName = localizedName(option as { name: string; i18n?: I18nMap }, lang);
           return (
-            <button
+            <li
               key={option.id}
-              type="button"
-              onClick={() => onToggle(group, option.id)}
-              className={cn(
-                modifierOptionVariants({ checked }),
-                "min-h-[52px] py-3"
-              )}
+              className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 min-h-[52px]"
             >
-              <ModifierIndicator checked={checked} single={single} />
               <span className="flex-1 text-sm font-medium leading-snug">
                 {optionName}
               </span>
@@ -181,10 +109,10 @@ function ModifierGroupSection({
                   +{displayPrice(option.priceDelta, lang)}
                 </span>
               )}
-            </button>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -201,80 +129,10 @@ export function ItemSheet({
   onClose: () => void;
 }) {
   const t = makeT(lang);
-  const addLine = useCart((s) => s.addLine);
-  const [qty, setQty] = React.useState(1);
-  const [notes, setNotes] = React.useState("");
 
   const tags = Array.isArray(item.tags) ? (item.tags as string[]) : [];
   const name = localizedName(item, lang);
   const description = localizedDescription(item, lang);
-
-  const [selected, setSelected] = React.useState<Record<string, string[]>>(
-    () => {
-      const init: Record<string, string[]> = {};
-      for (const group of item.modifierGroups) {
-        const defaults = group.options
-          .filter((o) => o.isDefault)
-          .map((o) => o.id);
-        init[group.id] = defaults;
-      }
-      return init;
-    }
-  );
-
-  function toggle(group: Group, optionId: string) {
-    setSelected((prev) => {
-      const cur = prev[group.id] ?? [];
-      if (group.maxSelect <= 1) {
-        return { ...prev, [group.id]: [optionId] };
-      }
-      if (cur.includes(optionId)) {
-        return { ...prev, [group.id]: cur.filter((x) => x !== optionId) };
-      }
-      if (cur.length >= group.maxSelect) return prev;
-      return { ...prev, [group.id]: [...cur, optionId] };
-    });
-  }
-
-  const chosenModifiers: SelectedModifier[] = item.modifierGroups.flatMap(
-    (group) =>
-      (selected[group.id] ?? []).map((optId) => {
-        const opt = group.options.find((o) => o.id === optId)!;
-        return {
-          groupId: group.id,
-          groupName: localizedName(group as { name: string; i18n?: I18nMap }, lang),
-          optionId: opt.id,
-          optionName: localizedName(opt as { name: string; i18n?: I18nMap }, lang),
-          priceDelta: BigInt(opt.priceDelta),
-        };
-      })
-  );
-
-  const unitPriceRial = BigInt(item.price);
-  const unitWithMods =
-    unitPriceRial +
-    chosenModifiers.reduce((sum, mod) => sum + mod.priceDelta, 0n);
-  const lineTotal = unitWithMods * BigInt(qty);
-
-  const missingRequired = item.modifierGroups.some(
-    (g) =>
-      g.required && (selected[g.id]?.length ?? 0) < Math.max(1, g.minSelect)
-  );
-
-  const charsLeft = INSTRUCTIONS_MAX - notes.length;
-
-  function handleAdd() {
-    addLine({
-      itemId: item.id,
-      name,
-      imageUrl: item.imageUrl,
-      unitPrice: unitPriceRial,
-      quantity: qty,
-      modifiers: chosenModifiers,
-      notes: notes.trim() || undefined,
-    });
-    onClose();
-  }
 
   return (
     <Dialog.Root open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -317,7 +175,7 @@ export function ItemSheet({
                 <ItemHero imageUrl={item.imageUrl} name={name} />
               </div>
 
-              <div className="px-5 pt-5 pb-2">
+              <div className="px-5 pt-5 pb-6">
                 <div className="flex items-start justify-between gap-3">
                   <h2 className="text-2xl font-extrabold leading-heading">
                     {name}
@@ -343,81 +201,22 @@ export function ItemSheet({
 
                 {item.calories != null && (
                   <p className="mt-2 text-sm text-muted">
-                    {lang === "fa"
-                      ? latinDigitsToPersian(String(item.calories))
-                      : item.calories}{" "}
-                    {t("kcal")}
+                    {item.calories} {t("kcal")}
                   </p>
                 )}
               </div>
 
               {item.modifierGroups.length > 0 && (
-                <div className="border-t border-line pt-4">
+                <div className="border-t border-line pt-4 pb-8">
                   {item.modifierGroups.map((group) => (
-                    <ModifierGroupSection
+                    <ReadOnlyModifierGroup
                       key={group.id}
                       group={group}
-                      selected={selected[group.id] ?? []}
-                      onToggle={toggle}
-                      t={t}
                       lang={lang}
+                      t={t}
                     />
                   ))}
                 </div>
-              )}
-
-              <div className="mt-6 px-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold">{t("special")}</h3>
-                  <span
-                    className={cn(
-                      "text-xs tabular-nums",
-                      charsLeft < 20 ? "text-warning" : "text-muted"
-                    )}
-                  >
-                    {lang === "fa" ? latinDigitsToPersian(String(charsLeft)) : charsLeft}
-                  </span>
-                </div>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value.slice(0, INSTRUCTIONS_MAX))}
-                  rows={3}
-                  placeholder={t("specialPlaceholder")}
-                  className="mt-2 w-full resize-none rounded-2xl border border-line bg-surface-2 px-4 py-3 text-sm leading-persian outline-none transition-colors focus:border-brand focus:bg-surface"
-                />
-              </div>
-
-              <div className="h-36" aria-hidden />
-            </div>
-
-            <div className="shrink-0 border-t border-line bg-surface/95 px-4 pt-3 pb-4 backdrop-blur-sm safe-bottom">
-              <div className="flex items-center gap-3">
-                <QuantityStepper
-                  value={qty}
-                  onChange={setQty}
-                  min={1}
-                  size="lg"
-                  decreaseLabel={t("decreaseQty")}
-                  increaseLabel={t("increaseQty")}
-                  displayValue={lang === "fa" ? latinDigitsToPersian(String(qty)) : undefined}
-                />
-                <Button
-                  fullWidth
-                  size="lg"
-                  disabled={missingRequired}
-                  onClick={handleAdd}
-                  className="justify-between"
-                >
-                  <span>{t("addToOrder")}</span>
-                  <span className="tabular-nums opacity-90">
-                    {displayPrice(lineTotal, lang)}
-                  </span>
-                </Button>
-              </div>
-              {missingRequired && (
-                <p className="mt-2 text-center text-xs text-danger">
-                  {t("completeRequired")}
-                </p>
               )}
             </div>
           </Dialog.Content>

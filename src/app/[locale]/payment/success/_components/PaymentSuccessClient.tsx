@@ -30,6 +30,9 @@ interface PaymentSuccessClientProps {
   country: string;
   paymentId: string | null;
   tippingEnabled: boolean;
+  isSplitPayment: boolean;
+  splitPaymentAmount: number;
+  splitPaymentTipAmount: number;
 }
 
 export function PaymentSuccessClient({
@@ -46,6 +49,9 @@ export function PaymentSuccessClient({
   country,
   paymentId,
   tippingEnabled,
+  isSplitPayment,
+  splitPaymentAmount,
+  splitPaymentTipAmount,
 }: PaymentSuccessClientProps) {
   const dir = dirFor(lang);
   const router = useRouter();
@@ -92,6 +98,9 @@ export function PaymentSuccessClient({
       vendorName={vendorName}
       paymentId={paymentId}
       tippingEnabled={tippingEnabled}
+      isSplitPayment={isSplitPayment}
+      splitPaymentAmount={splitPaymentAmount}
+      splitPaymentTipAmount={splitPaymentTipAmount}
       onRateExperience={() => setStep("review")}
       onBackToMenu={() => router.push(menuUrl)}
     />

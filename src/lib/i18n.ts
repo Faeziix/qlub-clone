@@ -161,6 +161,8 @@ const en: Dict = {
   receiptFor: "Receipt for",
   leaveReview: "Leave a review",
   skipReview: "Skip",
+  yourShare: "Your share",
+  splitReceiptNote: "You paid your share of the table bill.",
 };
 
 const fa: Dict = {
@@ -292,6 +294,8 @@ const fa: Dict = {
   receiptFor: "رسید برای",
   leaveReview: "ثبت نظر",
   skipReview: "رد کردن",
+  yourShare: "سهم شما",
+  splitReceiptNote: "شما سهم خود از صورتحساب میز را پرداخت کردید.",
 };
 
 const dicts: Record<string, Dict> = { fa, en };

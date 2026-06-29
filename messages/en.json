@@ -154,7 +154,8 @@
       "platformConsole": "Platform Console",
       "platformDashboard": "Platform Dashboard",
       "tenants": "Restaurants",
-      "platformStaff": "Platform Staff"
+      "platformStaff": "Platform Staff",
+      "orderEntry": "Order Entry"
     },
     "auth": {
       "title": "qlub_ Manager",
@@ -504,6 +505,44 @@
       "enamadStatus_none": "No eNamad",
       "enamadStatus_pending": "Pending",
       "enamadStatus_verified": "Verified"
+    },
+    "orderEntry": {
+      "pageTitle": "Order Entry",
+      "pageSubtitle": "Add items to a table's order.",
+      "selectTable": "Select table",
+      "noTables": "No tables defined yet.",
+      "openOrder": "Open order",
+      "noOpenOrder": "No open order",
+      "searchMenu": "Search menu…",
+      "runningBill": "Running bill",
+      "subtotal": "Subtotal",
+      "serviceCharge": "Service charge",
+      "tax": "VAT",
+      "total": "Total",
+      "emptyCart": "Cart is empty",
+      "emptyCartHint": "Pick items from the menu.",
+      "addItem": "Add",
+      "qty": "Qty",
+      "notes": "Notes",
+      "orderCreated": "Order created",
+      "itemsAppended": "Items added",
+      "errorGeneral": "Failed to place order",
+      "table": "Table",
+      "cancel": "Cancel",
+      "items": "Items",
+      "modifiers": "Modifiers",
+      "required": "Required",
+      "optional": "Optional",
+      "chooseUpTo": "Choose up to {count}",
+      "submitOrder": "Place order",
+      "appendOrder": "Add to order #{orderNumber}",
+      "selectModifiers": "Select modifiers",
+      "tableStatus_available": "Available",
+      "tableStatus_occupied": "Occupied",
+      "tableStatus_bill_requested": "Bill requested",
+      "orderNumber": "Order #{number}",
+      "changeTable": "Change table",
+      "walkIn": "Walk-in"
     }
   }
 }

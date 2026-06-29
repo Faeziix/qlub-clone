@@ -154,7 +154,8 @@
       "platformConsole": "کنسول پلتفرم",
       "platformDashboard": "داشبورد پلتفرم",
       "tenants": "رستوران‌ها",
-      "platformStaff": "کارکنان پلتفرم"
+      "platformStaff": "کارکنان پلتفرم",
+      "orderEntry": "ورود سفارش"
     },
     "auth": {
       "title": "qlub_ مدیریت",
@@ -504,6 +505,44 @@
       "enamadStatus_none": "بدون اینماد",
       "enamadStatus_pending": "در انتظار",
       "enamadStatus_verified": "تأییدشده"
+    },
+    "orderEntry": {
+      "pageTitle": "ورود سفارش",
+      "pageSubtitle": "ثبت سفارش میز توسط گارسون.",
+      "selectTable": "انتخاب میز",
+      "noTables": "هنوز میزی تعریف نشده.",
+      "openOrder": "سفارش باز",
+      "noOpenOrder": "سفارش باز وجود ندارد",
+      "searchMenu": "جستجو در منو…",
+      "runningBill": "صورتحساب جاری",
+      "subtotal": "جمع جزء",
+      "serviceCharge": "هزینه خدمات",
+      "tax": "مالیات",
+      "total": "مجموع",
+      "emptyCart": "سبد خالی است",
+      "emptyCartHint": "آیتم‌ها را از منو انتخاب کنید.",
+      "addItem": "افزودن",
+      "qty": "تعداد",
+      "notes": "یادداشت",
+      "orderCreated": "سفارش ایجاد شد",
+      "itemsAppended": "آیتم‌ها اضافه شدند",
+      "errorGeneral": "خطا در ثبت سفارش",
+      "table": "میز",
+      "cancel": "لغو",
+      "items": "آیتم‌ها",
+      "modifiers": "افزودنی‌ها",
+      "required": "اجباری",
+      "optional": "اختیاری",
+      "chooseUpTo": "حداکثر {count} مورد",
+      "submitOrder": "ثبت سفارش",
+      "appendOrder": "افزودن به سفارش #{orderNumber}",
+      "selectModifiers": "انتخاب افزودنی‌ها",
+      "tableStatus_available": "آزاد",
+      "tableStatus_occupied": "اشغال",
+      "tableStatus_bill_requested": "درخواست صورتحساب",
+      "orderNumber": "سفارش #{number}",
+      "changeTable": "تغییر میز",
+      "walkIn": "بدون میز"
     }
   }
 }

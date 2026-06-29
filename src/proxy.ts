@@ -25,7 +25,7 @@ function isSuperadminPath(pathname: string): boolean {
 
 function isVendorAdminPath(pathname: string): boolean {
   return (
-    /^(\/[a-z]{2})?\/admin\/(orders|menu|tables|reviews|settings)(\/.*)?$/.test(pathname) ||
+    /^(\/[a-z]{2})?\/admin\/(orders|order-entry|menu|tables|reviews|settings)(\/.*)?$/.test(pathname) ||
     /^(\/[a-z]{2})?\/admin$/.test(pathname)
   );
 }

@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu as MenuIcon,
   X,
+  ClipboardPen,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn, initials } from "@/lib/utils";
@@ -20,6 +21,7 @@ import { logout } from "@/app/[locale]/admin/actions";
 
 const NAV_ITEMS = [
   { href: "/admin", key: "dashboard", icon: LayoutDashboard },
+  { href: "/admin/order-entry", key: "orderEntry", icon: ClipboardPen },
   { href: "/admin/orders", key: "orders", icon: ReceiptText },
   { href: "/admin/menu", key: "menu", icon: UtensilsCrossed },
   { href: "/admin/tables", key: "tables", icon: QrCode },

@@ -98,13 +98,17 @@ export default async function TablesPage() {
           copy: t("copy"),
           copied: t("copied"),
           viewMenu: t("viewMenu"),
-          toggleStatus: t("toggleStatus"),
           delete: t("delete"),
           deleteConfirmFull: t.raw("deleteConfirmFull"),
           couldNotAddTable: t("couldNotAddTable"),
           createTable: t("createTable"),
           cancel: t("cancel"),
-          clickToChangeStatus: t("clickToChangeStatus"),
+          status: t("status"),
+          statusLabels: {
+            available: t("available"),
+            occupied: t("occupied"),
+            bill_requested: t("billRequested"),
+          },
         }}
       />
     </>

@@ -11,8 +11,9 @@ import {
   Users,
   MapPin,
   QrCode,
+  ChevronDown,
 } from "lucide-react";
-import { Card, StatusPill, EmptyRow } from "@/components/admin/ui";
+import { Card, EmptyRow } from "@/components/admin/ui";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { cn } from "@/lib/utils";
@@ -61,16 +62,23 @@ export type TablesTranslations = {
   copy: string;
   copied: string;
   viewMenu: string;
-  toggleStatus: string;
   delete: string;
   deleteConfirmFull: string;
   couldNotAddTable: string;
   createTable: string;
   cancel: string;
-  clickToChangeStatus: string;
+  status: string;
+  statusLabels: Record<TableStatusOption, string>;
 };
 
-const STATUS_OPTIONS = ["available", "occupied", "bill-requested"] as const;
+const STATUS_OPTIONS = ["available", "occupied", "bill_requested"] as const;
+type TableStatusOption = (typeof STATUS_OPTIONS)[number];
+
+const STATUS_DOT: Record<TableStatusOption, string> = {
+  available: "bg-success",
+  occupied: "bg-amber-500",
+  bill_requested: "bg-purple-500",
+};
 
 function buildCustomerUrl(
   country: string,
@@ -130,11 +138,8 @@ function TableCard({
   const fullUrl = origin ? `${origin}${customerUrl}` : customerUrl;
   const qrSrc = `/api/qr?size=160&data=${encodeURIComponent(fullUrl)}`;
 
-  function cycleStatus() {
-    const idx = STATUS_OPTIONS.indexOf(
-      table.status as (typeof STATUS_OPTIONS)[number]
-    );
-    const next = STATUS_OPTIONS[(idx + 1) % STATUS_OPTIONS.length];
+  function changeStatus(next: string) {
+    if (next === table.status) return;
     startTransition(() => {
       void updateTableStatus(table.id, next);
     });
@@ -176,15 +181,34 @@ function TableCard({
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={cycleStatus}
-          disabled={busy}
-          title={t.clickToChangeStatus}
-          className="shrink-0 disabled:pointer-events-none"
-        >
-          <StatusPill status={table.status} />
-        </button>
+        <div className="relative shrink-0">
+          <span
+            className={cn(
+              "pointer-events-none absolute top-1/2 -translate-y-1/2 h-2 w-2 rounded-full",
+              "start-3",
+              STATUS_DOT[table.status as TableStatusOption] ?? "bg-muted"
+            )}
+            aria-hidden
+          />
+          <select
+            value={table.status}
+            onChange={(e) => changeStatus(e.target.value)}
+            disabled={busy}
+            aria-label={t.status}
+            className="appearance-none rounded-full border border-line bg-surface py-1 pe-7 ps-7 text-xs font-semibold text-ink outline-none transition-colors hover:bg-surface-2 focus:border-brand disabled:opacity-60"
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {t.statusLabels[option]}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={13}
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 -translate-y-1/2 end-2.5 text-muted"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-4">
@@ -219,15 +243,7 @@ function TableCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-line pt-3">
-        <button
-          type="button"
-          onClick={cycleStatus}
-          disabled={busy}
-          className="text-xs font-semibold text-muted transition-colors hover:text-ink disabled:pointer-events-none"
-        >
-          {t.toggleStatus}
-        </button>
+      <div className="flex items-center justify-end border-t border-line pt-3">
         <button
           type="button"
           onClick={remove}
